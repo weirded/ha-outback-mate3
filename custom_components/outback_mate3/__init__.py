@@ -176,10 +176,7 @@ class OutbackMate3(DataUpdateCoordinator):
     def _process_inverter(self, no, values, remote_ip):
         """Process inverter data."""
         if no not in self.inverters[remote_ip]:
-            self.inverters[remote_ip][no] = {
-                'inverter_mode': 'unknown',  # Initialize mode sensors
-                'ac_mode': 'unknown'
-            }
+            self.inverters[remote_ip][no] = {}
             _LOGGER.debug("Created new inverter with ID %d for IP %s", no, remote_ip)
 
         inv = self.inverters[remote_ip][no]
@@ -200,9 +197,9 @@ class OutbackMate3(DataUpdateCoordinator):
         l2_ac_input_voltage = float(values[6 + 7])
         l2_ac_output_voltage = float(values[8 + 7])
 
-        # Combined measurements
-        inv['total_inverter_current'] = l1_inverter_current + l2_inverter_current
-        inv['total_charger_current'] = l1_charger_current + l2_charger_current
+        # Store raw values for aggregation
+        inv['inverter_current'] = l1_inverter_current + l2_inverter_current
+        inv['charger_current'] = l1_charger_current + l2_charger_current
         
         # Combine buy/sell into grid current (buy is positive, sell is negative)
         total_buy = l1_buy_current + l2_buy_current
@@ -210,16 +207,24 @@ class OutbackMate3(DataUpdateCoordinator):
         inv['grid_current'] = total_buy if total_buy > 0 else -total_sell
         
         # Average voltages (they should be the same for both legs)
-        inv['ac_input_voltage'] = (l1_ac_input_voltage + l2_ac_input_voltage) / 2
-        inv['ac_output_voltage'] = (l1_ac_output_voltage + l2_ac_output_voltage) / 2
+        inv['grid_voltage'] = (l1_ac_input_voltage + l2_ac_input_voltage) / 2
+        inv['output_voltage'] = (l1_ac_output_voltage + l2_ac_output_voltage) / 2
 
         # Calculate power values
-        inv['inverter_power'] = (l1_inverter_current + l2_inverter_current) * ((l1_ac_output_voltage + l2_ac_output_voltage) / 2)
-        inv['charger_power'] = (l1_charger_current + l2_charger_current) * ((l1_ac_input_voltage + l2_ac_input_voltage) / 2)
-        
-        # Grid power (buy is positive, sell is negative)
-        grid_voltage = (l1_ac_input_voltage + l2_ac_input_voltage) / 2  # Use input voltage for both buy and sell
-        inv['grid_power'] = inv['grid_current'] * grid_voltage
+        inv['inverter_power'] = inv['inverter_current'] * inv['output_voltage']
+        inv['charger_power'] = inv['charger_current'] * inv['grid_voltage']
+        inv['grid_power'] = inv['grid_current'] * inv['grid_voltage']
+
+        # Update energy counters (kWh)
+        time_delta = 5/3600  # 5 seconds in hours
+        if 'grid_energy' not in inv:
+            inv['grid_energy'] = 0
+            inv['inverter_energy'] = 0
+            inv['charger_energy'] = 0
+            
+        inv['grid_energy'] += abs(inv['grid_power']) * time_delta / 1000  # Convert from Wh to kWh
+        inv['inverter_energy'] += abs(inv['inverter_power']) * time_delta / 1000
+        inv['charger_energy'] += abs(inv['charger_power']) * time_delta / 1000
 
         # Process modes
         inverter_mode = int(values[16])
@@ -255,22 +260,21 @@ class OutbackMate3(DataUpdateCoordinator):
     def _process_charge_controller(self, no, values, remote_ip):
         """Process charge controller data."""
         if no not in self.charge_controllers[remote_ip]:
-            self.charge_controllers[remote_ip][no] = {
-                'charge_mode': 'unknown'  # Initialize mode sensor
-            }
+            self.charge_controllers[remote_ip][no] = {}
             _LOGGER.debug("Created new charge controller with ID %d for IP %s", no, remote_ip)
             
         cc = self.charge_controllers[remote_ip][no]
         
-        pv_current = float(values[4])
-        pv_voltage = float(values[5])
-        battery_voltage = float(values[6])  # Already in proper units
-        cc['pv_current'] = pv_current
-        cc['pv_voltage'] = pv_voltage
-        cc['pv_power'] = pv_voltage * pv_current
+        cc['solar_current'] = float(values[4])
+        cc['solar_voltage'] = float(values[5])
+        cc['battery_voltage'] = float(values[6])  # Already in proper units
+        cc['solar_power'] = cc['solar_voltage'] * cc['solar_current']
 
-        cc['output_current'] = float(values[3]) + (float(values[7]) / 10)
-        cc['battery_voltage'] = battery_voltage
+        # Update energy counter (kWh)
+        time_delta = 5/3600  # 5 seconds in hours
+        if 'solar_energy' not in cc:
+            cc['solar_energy'] = 0
+        cc['solar_energy'] += (cc['solar_power'] * time_delta) / 1000  # Convert from Wh to kWh
 
         charge_mode = int(values[8])
         cc['charge_mode'] = {
@@ -282,3 +286,62 @@ class OutbackMate3(DataUpdateCoordinator):
         }.get(charge_mode, 'unknown')
 
         _LOGGER.debug("Updated charge controller %d values for IP %s", no, remote_ip)
+
+    def get_aggregated_value(self, sensor_type: str) -> float | str | None:
+        """Get aggregated value across all devices."""
+        value = None
+
+        # Handle inverter values
+        if sensor_type in ['inverter_current', 'charger_current', 'grid_current',
+                          'inverter_power', 'charger_power', 'grid_power',
+                          'inverter_energy', 'charger_energy', 'grid_energy']:
+            value = 0
+            for ip in self.inverters:
+                for inv in self.inverters[ip].values():
+                    if sensor_type in inv:
+                        value += inv[sensor_type]
+
+        # Handle charge controller values
+        elif sensor_type in ['solar_current', 'solar_power', 'solar_energy']:
+            value = 0
+            for ip in self.charge_controllers:
+                for cc in self.charge_controllers[ip].values():
+                    if sensor_type in cc:
+                        value += cc[sensor_type]
+
+        # Handle voltage values (use average)
+        elif sensor_type in ['grid_voltage', 'output_voltage', 'solar_voltage', 'battery_voltage']:
+            count = 0
+            total = 0
+            
+            # Check inverters
+            for ip in self.inverters:
+                for inv in self.inverters[ip].values():
+                    if sensor_type in inv:
+                        total += inv[sensor_type]
+                        count += 1
+                        
+            # Check charge controllers
+            for ip in self.charge_controllers:
+                for cc in self.charge_controllers[ip].values():
+                    if sensor_type in cc:
+                        total += cc[sensor_type]
+                        count += 1
+                        
+            if count > 0:
+                value = total / count
+
+        # Handle system mode
+        elif sensor_type == 'system_mode':
+            # Use the first inverter's mode as the system mode
+            for ip in self.inverters:
+                for inv in self.inverters[ip].values():
+                    if 'inverter_mode' in inv:
+                        return inv['inverter_mode']
+            value = 'unknown'
+
+        return value
+
+    def has_aggregated_value(self, sensor_type: str) -> bool:
+        """Check if we have data for the given sensor type."""
+        return self.get_aggregated_value(sensor_type) is not None
