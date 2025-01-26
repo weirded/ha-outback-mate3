@@ -1,0 +1,13 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Outback MATE3 Setup",
+                "description": "Set up your Outback MATE3 integration",
+                "data": {
+                    "port": "UDP Port (default: 57027)"
+                }
+            }
+        }
+    }
+}

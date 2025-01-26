@@ -1,0 +1,7 @@
+{
+    "name": "Outback MATE3",
+    "render_readme": true,
+    "domains": ["sensor"],
+    "iot_class": "local_push",
+    "homeassistant": "2023.12.0"
+}
