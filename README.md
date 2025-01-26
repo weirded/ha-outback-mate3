@@ -2,9 +2,7 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub Release][releases-shield]][releases]
-[![License][license-shield]](LICENSE)
-
-![Outback Power](https://www.outbackpower.com/images/logo_outback.png)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 Monitor and track your Outback Power Systems MATE3 controller in real-time through Home Assistant. This integration receives UDP streaming data directly from your MATE3 controller, providing detailed insights into your solar power system's performance.
 
@@ -123,4 +121,4 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 [releases-shield]: https://img.shields.io/github/release/weirded/ha-outback-mate3.svg
 [releases]: https://github.com/weirded/ha-outback-mate3/releases
-[license-shield]: https://img.shields.io/github/license/weirded/ha-outback-mate3.svg
+[license-shield]: https://img.shields.io/badge/License-Apache%202.0-blue.svg
