@@ -6,6 +6,6 @@
   "codeowners": ["@weirded"],
   "requirements": [],
   "iot_class": "local_push",
-  "version": "1.0.1",
-  "icon": "icon.png"
+  "version": "1.0.4",
+  "config_flow": true
 }
