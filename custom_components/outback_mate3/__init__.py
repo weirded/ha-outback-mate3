@@ -4,6 +4,7 @@ import logging
 import socket
 import re
 from datetime import datetime
+from typing import Dict, Set
 
 import voluptuous as vol
 
@@ -14,6 +15,7 @@ from homeassistant.const import (
     Platform,
 )
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,6 +39,7 @@ CONFIG_SCHEMA = vol.Schema(
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Outback MATE3 from a config entry."""
+    _LOGGER.debug("Setting up Outback MATE3 integration")
     hass.data.setdefault(DOMAIN, {})
     
     mate3 = OutbackMate3(hass, entry.data[CONF_PORT])
@@ -44,6 +47,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     
+    _LOGGER.debug("Starting UDP listener")
     mate3.start_listening()
     
     return True
@@ -72,21 +76,30 @@ class OutbackMate3(DataUpdateCoordinator):
         self.port = port
         self._socket = None
         self._running = False
-        self.device_counts = {}
-        self.charge_controllers = {}
-        self.inverters = {}
+        self._add_entities_callback = None
+        self.device_counts: Dict[str, Dict[int, int]] = {}  # IP -> {device_type -> count}
+        self.charge_controllers: Dict[str, Dict[int, dict]] = {}  # IP -> {device_id -> data}
+        self.inverters: Dict[str, Dict[int, dict]] = {}  # IP -> {device_id -> data}
+        self.discovered_devices: Set[str] = set()  # Set of "ip_type_id" strings
+        _LOGGER.debug("Initialized OutbackMate3 with port %d", port)
+
+    def set_add_entities_callback(self, callback: AddEntitiesCallback) -> None:
+        """Set the callback for adding entities."""
+        self._add_entities_callback = callback
 
     def start_listening(self):
         """Start listening for UDP packets."""
         if not self._running:
             self._running = True
             asyncio.create_task(self._listen())
+            _LOGGER.debug("Created UDP listener task")
 
     def stop_listening(self):
         """Stop listening for UDP packets."""
         self._running = False
         if self._socket:
             self._socket.close()
+            _LOGGER.debug("Closed UDP socket")
 
     async def _listen(self):
         """Listen for UDP packets from MATE3."""
@@ -98,47 +111,75 @@ class OutbackMate3(DataUpdateCoordinator):
 
         while self._running:
             try:
-                data = await self.hass.loop.sock_recv(self._socket, 4096)
+                data, addr = await self.hass.loop.sock_recvfrom(self._socket, 4096)
                 if data:
-                    self._process_data(data)
+                    remote_ip = addr[0]
+                    _LOGGER.debug("Received UDP data from %s: %s", remote_ip, data.decode('utf-8'))
+                    self._process_data(data, remote_ip)
                     self.async_set_updated_data(None)
+                    _LOGGER.debug("Current devices for IP %s - Inverters: %s, Charge Controllers: %s", 
+                                remote_ip, 
+                                list(self.inverters.get(remote_ip, {}).keys()), 
+                                list(self.charge_controllers.get(remote_ip, {}).keys()))
             except Exception as e:
                 _LOGGER.error("Error receiving data: %s", str(e))
                 await asyncio.sleep(1)
 
-    def _process_data(self, data):
+    def _process_data(self, data, remote_ip):
         """Process received data."""
         try:
             metrics = data.decode('utf-8')
             header, *devices = re.split(']<|><|>', metrics)
             devices = list(filter(lambda x: x.startswith('0'), devices))
 
-            self.device_counts = {}
+            _LOGGER.debug("Processing %d devices from IP %s", len(devices), remote_ip)
+            if remote_ip not in self.device_counts:
+                self.device_counts[remote_ip] = {}
+            self.device_counts[remote_ip].clear()
+            
             for device in devices:
-                self._process_device(device)
+                self._process_device(device, remote_ip)
         except Exception as e:
             _LOGGER.error("Error processing data: %s", str(e))
 
-    def _process_device(self, device):
+    def _process_device(self, device, remote_ip):
         """Process individual device data."""
         values = list(device.split(","))
         device_type = int(values[1])
-        no = self.device_counts.get(device_type, 0) + 1
-        self.device_counts[device_type] = no
+        no = self.device_counts[remote_ip].get(device_type, 0) + 1
+        self.device_counts[remote_ip][device_type] = no
+
+        device_key = f"{remote_ip}_{device_type}_{no}"
+        is_new_device = device_key not in self.discovered_devices
+
+        _LOGGER.debug("Processing device type %d, number %d from IP %s", device_type, no, remote_ip)
 
         if device_type == 6:  # Inverter
-            self._process_inverter(no, values)
+            if remote_ip not in self.inverters:
+                self.inverters[remote_ip] = {}
+            self._process_inverter(no, values, remote_ip)
         elif device_type == 3:  # Charge Controller
-            self._process_charge_controller(no, values)
+            if remote_ip not in self.charge_controllers:
+                self.charge_controllers[remote_ip] = {}
+            self._process_charge_controller(no, values, remote_ip)
         else:
             _LOGGER.warning("Unknown device type: %s", device_type)
+            return
 
-    def _process_inverter(self, no, values):
+        if is_new_device:
+            self.discovered_devices.add(device_key)
+            if self._add_entities_callback:
+                from .sensor import create_device_entities
+                entities = create_device_entities(self, remote_ip, device_type, no)
+                self.hass.async_create_task(self._add_entities_callback(entities))
+
+    def _process_inverter(self, no, values, remote_ip):
         """Process inverter data."""
-        if no not in self.inverters:
-            self.inverters[no] = {}
+        if no not in self.inverters[remote_ip]:
+            self.inverters[remote_ip][no] = {}
+            _LOGGER.debug("Created new inverter with ID %d for IP %s", no, remote_ip)
 
-        inv = self.inverters[no]
+        inv = self.inverters[remote_ip][no]
         ac_factor = 0.1  # AC values are multiplied by 10 in the data stream
 
         # L1 values
@@ -188,12 +229,15 @@ class OutbackMate3(DataUpdateCoordinator):
             2: 'ac-use',
         }.get(ac_mode, 'unknown')
 
-    def _process_charge_controller(self, no, values):
+        _LOGGER.debug("Updated inverter %d values for IP %s", no, remote_ip)
+
+    def _process_charge_controller(self, no, values, remote_ip):
         """Process charge controller data."""
-        if no not in self.charge_controllers:
-            self.charge_controllers[no] = {}
+        if no not in self.charge_controllers[remote_ip]:
+            self.charge_controllers[remote_ip][no] = {}
+            _LOGGER.debug("Created new charge controller with ID %d for IP %s", no, remote_ip)
             
-        cc = self.charge_controllers[no]
+        cc = self.charge_controllers[remote_ip][no]
         
         pv_current = float(values[4])
         pv_voltage = float(values[5])
@@ -212,3 +256,5 @@ class OutbackMate3(DataUpdateCoordinator):
             3: 'absorb',
             4: 'eq',
         }.get(charge_mode, 'unknown')
+
+        _LOGGER.debug("Updated charge controller %d values for IP %s", no, remote_ip)
