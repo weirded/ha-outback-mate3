@@ -183,7 +183,6 @@ class OutbackMate3(DataUpdateCoordinator):
             _LOGGER.debug("Created new inverter with ID %d for IP %s", no, remote_ip)
 
         inv = self.inverters[remote_ip][no]
-        ac_factor = 1.0  # AC values are already in proper units
 
         # L1 values
         l1_inverter_current = float(values[2])
@@ -201,25 +200,14 @@ class OutbackMate3(DataUpdateCoordinator):
         l2_ac_input_voltage = float(values[6 + 7])
         l2_ac_output_voltage = float(values[8 + 7])
 
-        # Store individual values
-        inv['l1_inverter_current'] = l1_inverter_current
-        inv['l1_charger_current'] = l1_charger_current
-        inv['l1_buy_current'] = l1_buy_current
-        inv['l1_sell_current'] = l1_sell_current
-        inv['l1_ac_input_voltage'] = l1_ac_input_voltage
-        inv['l1_ac_output_voltage'] = l1_ac_output_voltage
-        inv['l2_inverter_current'] = l2_inverter_current
-        inv['l2_charger_current'] = l2_charger_current
-        inv['l2_buy_current'] = l2_buy_current
-        inv['l2_sell_current'] = l2_sell_current
-        inv['l2_ac_input_voltage'] = l2_ac_input_voltage
-        inv['l2_ac_output_voltage'] = l2_ac_output_voltage
-
         # Combined measurements
         inv['total_inverter_current'] = l1_inverter_current + l2_inverter_current
         inv['total_charger_current'] = l1_charger_current + l2_charger_current
-        inv['total_buy_current'] = l1_buy_current + l2_buy_current
-        inv['total_sell_current'] = l1_sell_current + l2_sell_current
+        
+        # Combine buy/sell into grid current (buy is positive, sell is negative)
+        total_buy = l1_buy_current + l2_buy_current
+        total_sell = l1_sell_current + l2_sell_current
+        inv['grid_current'] = total_buy if total_buy > 0 else -total_sell
         
         # Average voltages (they should be the same for both legs)
         inv['ac_input_voltage'] = (l1_ac_input_voltage + l2_ac_input_voltage) / 2
@@ -228,9 +216,12 @@ class OutbackMate3(DataUpdateCoordinator):
         # Calculate power values
         inv['inverter_power'] = (l1_inverter_current + l2_inverter_current) * ((l1_ac_output_voltage + l2_ac_output_voltage) / 2)
         inv['charger_power'] = (l1_charger_current + l2_charger_current) * ((l1_ac_input_voltage + l2_ac_input_voltage) / 2)
-        inv['buy_power'] = (l1_buy_current + l2_buy_current) * ((l1_ac_input_voltage + l2_ac_input_voltage) / 2)
-        inv['sell_power'] = (l1_sell_current + l2_sell_current) * ((l1_ac_output_voltage + l2_ac_output_voltage) / 2)
+        
+        # Grid power (buy is positive, sell is negative)
+        grid_voltage = (l1_ac_input_voltage + l2_ac_input_voltage) / 2  # Use input voltage for both buy and sell
+        inv['grid_power'] = inv['grid_current'] * grid_voltage
 
+        # Process modes
         inverter_mode = int(values[16])
         inv['inverter_mode'] = {
             0: 'off',

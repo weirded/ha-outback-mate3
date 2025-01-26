@@ -48,9 +48,7 @@ def create_device_entities(mate3: OutbackMate3, remote_ip: str, device_type: int
                                 SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
             OutbackInverterSensor(mate3, remote_ip, device_id, "total_charger_current", "Total Charger Current",
                                 SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
-            OutbackInverterSensor(mate3, remote_ip, device_id, "total_buy_current", "Total Buy Current",
-                                SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
-            OutbackInverterSensor(mate3, remote_ip, device_id, "total_sell_current", "Total Sell Current",
+            OutbackInverterSensor(mate3, remote_ip, device_id, "grid_current", "Grid Current",
                                 SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
             OutbackInverterSensor(mate3, remote_ip, device_id, "ac_input_voltage", "AC Input Voltage",
                                 SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
@@ -62,9 +60,7 @@ def create_device_entities(mate3: OutbackMate3, remote_ip: str, device_type: int
                                 SensorDeviceClass.POWER, UnitOfPower.WATT),
             OutbackInverterSensor(mate3, remote_ip, device_id, "charger_power", "Charger Power",
                                 SensorDeviceClass.POWER, UnitOfPower.WATT),
-            OutbackInverterSensor(mate3, remote_ip, device_id, "buy_power", "Buy Power",
-                                SensorDeviceClass.POWER, UnitOfPower.WATT),
-            OutbackInverterSensor(mate3, remote_ip, device_id, "sell_power", "Sell Power",
+            OutbackInverterSensor(mate3, remote_ip, device_id, "grid_power", "Grid Power",
                                 SensorDeviceClass.POWER, UnitOfPower.WATT),
 
             # Mode sensors
