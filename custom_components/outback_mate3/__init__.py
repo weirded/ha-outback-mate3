@@ -176,7 +176,10 @@ class OutbackMate3(DataUpdateCoordinator):
     def _process_inverter(self, no, values, remote_ip):
         """Process inverter data."""
         if no not in self.inverters[remote_ip]:
-            self.inverters[remote_ip][no] = {}
+            self.inverters[remote_ip][no] = {
+                'inverter_mode': 'unknown',  # Initialize mode sensors
+                'ac_mode': 'unknown'
+            }
             _LOGGER.debug("Created new inverter with ID %d for IP %s", no, remote_ip)
 
         inv = self.inverters[remote_ip][no]
@@ -261,7 +264,9 @@ class OutbackMate3(DataUpdateCoordinator):
     def _process_charge_controller(self, no, values, remote_ip):
         """Process charge controller data."""
         if no not in self.charge_controllers[remote_ip]:
-            self.charge_controllers[remote_ip][no] = {}
+            self.charge_controllers[remote_ip][no] = {
+                'charge_mode': 'unknown'  # Initialize mode sensor
+            }
             _LOGGER.debug("Created new charge controller with ID %d for IP %s", no, remote_ip)
             
         cc = self.charge_controllers[remote_ip][no]
