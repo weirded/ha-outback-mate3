@@ -180,26 +180,53 @@ class OutbackMate3(DataUpdateCoordinator):
             _LOGGER.debug("Created new inverter with ID %d for IP %s", no, remote_ip)
 
         inv = self.inverters[remote_ip][no]
-        ac_factor = 0.1  # AC values are multiplied by 10 in the data stream
+        ac_factor = 1.0  # AC values are already in proper units
 
         # L1 values
-        inv['l1_inverter_current'] = float(values[2])
-        inv['l1_charger_current'] = float(values[3])
-        inv['l1_buy_current'] = float(values[4])
-        inv['l1_sell_current'] = float(values[5])
-        inv['l1_ac_input_voltage'] = float(values[6]) * ac_factor
-        inv['l1_ac_output_voltage'] = float(values[8]) * ac_factor
+        l1_inverter_current = float(values[2])
+        l1_charger_current = float(values[3])
+        l1_buy_current = float(values[4])
+        l1_sell_current = float(values[5])
+        l1_ac_input_voltage = float(values[6])
+        l1_ac_output_voltage = float(values[8])
 
         # L2 values
-        inv['l2_inverter_current'] = float(values[2 + 7])
-        inv['l2_charger_current'] = float(values[3 + 7])
-        inv['l2_buy_current'] = float(values[4 + 7])
-        inv['l2_sell_current'] = float(values[5 + 7])
-        inv['l2_ac_input_voltage'] = float(values[6 + 7]) * ac_factor
-        inv['l2_ac_output_voltage'] = float(values[8 + 7]) * ac_factor
+        l2_inverter_current = float(values[2 + 7])
+        l2_charger_current = float(values[3 + 7])
+        l2_buy_current = float(values[4 + 7])
+        l2_sell_current = float(values[5 + 7])
+        l2_ac_input_voltage = float(values[6 + 7])
+        l2_ac_output_voltage = float(values[8 + 7])
 
-        output_power = (float(values[2]) + float(values[2 + 7])) * 110.0 
-        inv['output_power'] = int(output_power)
+        # Store individual values
+        inv['l1_inverter_current'] = l1_inverter_current
+        inv['l1_charger_current'] = l1_charger_current
+        inv['l1_buy_current'] = l1_buy_current
+        inv['l1_sell_current'] = l1_sell_current
+        inv['l1_ac_input_voltage'] = l1_ac_input_voltage
+        inv['l1_ac_output_voltage'] = l1_ac_output_voltage
+        inv['l2_inverter_current'] = l2_inverter_current
+        inv['l2_charger_current'] = l2_charger_current
+        inv['l2_buy_current'] = l2_buy_current
+        inv['l2_sell_current'] = l2_sell_current
+        inv['l2_ac_input_voltage'] = l2_ac_input_voltage
+        inv['l2_ac_output_voltage'] = l2_ac_output_voltage
+
+        # Combined measurements
+        inv['total_inverter_current'] = l1_inverter_current + l2_inverter_current
+        inv['total_charger_current'] = l1_charger_current + l2_charger_current
+        inv['total_buy_current'] = l1_buy_current + l2_buy_current
+        inv['total_sell_current'] = l1_sell_current + l2_sell_current
+        
+        # Average voltages (they should be the same for both legs)
+        inv['ac_input_voltage'] = (l1_ac_input_voltage + l2_ac_input_voltage) / 2
+        inv['ac_output_voltage'] = (l1_ac_output_voltage + l2_ac_output_voltage) / 2
+
+        # Calculate power values
+        inv['inverter_power'] = (l1_inverter_current + l2_inverter_current) * ((l1_ac_output_voltage + l2_ac_output_voltage) / 2)
+        inv['charger_power'] = (l1_charger_current + l2_charger_current) * ((l1_ac_input_voltage + l2_ac_input_voltage) / 2)
+        inv['buy_power'] = (l1_buy_current + l2_buy_current) * ((l1_ac_input_voltage + l2_ac_input_voltage) / 2)
+        inv['sell_power'] = (l1_sell_current + l2_sell_current) * ((l1_ac_output_voltage + l2_ac_output_voltage) / 2)
 
         inverter_mode = int(values[16])
         inv['inverter_mode'] = {
@@ -241,12 +268,13 @@ class OutbackMate3(DataUpdateCoordinator):
         
         pv_current = float(values[4])
         pv_voltage = float(values[5])
+        battery_voltage = float(values[6])  # Already in proper units
         cc['pv_current'] = pv_current
         cc['pv_voltage'] = pv_voltage
         cc['pv_power'] = pv_voltage * pv_current
 
         cc['output_current'] = float(values[3]) + (float(values[7]) / 10)
-        cc['battery_voltage'] = float(values[6]) / 10.0
+        cc['battery_voltage'] = battery_voltage
 
         charge_mode = int(values[8])
         cc['charge_mode'] = {
