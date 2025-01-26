@@ -26,7 +26,7 @@ This Home Assistant integration allows you to monitor your Outback Power Systems
    - Click on "Integrations"
    - Click the three dots in the top right corner
    - Select "Custom repositories"
-   - Add the URL `https://github.com/yourusername/ha-outback-mate3`
+   - Add the URL `https://github.com/weirded/ha-outback-mate3`
    - Select "Integration" as the category
    - Click "Add"
 3. Click on "+ Explore & Download Repositories" in the bottom right
