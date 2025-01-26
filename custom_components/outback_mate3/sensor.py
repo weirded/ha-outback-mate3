@@ -9,7 +9,6 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
@@ -70,9 +69,9 @@ def create_device_entities(mate3: OutbackMate3, remote_ip: str, device_type: int
 
             # Mode sensors
             OutbackInverterSensor(mate3, remote_ip, device_id, "inverter_mode", "Inverter Mode",
-                                None, None),
+                                SensorDeviceClass.ENUM, None),
             OutbackInverterSensor(mate3, remote_ip, device_id, "ac_mode", "AC Mode",
-                                None, None),
+                                SensorDeviceClass.ENUM, None),
         ])
     elif device_type == 3:  # Charge Controller
         _LOGGER.debug("Creating sensors for charge controller %d from IP %s", device_id, remote_ip)
@@ -88,7 +87,7 @@ def create_device_entities(mate3: OutbackMate3, remote_ip: str, device_type: int
             OutbackChargeControllerSensor(mate3, remote_ip, device_id, "battery_voltage", "Battery Voltage",
                                         SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
             OutbackChargeControllerSensor(mate3, remote_ip, device_id, "charge_mode", "Charge Mode",
-                                        None, None),
+                                        SensorDeviceClass.ENUM, None),
         ])
 
     _LOGGER.debug("Created %d entities for device type %d, id %d from IP %s", 
@@ -126,7 +125,8 @@ class OutbackBaseSensor(CoordinatorEntity, SensorEntity):
         
         self._attr_device_class = device_class
         self._attr_native_unit_of_measurement = unit
-        self._attr_state_class = SensorStateClass.MEASUREMENT
+        if device_class not in [SensorDeviceClass.ENUM]:
+            self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_unique_id = f"{DOMAIN}_{remote_ip}_{device_id}_{sensor_type}"
         _LOGGER.debug("Initialized sensor %s for device %d from IP %s", 
                      sensor_type, device_id, remote_ip)
