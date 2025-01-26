@@ -76,27 +76,27 @@ async def async_setup_entry(
                                         SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
             OutbackChargeControllerSensor(mate3, cc_id, "battery_voltage", "Battery Voltage",
                                         SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
-            OutbackChargeControllerSensor(mate3, cc_id, "charger_mode", "Charger Mode",
+            OutbackChargeControllerSensor(mate3, cc_id, "charge_mode", "Charge Mode",
                                         None, None),
         ])
 
     async_add_entities(entities)
 
 
-class OutbackBaseSensor(SensorEntity):
+class OutbackBaseSensor(SensorEntity, CoordinatorEntity):
     """Base class for Outback MATE3 sensors."""
 
     def __init__(
-        self,
-        mate3: OutbackMate3,
-        device_id: int,
-        sensor_type: str,
-        name: str,
-        device_class: SensorDeviceClass | None,
-        unit: str | None,
-    ) -> None:
+            self,
+            mate3: OutbackMate3,
+            device_id: int,
+            sensor_type: str,
+            name: str,
+            device_class: SensorDeviceClass | None,
+            unit: str | None,
+        ) -> None:
         """Initialize the sensor."""
-        self._mate3 = mate3
+        super().__init__(mate3)
         self._device_id = device_id
         self._sensor_type = sensor_type
         self._attr_name = name
@@ -111,19 +111,24 @@ class OutbackBaseSensor(SensorEntity):
         """Return the state of the sensor."""
         return self._state
 
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self.async_write_ha_state()
+
 
 class OutbackInverterSensor(OutbackBaseSensor):
     """Representation of an Outback inverter sensor."""
 
     def __init__(
-        self,
-        mate3: OutbackMate3,
-        device_id: int,
-        sensor_type: str,
-        name: str,
-        device_class: SensorDeviceClass | None,
-        unit: str | None,
-    ) -> None:
+            self,
+            mate3: OutbackMate3,
+            device_id: int,
+            sensor_type: str,
+            name: str,
+            device_class: SensorDeviceClass | None,
+            unit: str | None,
+        ) -> None:
         """Initialize the inverter sensor."""
         super().__init__(mate3, device_id, sensor_type, name, device_class, unit)
         self._attr_device_info = DeviceInfo(
@@ -133,19 +138,26 @@ class OutbackInverterSensor(OutbackBaseSensor):
             model="Radian Inverter",
         )
 
+    @property
+    def native_value(self):
+        """Return the state of the sensor."""
+        if self._device_id in self.coordinator.inverters:
+            return self.coordinator.inverters[self._device_id].get(self._sensor_type)
+        return None
+
 
 class OutbackChargeControllerSensor(OutbackBaseSensor):
     """Representation of an Outback charge controller sensor."""
 
     def __init__(
-        self,
-        mate3: OutbackMate3,
-        device_id: int,
-        sensor_type: str,
-        name: str,
-        device_class: SensorDeviceClass | None,
-        unit: str | None,
-    ) -> None:
+            self,
+            mate3: OutbackMate3,
+            device_id: int,
+            sensor_type: str,
+            name: str,
+            device_class: SensorDeviceClass | None,
+            unit: str | None,
+        ) -> None:
         """Initialize the charge controller sensor."""
         super().__init__(mate3, device_id, sensor_type, name, device_class, unit)
         self._attr_device_info = DeviceInfo(
@@ -154,3 +166,10 @@ class OutbackChargeControllerSensor(OutbackBaseSensor):
             manufacturer="Outback Power",
             model="Charge Controller",
         )
+
+    @property
+    def native_value(self):
+        """Return the state of the sensor."""
+        if self._device_id in self.coordinator.charge_controllers:
+            return self.coordinator.charge_controllers[self._device_id].get(self._sensor_type)
+        return None

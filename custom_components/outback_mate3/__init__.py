@@ -8,11 +8,12 @@ from datetime import datetime
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.const import (
     CONF_PORT,
     Platform,
 )
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,11 +57,17 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     return unload_ok
 
-class OutbackMate3:
+
+class OutbackMate3(DataUpdateCoordinator):
     """Main class for Outback MATE3 integration."""
 
     def __init__(self, hass: HomeAssistant, port: int):
         """Initialize the MATE3 integration."""
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=DOMAIN,
+        )
         self.hass = hass
         self.port = port
         self._socket = None
@@ -71,8 +78,9 @@ class OutbackMate3:
 
     def start_listening(self):
         """Start listening for UDP packets."""
-        self._running = True
-        asyncio.create_task(self._listen())
+        if not self._running:
+            self._running = True
+            asyncio.create_task(self._listen())
 
     def stop_listening(self):
         """Stop listening for UDP packets."""
@@ -93,6 +101,7 @@ class OutbackMate3:
                 data = await self.hass.loop.sock_recv(self._socket, 4096)
                 if data:
                     self._process_data(data)
+                    self.async_set_updated_data(None)
             except Exception as e:
                 _LOGGER.error("Error receiving data: %s", str(e))
                 await asyncio.sleep(1)
@@ -100,9 +109,9 @@ class OutbackMate3:
     def _process_data(self, data):
         """Process received data."""
         try:
-            metrics = str(data)
+            metrics = data.decode('utf-8')
             header, *devices = re.split(']<|><|>', metrics)
-            devices = filter(lambda x: x.startswith('0'), devices)
+            devices = list(filter(lambda x: x.startswith('0'), devices))
 
             self.device_counts = {}
             for device in devices:
@@ -130,13 +139,7 @@ class OutbackMate3:
             self.inverters[no] = {}
 
         inv = self.inverters[no]
-        misc = int(values[20])
-        
-        is_240v = bool(misc & (1 << 7))
-        ac_factor = 2 if is_240v else 2
-
-        is_grid = bool(misc & (1 << 6))
-        inv['ac_source'] = "grid" if is_grid else "generator"
+        ac_factor = 0.1  # AC values are multiplied by 10 in the data stream
 
         # L1 values
         inv['l1_inverter_current'] = float(values[2])
@@ -145,7 +148,7 @@ class OutbackMate3:
         inv['l1_sell_current'] = float(values[5])
         inv['l1_ac_input_voltage'] = float(values[6]) * ac_factor
         inv['l1_ac_output_voltage'] = float(values[8]) * ac_factor
-        
+
         # L2 values
         inv['l2_inverter_current'] = float(values[2 + 7])
         inv['l2_charger_current'] = float(values[3 + 7])
@@ -192,22 +195,20 @@ class OutbackMate3:
             
         cc = self.charge_controllers[no]
         
-        pv_current = int(values[4])
-        pv_voltage = int(values[5])
+        pv_current = float(values[4])
+        pv_voltage = float(values[5])
         cc['pv_current'] = pv_current
         cc['pv_voltage'] = pv_voltage
         cc['pv_power'] = pv_voltage * pv_current
 
-        cc_amps = float(values[3]) + (float(values[7]) / 10)
-        cc['output_current'] = cc_amps
+        cc['output_current'] = float(values[3]) + (float(values[7]) / 10)
+        cc['battery_voltage'] = float(values[6]) / 10.0
 
-        charger_mode = int(values[10])
-        cc['charger_mode'] = {
+        charge_mode = int(values[8])
+        cc['charge_mode'] = {
             0: 'silent',
             1: 'float',
             2: 'bulk',
             3: 'absorb',
-            4: 'equalize',
-        }.get(charger_mode, 'unknown')
-
-        cc['battery_voltage'] = float(values[11])/10
+            4: 'eq',
+        }.get(charge_mode, 'unknown')
