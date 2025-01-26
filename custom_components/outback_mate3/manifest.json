@@ -1,10 +1,11 @@
 {
   "domain": "outback_mate3",
   "name": "Outback MATE3",
-  "documentation": "https://github.com/yourusername/ha-outback-mate3",
+  "documentation": "https://github.com/weirded/ha-outback-mate3",
   "dependencies": [],
-  "codeowners": ["@yourusername"],
+  "codeowners": ["@weirded"],
   "requirements": [],
   "iot_class": "local_push",
-  "version": "1.0.0"
+  "version": "1.0.1",
+  "icon": "icon.png"
 }
