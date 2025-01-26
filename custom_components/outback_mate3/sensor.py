@@ -115,13 +115,25 @@ class OutbackBaseSensor(CoordinatorEntity, SensorEntity):
         self._remote_ip = remote_ip
         self._device_id = device_id
         self._sensor_type = sensor_type
+        
+        # Create entity_id friendly IP (replace dots with underscores)
+        ip_id = remote_ip.replace('.', '_')
+        
+        # Set entity name and ID
+        self._attr_has_entity_name = True
         self._attr_name = name
+        self.entity_id = f"sensor.mate3_{ip_id}_{self._get_device_type()}_{device_id}_{sensor_type}"
+        
         self._attr_device_class = device_class
         self._attr_native_unit_of_measurement = unit
         self._attr_state_class = SensorStateClass.MEASUREMENT
         self._attr_unique_id = f"{DOMAIN}_{remote_ip}_{device_id}_{sensor_type}"
         _LOGGER.debug("Initialized sensor %s for device %d from IP %s", 
                      sensor_type, device_id, remote_ip)
+
+    def _get_device_type(self) -> str:
+        """Get the device type string."""
+        raise NotImplementedError
 
 
 class OutbackInverterSensor(OutbackBaseSensor):
@@ -139,12 +151,20 @@ class OutbackInverterSensor(OutbackBaseSensor):
         ) -> None:
         """Initialize the inverter sensor."""
         super().__init__(mate3, remote_ip, device_id, sensor_type, name, device_class, unit)
+        
+        # Set up device info
+        ip_id = remote_ip.replace('.', '_')
+        device_name = f"Outback Inverter {device_id} ({remote_ip})"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"inverter_{remote_ip}_{device_id}")},
-            name=f"Outback Inverter {device_id} ({remote_ip})",
+            name=device_name,
             manufacturer="Outback Power",
             model="Radian Inverter",
         )
+
+    def _get_device_type(self) -> str:
+        """Get the device type string."""
+        return "inverter"
 
     @property
     def native_value(self):
@@ -156,6 +176,13 @@ class OutbackInverterSensor(OutbackBaseSensor):
                          self._sensor_type, self._device_id, self._remote_ip, value)
             return value
         return None
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return (self._remote_ip in self._mate3.inverters and 
+                self._device_id in self._mate3.inverters[self._remote_ip] and
+                self._sensor_type in self._mate3.inverters[self._remote_ip][self._device_id])
 
 
 class OutbackChargeControllerSensor(OutbackBaseSensor):
@@ -173,12 +200,20 @@ class OutbackChargeControllerSensor(OutbackBaseSensor):
         ) -> None:
         """Initialize the charge controller sensor."""
         super().__init__(mate3, remote_ip, device_id, sensor_type, name, device_class, unit)
+        
+        # Set up device info
+        ip_id = remote_ip.replace('.', '_')
+        device_name = f"Outback Charge Controller {device_id} ({remote_ip})"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, f"charge_controller_{remote_ip}_{device_id}")},
-            name=f"Outback Charge Controller {device_id} ({remote_ip})",
+            name=device_name,
             manufacturer="Outback Power",
             model="Charge Controller",
         )
+
+    def _get_device_type(self) -> str:
+        """Get the device type string."""
+        return "charge_controller"
 
     @property
     def native_value(self):
@@ -190,3 +225,10 @@ class OutbackChargeControllerSensor(OutbackBaseSensor):
                          self._sensor_type, self._device_id, self._remote_ip, value)
             return value
         return None
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return (self._remote_ip in self._mate3.charge_controllers and 
+                self._device_id in self._mate3.charge_controllers[self._remote_ip] and
+                self._sensor_type in self._mate3.charge_controllers[self._remote_ip][self._device_id])
