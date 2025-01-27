@@ -130,6 +130,10 @@ class OutbackMate3(DataUpdateCoordinator):
             # Decode and clean up the data
             message = data.decode().strip()
             
+            # Only process messages that start with MAC preamble
+            if not message.startswith('[0090EA-E07698]'):
+                return
+            
             # Split into header and device messages
             try:
                 header, *devices = re.split(']<|><|>', message)
@@ -161,9 +165,12 @@ class OutbackMate3(DataUpdateCoordinator):
                         # Create device identifier using MAC instead of entry_id
                         device_id = f"{mac_address}_{device_type}_{device_no}"
                         
+                        _LOGGER.debug("Processing device: type=%d, no=%d, id=%s", device_type, device_no, device_id)
+                        
                         # Process device data
                         if device_type == 6:  # Inverter
                             if device_id not in self.discovered_devices:
+                                _LOGGER.debug("Discovered new inverter: %s", device_id)
                                 self.discovered_devices.add(device_id)
                                 # Initialize device counts
                                 if mac_address not in self.device_counts:
@@ -182,6 +189,7 @@ class OutbackMate3(DataUpdateCoordinator):
                                 
                                 # Add entities
                                 if self._add_entities_callback:
+                                    _LOGGER.debug("Setting up inverter entities for %s", device_id)
                                     self.hass.async_create_task(
                                         self.hass.config_entries.async_forward_entry_setup(
                                             self.hass.config_entries.async_entries(DOMAIN)[0],
@@ -194,6 +202,7 @@ class OutbackMate3(DataUpdateCoordinator):
                             
                         elif device_type == 3:  # Charge Controller
                             if device_id not in self.discovered_devices:
+                                _LOGGER.debug("Discovered new charge controller: %s", device_id)
                                 self.discovered_devices.add(device_id)
                                 # Initialize device counts
                                 if mac_address not in self.device_counts:
@@ -212,6 +221,7 @@ class OutbackMate3(DataUpdateCoordinator):
                                 
                                 # Add entities
                                 if self._add_entities_callback:
+                                    _LOGGER.debug("Setting up charge controller entities for %s", device_id)
                                     self.hass.async_create_task(
                                         self.hass.config_entries.async_forward_entry_setup(
                                             self.hass.config_entries.async_entries(DOMAIN)[0],
