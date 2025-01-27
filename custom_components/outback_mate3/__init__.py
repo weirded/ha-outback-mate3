@@ -238,7 +238,7 @@ class OutbackMate3(DataUpdateCoordinator):
         except Exception as e:
             _LOGGER.error("Error processing data: %s", str(e))
 
-    def _is_bit_set(byte, bit_position):
+    def _is_bit_set(self, byte, bit_position):
         return (byte & (1 << bit_position)) != 0
 
     def _process_device(self, device, mac_address):
