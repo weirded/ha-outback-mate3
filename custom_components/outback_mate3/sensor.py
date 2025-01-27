@@ -108,6 +108,30 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str, device_type: i
                 SensorDeviceClass.POWER,
                 UnitOfPower.WATT,
             ),
+            OutbackCombinedSensor(
+                mate3,
+                mac_address,
+                "avg_ac_input_voltage",
+                "Average AC Input Voltage",
+                SensorDeviceClass.VOLTAGE,
+                UnitOfElectricPotential.VOLT,
+            ),
+            OutbackCombinedSensor(
+                mate3,
+                mac_address,
+                "avg_ac_output_voltage",
+                "Average AC Output Voltage",
+                SensorDeviceClass.VOLTAGE,
+                UnitOfElectricPotential.VOLT,
+            ),
+            OutbackCombinedSensor(
+                mate3,
+                mac_address,
+                "avg_battery_voltage",
+                "Average Battery Voltage",
+                SensorDeviceClass.VOLTAGE,
+                UnitOfElectricPotential.VOLT,
+            ),
         ])
         mate3.discovered_devices.add(f"combined_{mac_address}")
 

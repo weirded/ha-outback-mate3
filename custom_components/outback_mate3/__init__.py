@@ -162,6 +162,16 @@ class OutbackMate3(DataUpdateCoordinator):
                 'total_inverter_current': 0.0,
                 'total_cc_output_current': 0.0,
                 'total_cc_output_power': 0.0,
+                'avg_ac_input_voltage': 0.0,
+                'avg_ac_output_voltage': 0.0,
+                'avg_battery_voltage': 0.0,
+            }
+            
+            # Track counts for averaging
+            voltage_counts = {
+                'ac_input': 0,
+                'ac_output': 0,
+                'battery': 0,
             }
             
             # Process each device and accumulate totals
@@ -176,6 +186,14 @@ class OutbackMate3(DataUpdateCoordinator):
                 combined['total_charger_current'] += float(inv_data.get('charger_current', 0))
                 combined['total_inverter_power'] += float(inv_data.get('inverter_power', 0))
                 combined['total_inverter_current'] += float(inv_data.get('total_inverter_current', 0))
+                
+                # Add voltages for averaging
+                if 'ac_input_voltage' in inv_data:
+                    combined['avg_ac_input_voltage'] += float(inv_data['ac_input_voltage'])
+                    voltage_counts['ac_input'] += 1
+                if 'ac_output_voltage' in inv_data:
+                    combined['avg_ac_output_voltage'] += float(inv_data['ac_output_voltage'])
+                    voltage_counts['ac_output'] += 1
             
             # Calculate combined metrics for charge controllers
             for cc_data in self.charge_controllers.get(mac_address, {}).values():
@@ -188,6 +206,27 @@ class OutbackMate3(DataUpdateCoordinator):
                 
                 combined['total_cc_output_current'] += output_current
                 combined['total_cc_output_power'] += output_power
+                
+                # Add battery voltage for averaging
+                if 'battery_voltage' in cc_data:
+                    combined['avg_battery_voltage'] += battery_voltage
+                    voltage_counts['battery'] += 1
+            
+            # Calculate averages
+            if voltage_counts['ac_input'] > 0:
+                combined['avg_ac_input_voltage'] /= voltage_counts['ac_input']
+            else:
+                combined['avg_ac_input_voltage'] = None
+                
+            if voltage_counts['ac_output'] > 0:
+                combined['avg_ac_output_voltage'] /= voltage_counts['ac_output']
+            else:
+                combined['avg_ac_output_voltage'] = None
+                
+            if voltage_counts['battery'] > 0:
+                combined['avg_battery_voltage'] /= voltage_counts['battery']
+            else:
+                combined['avg_battery_voltage'] = None
             
             # Update the combined metrics
             self.combined_metrics[mac_address] = combined
