@@ -76,10 +76,10 @@ class OutbackMate3(DataUpdateCoordinator):
         self._socket = None
         self._running = False
         self._add_entities_callback = None
-        self.device_counts: Dict[str, Dict[int, int]] = {}  # entry_id -> {device_type -> count}
-        self.charge_controllers: Dict[str, Dict[int, dict]] = {}  # entry_id -> {device_id -> data}
-        self.inverters: Dict[str, Dict[int, dict]] = {}  # entry_id -> {device_id -> data}
-        self.discovered_devices: Set[str] = set()  # Set of "entry_id_type_id" strings
+        self.device_counts: Dict[str, Dict[int, int]] = {}  # mac_address -> {device_type -> count}
+        self.charge_controllers: Dict[str, Dict[int, dict]] = {}  # mac_address -> {device_id -> data}
+        self.inverters: Dict[str, Dict[int, dict]] = {}  # mac_address -> {device_id -> data}
+        self.discovered_devices: Set[str] = set()  # Set of "mac_address_type_id" strings
         self._entry_id = entry_id
         _LOGGER.debug("Initialized OutbackMate3 with port %d", port)
 
@@ -127,87 +127,124 @@ class OutbackMate3(DataUpdateCoordinator):
     def _process_data(self, data, entry_id):
         """Process received data."""
         try:
-            # Split data into device messages
-            messages = data.decode().strip().split('\n')
-            for message in messages:
-                if not message:
-                    continue
+            # Decode and clean up the data
+            message = data.decode().strip()
+            
+            # Split into header and device messages
+            try:
+                header, *devices = re.split(']<|><|>', message)
+                # Extract MAC address from header [XXXXXX-XXXXXX]
+                mac_match = re.match(r'\[([0-9A-F]{6}-[0-9A-F]{6})', header)
+                if not mac_match:
+                    _LOGGER.warning("Could not find MAC address in message header: %s", header)
+                    return
                     
-                # Extract device type and number
-                match = re.match(r'(\d+),(\d+),', message)
-                if match:
-                    device_type = int(match.group(1))
-                    device_no = int(match.group(2))
-                    self._process_device(message, device_type, device_no, entry_id)
-                else:
-                    _LOGGER.warning("Invalid message format: %s", message)
+                # Remove hyphen from MAC address
+                mac_address = mac_match.group(1).replace('-', '')
+                
+                _LOGGER.debug("Processing %d device messages from MAC %s", len(devices), mac_address)
+                
+                for device_msg in devices:
+                    if not device_msg:  # Skip empty messages
+                        continue
+                        
+                    # Split into values and remove empty strings
+                    values = [v for v in device_msg.split(',') if v]
+                    
+                    if len(values) < 3:  # Need at least type and device number
+                        continue
+                        
+                    try:
+                        device_type = int(values[0])
+                        device_no = int(values[1])
+                        
+                        # Create device identifier using MAC instead of entry_id
+                        device_id = f"{mac_address}_{device_type}_{device_no}"
+                        
+                        # Process device data
+                        if device_type == 6:  # Inverter
+                            if device_id not in self.discovered_devices:
+                                self.discovered_devices.add(device_id)
+                                # Initialize device counts
+                                if mac_address not in self.device_counts:
+                                    self.device_counts[mac_address] = {}
+                                if device_type not in self.device_counts[mac_address]:
+                                    self.device_counts[mac_address][device_type] = 0
+                                self.device_counts[mac_address][device_type] += 1
+                                
+                                # Create discovery info
+                                discovery_info = {
+                                    "device_type": device_type,
+                                    "device_id": device_no,
+                                    "entry_id": entry_id,
+                                    "mac_address": mac_address
+                                }
+                                
+                                # Add entities
+                                if self._add_entities_callback:
+                                    self.hass.async_create_task(
+                                        self.hass.config_entries.async_forward_entry_setup(
+                                            self.hass.config_entries.async_entries(DOMAIN)[0],
+                                            Platform.SENSOR,
+                                            discovery_info
+                                        )
+                                    )
+                            
+                            self._process_inverter(device_no, values, mac_address)
+                            
+                        elif device_type == 3:  # Charge Controller
+                            if device_id not in self.discovered_devices:
+                                self.discovered_devices.add(device_id)
+                                # Initialize device counts
+                                if mac_address not in self.device_counts:
+                                    self.device_counts[mac_address] = {}
+                                if device_type not in self.device_counts[mac_address]:
+                                    self.device_counts[mac_address][device_type] = 0
+                                self.device_counts[mac_address][device_type] += 1
+                                
+                                # Create discovery info
+                                discovery_info = {
+                                    "device_type": device_type,
+                                    "device_id": device_no,
+                                    "entry_id": entry_id,
+                                    "mac_address": mac_address
+                                }
+                                
+                                # Add entities
+                                if self._add_entities_callback:
+                                    self.hass.async_create_task(
+                                        self.hass.config_entries.async_forward_entry_setup(
+                                            self.hass.config_entries.async_entries(DOMAIN)[0],
+                                            Platform.SENSOR,
+                                            discovery_info
+                                        )
+                                    )
+                            
+                            self._process_charge_controller(device_no, values, mac_address)
+                            
+                    except (ValueError, IndexError) as e:
+                        _LOGGER.warning("Error processing device message: %s - %s", device_msg, str(e))
+                        continue
+                        
+            except ValueError as e:
+                _LOGGER.warning("Invalid message format: %s - %s", message, str(e))
                     
         except Exception as e:
             _LOGGER.error("Error processing data: %s", str(e))
 
-    def _process_device(self, message, device_type, device_no, entry_id):
-        """Process individual device data."""
-        # Create device identifier
-        device_id = f"{entry_id}_{device_type}_{device_no}"
-        
-        # Skip if we've already discovered this device
-        if device_id in self.discovered_devices:
-            if device_type == 2:  # Inverter
-                self._process_inverter(device_no, message.split(','), entry_id)
-            elif device_type == 3:  # Charge Controller
-                self._process_charge_controller(device_no, message.split(','), entry_id)
-            return
-            
-        # Add to discovered devices
-        self.discovered_devices.add(device_id)
-        
-        # Initialize device counts for this IP if not exists
-        if entry_id not in self.device_counts:
-            self.device_counts[entry_id] = {}
-            
-        # Initialize count for this device type if not exists
-        if device_type not in self.device_counts[entry_id]:
-            self.device_counts[entry_id][device_type] = 0
-            
-        # Increment device count
-        self.device_counts[entry_id][device_type] += 1
-        
-        # Create discovery info
-        discovery_info = {
-            "device_type": device_type,
-            "device_id": device_no,
-            "entry_id": entry_id
-        }
-        
-        # Add entities
-        if self._add_entities_callback:
-            self.hass.async_create_task(
-                self.hass.config_entries.async_forward_entry_setup(
-                    self.hass.config_entries.async_entries(DOMAIN)[0],
-                    Platform.SENSOR,
-                    discovery_info
-                )
-            )
-        
-        # Process device data
-        if device_type == 2:  # Inverter
-            self._process_inverter(device_no, message.split(','), entry_id)
-        elif device_type == 3:  # Charge Controller
-            self._process_charge_controller(device_no, message.split(','), entry_id)
-
-    def _process_inverter(self, no, values, entry_id):
+    def _process_inverter(self, no, values, mac_address):
         """Process inverter data."""
         if len(values) < 15:
             return
             
-        if entry_id not in self.inverters:
-            self.inverters[entry_id] = {}
+        if mac_address not in self.inverters:
+            self.inverters[mac_address] = {}
             
-        if no not in self.inverters[entry_id]:
-            self.inverters[entry_id][no] = {}
+        if no not in self.inverters[mac_address]:
+            self.inverters[mac_address][no] = {}
             
         try:
-            self.inverters[entry_id][no].update({
+            self.inverters[mac_address][no].update({
                 'inverter_current': float(values[3]),
                 'charger_current': float(values[4]),
                 'grid_current': float(values[5]),
@@ -222,19 +259,19 @@ class OutbackMate3(DataUpdateCoordinator):
         except (ValueError, IndexError) as e:
             _LOGGER.error("Error processing inverter data: %s", str(e))
 
-    def _process_charge_controller(self, no, values, entry_id):
+    def _process_charge_controller(self, no, values, mac_address):
         """Process charge controller data."""
         if len(values) < 8:
             return
             
-        if entry_id not in self.charge_controllers:
-            self.charge_controllers[entry_id] = {}
+        if mac_address not in self.charge_controllers:
+            self.charge_controllers[mac_address] = {}
             
-        if no not in self.charge_controllers[entry_id]:
-            self.charge_controllers[entry_id][no] = {}
+        if no not in self.charge_controllers[mac_address]:
+            self.charge_controllers[mac_address][no] = {}
             
         try:
-            self.charge_controllers[entry_id][no].update({
+            self.charge_controllers[mac_address][no].update({
                 'solar_current': float(values[3]),
                 'solar_voltage': float(values[4]),
                 'battery_voltage': float(values[5]),
@@ -249,8 +286,8 @@ class OutbackMate3(DataUpdateCoordinator):
         total = 0.0
         
         # Sum up values from all inverters
-        for entry_devices in self.inverters.values():
-            for device_data in entry_devices.values():
+        for mac_devices in self.inverters.values():
+            for device_data in mac_devices.values():
                 if sensor_type in device_data:
                     try:
                         total += float(device_data[sensor_type])
@@ -258,8 +295,8 @@ class OutbackMate3(DataUpdateCoordinator):
                         pass
                         
         # Sum up values from all charge controllers
-        for entry_devices in self.charge_controllers.values():
-            for device_data in entry_devices.values():
+        for mac_devices in self.charge_controllers.values():
+            for device_data in mac_devices.values():
                 if sensor_type in device_data:
                     try:
                         total += float(device_data[sensor_type])
@@ -271,14 +308,14 @@ class OutbackMate3(DataUpdateCoordinator):
     def has_aggregated_value(self, sensor_type: str) -> bool:
         """Check if we have data for the given sensor type."""
         # Check inverters
-        for entry_devices in self.inverters.values():
-            for device_data in entry_devices.values():
+        for mac_devices in self.inverters.values():
+            for device_data in mac_devices.values():
                 if sensor_type in device_data:
                     return True
                     
         # Check charge controllers
-        for entry_devices in self.charge_controllers.values():
-            for device_data in entry_devices.values():
+        for mac_devices in self.charge_controllers.values():
+            for device_data in mac_devices.values():
                 if sensor_type in device_data:
                     return True
                     
