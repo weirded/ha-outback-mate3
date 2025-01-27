@@ -81,10 +81,26 @@ class OutbackMate3(DataUpdateCoordinator):
         self.inverters: Dict[str, Dict[int, dict]] = {}  # mac_address -> {device_id -> data}
         self.discovered_devices: Set[str] = set()  # Set of "mac_address_type_id" strings
         self._entry_id = entry_id
+        self.device_data = {}
         _LOGGER.debug("Initialized OutbackMate3 with port %d", port)
+
+    async def async_setup_entry(self, hass: HomeAssistant, entry: ConfigEntry) -> bool:
+        """Set up Outback MATE3 from a config entry."""
+        _LOGGER.debug("Setting up Outback MATE3 integration for entry: %s", entry.entry_id)
+        
+        self.hass = hass
+        self.port = entry.data[CONF_PORT]
+        hass.data.setdefault(DOMAIN, {})[entry.entry_id] = self
+        
+        # Forward to sensor platform
+        _LOGGER.debug("Setting up sensor platform")
+        await hass.config_entries.async_forward_entry_setup(entry, Platform.SENSOR)
+        
+        return True
 
     def set_add_entities_callback(self, callback: AddEntitiesCallback) -> None:
         """Set the callback for adding entities."""
+        _LOGGER.debug("Setting add_entities_callback")
         self._add_entities_callback = callback
 
     def start_listening(self):
@@ -129,9 +145,11 @@ class OutbackMate3(DataUpdateCoordinator):
         try:
             # Decode and clean up the data
             message = data.decode().strip()
+            _LOGGER.debug("Processing message: %s", message)
             
-            # Only process messages that start with MAC preamble
-            if not message.startswith('[0090EA-E07698]'):
+            # Only process messages that start with MAC address format [XXXXXX-XXXXXX]
+            if not re.match(r'^\[[0-9A-F]{6}-[0-9A-F]{6}\]', message):
+                _LOGGER.debug("Skipping message without MAC address format")
                 return
             
             # Split into header and device messages
@@ -161,14 +179,16 @@ class OutbackMate3(DataUpdateCoordinator):
                     
                     # Add MATE3 entities
                     if self._add_entities_callback:
-                        _LOGGER.debug("Setting up MATE3 entities for %s", mate3_id)
-                        self.hass.async_create_task(
+                        _LOGGER.debug("Setting up MATE3 entities for %s with discovery info: %s", mate3_id, discovery_info)
+                        self.hass.create_task(
                             self.hass.config_entries.async_forward_entry_setup(
                                 self.hass.config_entries.async_entries(DOMAIN)[0],
                                 Platform.SENSOR,
                                 discovery_info
                             )
                         )
+                    else:
+                        _LOGGER.warning("No add_entities_callback available for MATE3: %s", mate3_id)
                 
                 _LOGGER.debug("Processing %d device messages from MAC %s", len(devices), mac_address)
                 
@@ -189,7 +209,8 @@ class OutbackMate3(DataUpdateCoordinator):
                         # Create device identifier using MAC instead of entry_id
                         device_id = f"{mac_address}_{device_type}_{device_no}"
                         
-                        _LOGGER.debug("Processing device: type=%d, no=%d, id=%s", device_type, device_no, device_id)
+                        _LOGGER.debug("Processing device: type=%d, no=%d, id=%s, values=%s", 
+                                    device_type, device_no, device_id, values)
                         
                         # Process device data based on type
                         if device_type == 1:  # Inverter status
@@ -211,54 +232,17 @@ class OutbackMate3(DataUpdateCoordinator):
         except Exception as e:
             _LOGGER.error("Error processing data: %s", str(e))
 
-    def _process_inverter(self, no, values, mac_address):
+    def _process_inverter(self, device_no, values, mac_address):
         """Process inverter data."""
-        if len(values) < 15:
-            return
-            
-        if mac_address not in self.inverters:
-            self.inverters[mac_address] = {}
-            
-        if no not in self.inverters[mac_address]:
-            self.inverters[mac_address][no] = {}
-            
-        try:
-            self.inverters[mac_address][no].update({
-                'inverter_current': float(values[3]),
-                'charger_current': float(values[4]),
-                'grid_current': float(values[5]),
-                'grid_voltage': float(values[6]),
-                'output_voltage': float(values[7]),
-                'inverter_power': float(values[8]),
-                'charger_power': float(values[9]),
-                'grid_power': float(values[10]),
-                'inverter_mode': values[11],
-                'ac_mode': values[12],
-            })
-        except (ValueError, IndexError) as e:
-            _LOGGER.error("Error processing inverter data: %s", str(e))
+        _LOGGER.debug("Processing inverter %d data: %s", device_no, values)
+        # Store values for sensor updates
+        self.device_data[f"{mac_address}_inverter_{device_no}"] = values
 
-    def _process_charge_controller(self, no, values, mac_address):
+    def _process_charge_controller(self, device_no, values, mac_address):
         """Process charge controller data."""
-        if len(values) < 8:
-            return
-            
-        if mac_address not in self.charge_controllers:
-            self.charge_controllers[mac_address] = {}
-            
-        if no not in self.charge_controllers[mac_address]:
-            self.charge_controllers[mac_address][no] = {}
-            
-        try:
-            self.charge_controllers[mac_address][no].update({
-                'solar_current': float(values[3]),
-                'solar_voltage': float(values[4]),
-                'battery_voltage': float(values[5]),
-                'solar_power': float(values[6]),
-                'charge_mode': values[7],
-            })
-        except (ValueError, IndexError) as e:
-            _LOGGER.error("Error processing charge controller data: %s", str(e))
+        _LOGGER.debug("Processing charge controller %d data: %s", device_no, values)
+        # Store values for sensor updates
+        self.device_data[f"{mac_address}_cc_{device_no}"] = values
 
     def get_aggregated_value(self, sensor_type: str) -> float:
         """Get aggregated value across all devices."""
