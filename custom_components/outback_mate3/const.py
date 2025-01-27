@@ -1,5 +1,8 @@
 """Constants for the Outback MATE3 integration."""
-from homeassistant.components.sensor import SensorDeviceClass
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorStateClass,
+)
 from homeassistant.const import (
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
@@ -22,24 +25,24 @@ ATTR_REMOTE_IP = "remote_ip"
 # Update interval in seconds
 UPDATE_INTERVAL = 60
 
-# Sensor definitions - (name, sensor_type, device_class, unit)
+# Sensor definitions - (name, sensor_type, device_class, unit, state_class)
 INVERTER_SENSORS = [
-    ("Inverter Current", "inverter_current", SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
-    ("Charger Current", "charger_current", SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
-    ("Grid Current", "grid_current", SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
-    ("Grid Voltage", "grid_voltage", SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
-    ("Output Voltage", "output_voltage", SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
-    ("Inverter Power", "inverter_power", SensorDeviceClass.POWER, UnitOfPower.WATT),
-    ("Charger Power", "charger_power", SensorDeviceClass.POWER, UnitOfPower.WATT),
-    ("Grid Power", "grid_power", SensorDeviceClass.POWER, UnitOfPower.WATT),
-    ("Inverter Mode", "inverter_mode", SensorDeviceClass.ENUM, None),
-    ("AC Mode", "ac_mode", SensorDeviceClass.ENUM, None),
+    ("Current", "inverter_current", SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE, SensorStateClass.MEASUREMENT),
+    ("Charger Current", "charger_current", SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE, SensorStateClass.MEASUREMENT),
+    ("Grid Current", "grid_current", SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE, SensorStateClass.MEASUREMENT),
+    ("Grid Voltage", "grid_voltage", SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT, SensorStateClass.MEASUREMENT),
+    ("Output Voltage", "output_voltage", SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT, SensorStateClass.MEASUREMENT),
+    ("Power", "inverter_power", SensorDeviceClass.POWER, UnitOfPower.WATT, SensorStateClass.MEASUREMENT),
+    ("Charger Power", "charger_power", SensorDeviceClass.POWER, UnitOfPower.WATT, SensorStateClass.MEASUREMENT),
+    ("Grid Power", "grid_power", SensorDeviceClass.POWER, UnitOfPower.WATT, SensorStateClass.MEASUREMENT),
+    ("Operating Mode", "inverter_mode", None, None, None),  # Text sensor
+    ("AC Mode", "ac_mode", None, None, None),  # Text sensor
 ]
 
 CHARGE_CONTROLLER_SENSORS = [
-    ("Solar Current", "solar_current", SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
-    ("Solar Voltage", "solar_voltage", SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
-    ("Battery Voltage", "battery_voltage", SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
-    ("Solar Power", "solar_power", SensorDeviceClass.POWER, UnitOfPower.WATT),
-    ("Charge Mode", "charge_mode", SensorDeviceClass.ENUM, None),
+    ("Solar Current", "solar_current", SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE, SensorStateClass.MEASUREMENT),
+    ("Solar Voltage", "solar_voltage", SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT, SensorStateClass.MEASUREMENT),
+    ("Battery Voltage", "battery_voltage", SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT, SensorStateClass.MEASUREMENT),
+    ("Solar Power", "solar_power", SensorDeviceClass.POWER, UnitOfPower.WATT, SensorStateClass.MEASUREMENT),
+    ("Charge Mode", "charge_mode", None, None, None),  # Text sensor
 ]

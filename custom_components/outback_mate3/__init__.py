@@ -237,14 +237,59 @@ class OutbackMate3(DataUpdateCoordinator):
     def _process_inverter(self, device_no, values, mac_address):
         """Process inverter data."""
         _LOGGER.debug("Processing inverter %d data: %s", device_no, values)
-        # Store values for sensor updates
-        self.device_data[f"{mac_address}_inverter_{device_no}"] = values
+        
+        # Get existing data or initialize new
+        device_key = f"{mac_address}_inverter_{device_no}"
+        device_data = list(self.device_data.get(device_key, [0] * 15))
+        
+        try:
+            if len(values) >= 15:
+                # Type 1: Status data
+                if values[0] == "1":
+                    device_data[11] = values[11]  # inverter_mode
+                    device_data[12] = values[12]  # ac_mode
+                # Type 2: Power data
+                elif values[0] == "2":
+                    device_data[3] = float(values[3])   # inverter_current
+                    device_data[4] = float(values[4])   # charger_current
+                    device_data[5] = float(values[5])   # grid_current
+                    device_data[6] = float(values[6])   # grid_voltage
+                    device_data[7] = float(values[7])   # output_voltage
+                    device_data[8] = float(values[8])   # inverter_power
+                    device_data[9] = float(values[9])   # charger_power
+                    device_data[10] = float(values[10]) # grid_power
+                
+                # Store combined data
+                self.device_data[device_key] = device_data
+                _LOGGER.debug("Updated inverter data for %s: %s", device_key, device_data)
+        except (ValueError, IndexError) as e:
+            _LOGGER.warning("Error processing inverter data: %s", str(e))
 
     def _process_charge_controller(self, device_no, values, mac_address):
         """Process charge controller data."""
         _LOGGER.debug("Processing charge controller %d data: %s", device_no, values)
-        # Store values for sensor updates
-        self.device_data[f"{mac_address}_cc_{device_no}"] = values
+        
+        # Get existing data or initialize new
+        device_key = f"{mac_address}_cc_{device_no}"
+        device_data = list(self.device_data.get(device_key, [0] * 10))
+        
+        try:
+            if len(values) >= 8:
+                # Type 4: Status data
+                if values[0] == "4":
+                    device_data[7] = values[7]  # charge_mode
+                # Type 5: Power data
+                elif values[0] == "5":
+                    device_data[3] = float(values[3])  # solar_current
+                    device_data[4] = float(values[4])  # solar_voltage
+                    device_data[5] = float(values[5])  # battery_voltage
+                    device_data[6] = float(values[6])  # solar_power
+                
+                # Store combined data
+                self.device_data[device_key] = device_data
+                _LOGGER.debug("Updated charge controller data for %s: %s", device_key, device_data)
+        except (ValueError, IndexError) as e:
+            _LOGGER.warning("Error processing charge controller data: %s", str(e))
 
     def get_aggregated_value(self, sensor_type: str) -> float:
         """Get aggregated value across all devices."""

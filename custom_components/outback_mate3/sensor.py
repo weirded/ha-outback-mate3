@@ -295,20 +295,23 @@ class OutbackInverterSensor(OutbackBaseSensor):
         """Initialize the inverter sensor."""
         super().__init__(*args, **kwargs)
         
-        # Set up entity ID and unique ID
-        entry_id_id = self._entry_id.replace('.', '_')
-        self.entity_id = f"sensor.mate3_{entry_id_id}_inverter_{self._device_id}_{self._sensor_type}"
+        # Set up entity ID and unique ID using MAC address
+        self.entity_id = f"sensor.mate3_{self._mac_address}_inverter_{self._device_id}_{self._sensor_type}"
         self._attr_unique_id = f"{DOMAIN}_{self._mac_address}_inverter_{self._device_id}_{self._sensor_type}"
         
         # Set up device info if not provided
         if self._device_info is None:
-            device_name = f"Outback Inverter {self._device_id} ({self._entry_id})"
+            device_name = f"Outback Inverter {self._device_id}"
             self._attr_device_info = DeviceInfo(
                 identifiers={(DOMAIN, f"inverter_{self._mac_address}_{self._device_id}")},
                 name=device_name,
                 manufacturer="Outback Power",
                 model="Radian Inverter",
+                via_device=(DOMAIN, self._mac_address),
             )
+        
+        # Make name distinct for each sensor
+        self._attr_name = f"Inverter {self._device_id} {self._name}"
 
     @property
     def native_value(self):
@@ -348,9 +351,7 @@ class OutbackInverterSensor(OutbackBaseSensor):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return (self._mac_address in self._mate3.inverters and 
-                self._device_id in self._mate3.inverters[self._mac_address] and
-                self._sensor_type in self._mate3.inverters[self._mac_address][self._device_id])
+        return True
 
 
 class OutbackChargeControllerSensor(OutbackBaseSensor):
@@ -360,20 +361,23 @@ class OutbackChargeControllerSensor(OutbackBaseSensor):
         """Initialize the charge controller sensor."""
         super().__init__(*args, **kwargs)
         
-        # Set up entity ID and unique ID
-        entry_id_id = self._entry_id.replace('.', '_')
-        self.entity_id = f"sensor.mate3_{entry_id_id}_cc_{self._device_id}_{self._sensor_type}"
+        # Set up entity ID and unique ID using MAC address
+        self.entity_id = f"sensor.mate3_{self._mac_address}_cc_{self._device_id}_{self._sensor_type}"
         self._attr_unique_id = f"{DOMAIN}_{self._mac_address}_cc_{self._device_id}_{self._sensor_type}"
         
         # Set up device info if not provided
         if self._device_info is None:
-            device_name = f"Outback Charge Controller {self._device_id} ({self._entry_id})"
+            device_name = f"Outback Charge Controller {self._device_id}"
             self._attr_device_info = DeviceInfo(
                 identifiers={(DOMAIN, f"cc_{self._mac_address}_{self._device_id}")},
                 name=device_name,
                 manufacturer="Outback Power",
                 model="Charge Controller",
+                via_device=(DOMAIN, self._mac_address),
             )
+        
+        # Make name distinct for each sensor
+        self._attr_name = f"Charge Controller {self._device_id} {self._name}"
 
     @property
     def native_value(self):
@@ -403,9 +407,7 @@ class OutbackChargeControllerSensor(OutbackBaseSensor):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return (self._mac_address in self._mate3.charge_controllers and 
-                self._device_id in self._mate3.charge_controllers[self._mac_address] and
-                self._sensor_type in self._mate3.charge_controllers[self._mac_address][self._device_id])
+        return True
 
 
 class OutbackCombinedSensor(OutbackBaseSensor):
@@ -415,16 +417,15 @@ class OutbackCombinedSensor(OutbackBaseSensor):
         """Initialize the combined sensor."""
         super().__init__(*args, device_id=None, **kwargs)
         
-        # Set up entity ID and unique ID
-        entry_id_id = self._entry_id.replace('.', '_')
-        self.entity_id = f"sensor.mate3_{entry_id_id}_{self._sensor_type}"
+        # Set up entity ID and unique ID using MAC address
+        self.entity_id = f"sensor.mate3_{self._mac_address}_{self._sensor_type}"
         self._attr_unique_id = f"{DOMAIN}_{self._mac_address}_{self._sensor_type}"
         
         # Set up device info if not provided
         if self._device_info is None:
             self._attr_device_info = DeviceInfo(
-                identifiers={(DOMAIN, f"mate3_{self._mac_address}")},
-                name=f"Outback MATE3 ({self._entry_id})",
+                identifiers={(DOMAIN, self._mac_address)},
+                name="Outback MATE3",
                 manufacturer="Outback Power",
                 model="MATE3",
             )
