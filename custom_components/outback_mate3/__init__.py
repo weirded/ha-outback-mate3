@@ -177,14 +177,16 @@ class OutbackMate3(DataUpdateCoordinator):
                         "mac_address": mac_address
                     }
                     
+                    # Store discovery info in hass.data
+                    self.hass.data[DOMAIN][f"{entry_id}_discovery"] = discovery_info
+                    
                     # Add MATE3 entities
                     if self._add_entities_callback:
                         _LOGGER.debug("Setting up MATE3 entities for %s with discovery info: %s", mate3_id, discovery_info)
                         self.hass.create_task(
                             self.hass.config_entries.async_forward_entry_setup(
                                 self.hass.config_entries.async_entries(DOMAIN)[0],
-                                Platform.SENSOR,
-                                discovery_info
+                                Platform.SENSOR
                             )
                         )
                     else:

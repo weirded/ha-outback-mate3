@@ -31,18 +31,26 @@ async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
-    discovery_info: DiscoveryInfoType | None = None,
 ) -> None:
     """Set up the sensor platform."""
+    _LOGGER.debug("Setting up sensor platform with entry_id: %s", entry.entry_id)
+    
     mate3 = hass.data[DOMAIN][entry.entry_id]
+    discovery_info = hass.data[DOMAIN].get(f"{entry.entry_id}_discovery")
+    
+    _LOGGER.debug("Retrieved discovery info: %s", discovery_info)
     
     if discovery_info is None:
+        _LOGGER.debug("No discovery info, setting add_entities_callback")
         mate3.set_add_entities_callback(async_add_entities)
         return
         
     device_type = discovery_info["device_type"]
     entry_id = discovery_info["entry_id"]
     mac_address = discovery_info["mac_address"]
+    
+    _LOGGER.debug("Processing discovery info - type: %s, entry_id: %s, mac: %s",
+                 device_type, entry_id, mac_address)
     
     if device_type == "mate3":
         # Create device info for MATE3
@@ -53,11 +61,14 @@ async def async_setup_entry(
             model="MATE3",
         )
         
+        _LOGGER.debug("Created MATE3 device info: %s", device_info)
+        
         # Create all inverter and charge controller entities
         entities = []
         
         # Add inverter entities
         for i in range(1, 11):  # Support up to 10 inverters
+            _LOGGER.debug("Creating entities for inverter %d", i)
             for sensor_info in INVERTER_SENSORS:
                 entities.append(
                     OutbackInverterSensor(
@@ -75,6 +86,7 @@ async def async_setup_entry(
         
         # Add charge controller entities
         for i in range(1, 11):  # Support up to 10 charge controllers
+            _LOGGER.debug("Creating entities for charge controller %d", i)
             for sensor_info in CHARGE_CONTROLLER_SENSORS:
                 entities.append(
                     OutbackChargeControllerSensor(
@@ -94,13 +106,13 @@ async def async_setup_entry(
             _LOGGER.debug("Adding %d entities for MATE3 %s", len(entities), mac_address)
             async_add_entities(entities)
     elif device_type == 6:  # Inverter
-        _LOGGER.debug("Creating sensors for inverter %d from MAC %s", device_id, mac_address)
+        _LOGGER.debug("Creating sensors for inverter %d from MAC %s", discovery_info["device_id"], mac_address)
         for sensor_info in INVERTER_SENSORS:
             entities.append(
                 OutbackInverterSensor(
                     mate3,
                     entry_id,
-                    device_id,
+                    discovery_info["device_id"],
                     sensor_info[1],  # sensor_type
                     sensor_info[0],  # name
                     sensor_info[2],  # device_class
@@ -109,13 +121,13 @@ async def async_setup_entry(
                 )
             )
     elif device_type == 3:  # Charge Controller
-        _LOGGER.debug("Creating sensors for charge controller %d from MAC %s", device_id, mac_address)
+        _LOGGER.debug("Creating sensors for charge controller %d from MAC %s", discovery_info["device_id"], mac_address)
         for sensor_info in CHARGE_CONTROLLER_SENSORS:
             entities.append(
                 OutbackChargeControllerSensor(
                     mate3,
                     entry_id,
-                    device_id,
+                    discovery_info["device_id"],
                     sensor_info[1],  # sensor_type
                     sensor_info[0],  # name
                     sensor_info[2],  # device_class
@@ -126,7 +138,7 @@ async def async_setup_entry(
             
     if entities:
         _LOGGER.debug("Adding %d entities for device type %d, id %d from MAC %s", 
-                     len(entities), device_type, device_id, mac_address)
+                     len(entities), device_type, discovery_info["device_id"], mac_address)
         async_add_entities(entities)
 
 
@@ -301,10 +313,37 @@ class OutbackInverterSensor(OutbackBaseSensor):
     @property
     def native_value(self):
         """Return the state of the sensor."""
-        if (self._mac_address in self._mate3.inverters and 
-            self._device_id in self._mate3.inverters[self._mac_address]):
-            return self._mate3.inverters[self._mac_address][self._device_id].get(self._sensor_type)
-        return None
+        try:
+            device_key = f"{self._mac_address}_inverter_{self._device_id}"
+            device_data = self._mate3.device_data.get(device_key)
+            _LOGGER.debug("Getting value for inverter sensor %s from data: %s", device_key, device_data)
+            
+            if not device_data:
+                return None
+                
+            if self._sensor_type == "inverter_current":
+                return float(device_data[3])
+            elif self._sensor_type == "charger_current":
+                return float(device_data[4])
+            elif self._sensor_type == "grid_current":
+                return float(device_data[5])
+            elif self._sensor_type == "grid_voltage":
+                return float(device_data[6])
+            elif self._sensor_type == "output_voltage":
+                return float(device_data[7])
+            elif self._sensor_type == "inverter_power":
+                return float(device_data[8])
+            elif self._sensor_type == "charger_power":
+                return float(device_data[9])
+            elif self._sensor_type == "grid_power":
+                return float(device_data[10])
+            elif self._sensor_type == "inverter_mode":
+                return device_data[11]
+            elif self._sensor_type == "ac_mode":
+                return device_data[12]
+        except (KeyError, IndexError, ValueError) as e:
+            _LOGGER.warning("Error getting inverter sensor value: %s", str(e))
+            return None
 
     @property
     def available(self) -> bool:
@@ -339,10 +378,27 @@ class OutbackChargeControllerSensor(OutbackBaseSensor):
     @property
     def native_value(self):
         """Return the state of the sensor."""
-        if (self._mac_address in self._mate3.charge_controllers and 
-            self._device_id in self._mate3.charge_controllers[self._mac_address]):
-            return self._mate3.charge_controllers[self._mac_address][self._device_id].get(self._sensor_type)
-        return None
+        try:
+            device_key = f"{self._mac_address}_cc_{self._device_id}"
+            device_data = self._mate3.device_data.get(device_key)
+            _LOGGER.debug("Getting value for charge controller sensor %s from data: %s", device_key, device_data)
+            
+            if not device_data:
+                return None
+                
+            if self._sensor_type == "solar_current":
+                return float(device_data[3])
+            elif self._sensor_type == "solar_voltage":
+                return float(device_data[4])
+            elif self._sensor_type == "battery_voltage":
+                return float(device_data[5])
+            elif self._sensor_type == "solar_power":
+                return float(device_data[6])
+            elif self._sensor_type == "charge_mode":
+                return device_data[7]
+        except (KeyError, IndexError, ValueError) as e:
+            _LOGGER.warning("Error getting charge controller sensor value: %s", str(e))
+            return None
 
     @property
     def available(self) -> bool:
