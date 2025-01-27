@@ -53,33 +53,41 @@ Monitor your Outback Power Systems MATE3 controller in Home Assistant. This inte
 
 ## Available Sensors
 
-### System-wide Sensors
-- Total Solar Power (W)
+### Combined System Metrics
 - Total Grid Power (W)
-- Total Solar Energy (kWh)
-- Total Grid Energy Import (kWh)
-- Total Grid Energy Export (kWh)
+- Total Grid Current (A)
+- Total Charger Power (W)
+- Total Charger Current (A)
+- Total Inverter Power (W)
+- Total Inverter Current (A)
+- Total Charge Controller Output Current (A)
+- Total Charge Controller Output Power (W)
+- Average AC Input Voltage (V)
+- Average AC Output Voltage (V)
+- Average Battery Voltage (V)
 
 ### Inverter Sensors
 Each inverter in your system will have:
 - Current (A)
 - Charger Current (A)
 - Grid Current (A)
-- Grid Voltage (V)
-- Output Voltage (V)
-- Power (W)
+- AC Input Voltage (V)
+- AC Output Voltage (V)
+- Inverter Power (W)
 - Charger Power (W)
 - Grid Power (W)
-- Operating Mode
+- Inverter Mode
 - AC Mode
 
 ### Charge Controller Sensors
 Each charge controller will have:
-- Solar Current (A)
-- Solar Voltage (V)
+- PV Current (A)
+- PV Voltage (V)
+- PV Power (W)
+- Output Current (A)
 - Battery Voltage (V)
-- Solar Power (W)
 - Charge Mode
+- Output Power (W)
 
 ## Energy Dashboard Integration
 
@@ -108,5 +116,5 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 - Outback Power Systems for their excellent documentation on the MATE3 data stream protocol
 - The Home Assistant community for their continued support and inspiration
 
-[releases-shield]: https://img.shields.io/github/release/weirded/ha-outback-mate3.svg
+[releases-shield]: https://img.shields.io/github/v/release/weirded/ha-outback-mate3?style=flat
 [releases]: https://github.com/weirded/ha-outback-mate3/releases
