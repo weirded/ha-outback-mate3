@@ -238,9 +238,8 @@ class OutbackMate3(DataUpdateCoordinator):
         except Exception as e:
             _LOGGER.error("Error processing data: %s", str(e))
 
-    def is_bit_set(byte, bit_position):
+    def _is_bit_set(byte, bit_position):
         return (byte & (1 << bit_position)) != 0
-
 
     def _process_device(self, device, mac_address):
         """Process individual device data."""
@@ -286,9 +285,9 @@ class OutbackMate3(DataUpdateCoordinator):
 
         # Check for 240V and grid/generator
         misc = int(values[20])
-        is_240v = is_bit_set(misc, 7)
+        is_240v = self._is_bit_set(misc, 7)
         ac_factor = 2 if is_240v else 1
-        is_grid = is_bit_set(misc, 6)
+        is_grid = self._is_bit_set(misc, 6)
 
         # L1 values
         l1_inverter_current = float(values[2])
