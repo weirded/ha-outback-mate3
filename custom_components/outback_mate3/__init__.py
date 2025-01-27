@@ -297,6 +297,9 @@ class OutbackMate3(DataUpdateCoordinator):
         l1_ac_input_voltage = float(values[6]) * ac_factor
         l1_ac_output_voltage = float(values[8]) * ac_factor
 
+        # Battery voltage from field 12
+        inv['battery_voltage'] = float(values[12]) / 10.0
+
         # L2 values
         l2_inverter_current = float(values[2 + 7])
         l2_charger_current = float(values[3 + 7])
