@@ -77,7 +77,9 @@ Each inverter in your system will have:
 - Charger Power (W)
 - Grid Power (W)
 - Inverter Mode
-- AC Mode
+- AC Mode (no-ac, ac-drop, ac-use)
+- Grid Mode (grid, generator)
+- Battery Voltage (V)
 
 ### Charge Controller Sensors
 Each charge controller will have:

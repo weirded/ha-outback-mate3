@@ -206,30 +206,28 @@ class OutbackBaseSensor(CoordinatorEntity, SensorEntity):
         self._mac_address = mac_address
         self._device_id = device_id
         self._sensor_type = sensor_type
-        
+
         # Create entity_id friendly MAC (replace dots with underscores)
         mac_id = mac_address.replace('.', '_')
-        device_type = self._get_device_type()
-        device_name = f"Outback {device_type.replace('_', ' ').title()} {device_id}"
+        device_name = f"Outback {self._get_device_type()} {device_id}"
         
         # Set entity name and ID
         self._attr_has_entity_name = True
         self._attr_name = name
-        self.entity_id = f"sensor.mate3_{mac_id}_{device_type}_{device_id}_{sensor_type}"
-        
+        self.entity_id = f"sensor.mate3_{mac_id}_{self._get_device_type().lower()}_{device_id}_{sensor_type}"
+
         self._attr_device_class = device_class
         self._attr_native_unit_of_measurement = unit
         if device_class not in [SensorDeviceClass.ENUM]:
             self._attr_state_class = SensorStateClass.MEASUREMENT
-        self._attr_unique_id = f"{DOMAIN}_{mac_address}_{device_id}_{sensor_type}"
+        self._attr_unique_id = f"{DOMAIN}_{mac_address}_{self._get_device_type().lower()}_{device_id}_{sensor_type}"
         
         # Set up device info
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{device_type}_{mac_address}_{device_id}")},
+            identifiers={(DOMAIN, f"{mac_address}_{self._get_device_type().lower()}_{device_id}")},
             name=device_name,
             manufacturer="Outback Power",
-            model=f"MATE3 {device_type.replace('_', ' ').title()}",
-            via_device=(DOMAIN, f"system_{mac_address}"),  # Link to the combined system device
+            model=self._get_device_type(),
         )
         
         _LOGGER.debug("Initialized sensor %s for device %d from MAC %s", 

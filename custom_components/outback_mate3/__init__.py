@@ -309,6 +309,10 @@ class OutbackMate3(DataUpdateCoordinator):
         l2_ac_output_voltage = float(values[8 + 7]) * ac_factor
 
         # Combined measurements
+        inv['current'] = l1_inverter_current + l2_inverter_current
+        inv['charger_current'] = l1_charger_current + l2_charger_current
+        
+        # Combined measurements for system metrics
         inv['total_inverter_current'] = l1_inverter_current + l2_inverter_current
         inv['total_charger_current'] = l1_charger_current + l2_charger_current
         
