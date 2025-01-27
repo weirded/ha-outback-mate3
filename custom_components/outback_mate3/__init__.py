@@ -146,6 +146,30 @@ class OutbackMate3(DataUpdateCoordinator):
                 # Remove hyphen from MAC address
                 mac_address = mac_match.group(1).replace('-', '')
                 
+                # Register MATE3 device if not already registered
+                mate3_id = f"{mac_address}"
+                if mate3_id not in self.discovered_devices:
+                    _LOGGER.debug("Discovered new MATE3: %s", mate3_id)
+                    self.discovered_devices.add(mate3_id)
+                    
+                    # Create discovery info for MATE3
+                    discovery_info = {
+                        "device_type": "mate3",
+                        "entry_id": entry_id,
+                        "mac_address": mac_address
+                    }
+                    
+                    # Add MATE3 entities
+                    if self._add_entities_callback:
+                        _LOGGER.debug("Setting up MATE3 entities for %s", mate3_id)
+                        self.hass.async_create_task(
+                            self.hass.config_entries.async_forward_entry_setup(
+                                self.hass.config_entries.async_entries(DOMAIN)[0],
+                                Platform.SENSOR,
+                                discovery_info
+                            )
+                        )
+                
                 _LOGGER.debug("Processing %d device messages from MAC %s", len(devices), mac_address)
                 
                 for device_msg in devices:
@@ -167,69 +191,14 @@ class OutbackMate3(DataUpdateCoordinator):
                         
                         _LOGGER.debug("Processing device: type=%d, no=%d, id=%s", device_type, device_no, device_id)
                         
-                        # Process device data
-                        if device_type == 6:  # Inverter
-                            if device_id not in self.discovered_devices:
-                                _LOGGER.debug("Discovered new inverter: %s", device_id)
-                                self.discovered_devices.add(device_id)
-                                # Initialize device counts
-                                if mac_address not in self.device_counts:
-                                    self.device_counts[mac_address] = {}
-                                if device_type not in self.device_counts[mac_address]:
-                                    self.device_counts[mac_address][device_type] = 0
-                                self.device_counts[mac_address][device_type] += 1
-                                
-                                # Create discovery info
-                                discovery_info = {
-                                    "device_type": device_type,
-                                    "device_id": device_no,
-                                    "entry_id": entry_id,
-                                    "mac_address": mac_address
-                                }
-                                
-                                # Add entities
-                                if self._add_entities_callback:
-                                    _LOGGER.debug("Setting up inverter entities for %s", device_id)
-                                    self.hass.async_create_task(
-                                        self.hass.config_entries.async_forward_entry_setup(
-                                            self.hass.config_entries.async_entries(DOMAIN)[0],
-                                            Platform.SENSOR,
-                                            discovery_info
-                                        )
-                                    )
-                            
+                        # Process device data based on type
+                        if device_type == 1:  # Inverter status
                             self._process_inverter(device_no, values, mac_address)
-                            
-                        elif device_type == 3:  # Charge Controller
-                            if device_id not in self.discovered_devices:
-                                _LOGGER.debug("Discovered new charge controller: %s", device_id)
-                                self.discovered_devices.add(device_id)
-                                # Initialize device counts
-                                if mac_address not in self.device_counts:
-                                    self.device_counts[mac_address] = {}
-                                if device_type not in self.device_counts[mac_address]:
-                                    self.device_counts[mac_address][device_type] = 0
-                                self.device_counts[mac_address][device_type] += 1
-                                
-                                # Create discovery info
-                                discovery_info = {
-                                    "device_type": device_type,
-                                    "device_id": device_no,
-                                    "entry_id": entry_id,
-                                    "mac_address": mac_address
-                                }
-                                
-                                # Add entities
-                                if self._add_entities_callback:
-                                    _LOGGER.debug("Setting up charge controller entities for %s", device_id)
-                                    self.hass.async_create_task(
-                                        self.hass.config_entries.async_forward_entry_setup(
-                                            self.hass.config_entries.async_entries(DOMAIN)[0],
-                                            Platform.SENSOR,
-                                            discovery_info
-                                        )
-                                    )
-                            
+                        elif device_type == 2:  # Inverter power
+                            self._process_inverter(device_no, values, mac_address)
+                        elif device_type == 4:  # Charge controller status
+                            self._process_charge_controller(device_no, values, mac_address)
+                        elif device_type == 5:  # Charge controller power
                             self._process_charge_controller(device_no, values, mac_address)
                             
                     except (ValueError, IndexError) as e:

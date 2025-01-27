@@ -41,17 +41,63 @@ async def async_setup_entry(
         return
         
     device_type = discovery_info["device_type"]
-    device_id = discovery_info["device_id"]
     entry_id = discovery_info["entry_id"]
     mac_address = discovery_info["mac_address"]
     
-    entities = []
-    
-    if device_type == 3:  # Charge Controller
-        _LOGGER.debug("Creating sensors for charge controller %d from MAC %s", device_id, mac_address)
-        for sensor_info in CHARGE_CONTROLLER_SENSORS:
+    if device_type == "mate3":
+        # Create device info for MATE3
+        device_info = DeviceInfo(
+            identifiers={(DOMAIN, mac_address)},
+            name=f"Outback MATE3 ({entry_id})",
+            manufacturer="Outback Power",
+            model="MATE3",
+        )
+        
+        # Create all inverter and charge controller entities
+        entities = []
+        
+        # Add inverter entities
+        for i in range(1, 11):  # Support up to 10 inverters
+            for sensor_info in INVERTER_SENSORS:
+                entities.append(
+                    OutbackInverterSensor(
+                        mate3,
+                        entry_id,
+                        i,
+                        sensor_info[1],  # sensor_type
+                        sensor_info[0],  # name
+                        sensor_info[2],  # device_class
+                        sensor_info[3],  # unit
+                        mac_address,
+                        device_info
+                    )
+                )
+        
+        # Add charge controller entities
+        for i in range(1, 11):  # Support up to 10 charge controllers
+            for sensor_info in CHARGE_CONTROLLER_SENSORS:
+                entities.append(
+                    OutbackChargeControllerSensor(
+                        mate3,
+                        entry_id,
+                        i,
+                        sensor_info[1],  # sensor_type
+                        sensor_info[0],  # name
+                        sensor_info[2],  # device_class
+                        sensor_info[3],  # unit
+                        mac_address,
+                        device_info
+                    )
+                )
+        
+        if entities:
+            _LOGGER.debug("Adding %d entities for MATE3 %s", len(entities), mac_address)
+            async_add_entities(entities)
+    elif device_type == 6:  # Inverter
+        _LOGGER.debug("Creating sensors for inverter %d from MAC %s", device_id, mac_address)
+        for sensor_info in INVERTER_SENSORS:
             entities.append(
-                OutbackChargeControllerSensor(
+                OutbackInverterSensor(
                     mate3,
                     entry_id,
                     device_id,
@@ -62,11 +108,11 @@ async def async_setup_entry(
                     mac_address
                 )
             )
-    elif device_type == 6:  # Inverter
-        _LOGGER.debug("Creating sensors for inverter %d from MAC %s", device_id, mac_address)
-        for sensor_info in INVERTER_SENSORS:
+    elif device_type == 3:  # Charge Controller
+        _LOGGER.debug("Creating sensors for charge controller %d from MAC %s", device_id, mac_address)
+        for sensor_info in CHARGE_CONTROLLER_SENSORS:
             entities.append(
-                OutbackInverterSensor(
+                OutbackChargeControllerSensor(
                     mate3,
                     entry_id,
                     device_id,
@@ -194,6 +240,7 @@ class OutbackBaseSensor(CoordinatorEntity, SensorEntity):
             device_class: SensorDeviceClass | None,
             unit: str | None,
             mac_address: str,
+            device_info: DeviceInfo | None = None,
         ) -> None:
         """Initialize the sensor."""
         super().__init__(mate3)
@@ -205,6 +252,7 @@ class OutbackBaseSensor(CoordinatorEntity, SensorEntity):
         self._device_class = device_class
         self._unit = unit
         self._mac_address = mac_address
+        self._device_info = device_info
         
         # Create entity_id friendly IP (replace dots with underscores)
         entry_id_id = entry_id.replace('.', '_')
@@ -222,6 +270,10 @@ class OutbackBaseSensor(CoordinatorEntity, SensorEntity):
             self._attr_state_class = SensorStateClass.TOTAL_INCREASING
         elif device_class not in [SensorDeviceClass.ENUM]:
             self._attr_state_class = SensorStateClass.MEASUREMENT
+        
+        # Set device info
+        if device_info is not None:
+            self._attr_device_info = device_info
 
 
 class OutbackInverterSensor(OutbackBaseSensor):
@@ -236,14 +288,15 @@ class OutbackInverterSensor(OutbackBaseSensor):
         self.entity_id = f"sensor.mate3_{entry_id_id}_inverter_{self._device_id}_{self._sensor_type}"
         self._attr_unique_id = f"{DOMAIN}_{self._mac_address}_inverter_{self._device_id}_{self._sensor_type}"
         
-        # Set up device info
-        device_name = f"Outback Inverter {self._device_id} ({self._entry_id})"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"inverter_{self._mac_address}_{self._device_id}")},
-            name=device_name,
-            manufacturer="Outback Power",
-            model="Radian Inverter",
-        )
+        # Set up device info if not provided
+        if self._device_info is None:
+            device_name = f"Outback Inverter {self._device_id} ({self._entry_id})"
+            self._attr_device_info = DeviceInfo(
+                identifiers={(DOMAIN, f"inverter_{self._mac_address}_{self._device_id}")},
+                name=device_name,
+                manufacturer="Outback Power",
+                model="Radian Inverter",
+            )
 
     @property
     def native_value(self):
@@ -273,14 +326,15 @@ class OutbackChargeControllerSensor(OutbackBaseSensor):
         self.entity_id = f"sensor.mate3_{entry_id_id}_cc_{self._device_id}_{self._sensor_type}"
         self._attr_unique_id = f"{DOMAIN}_{self._mac_address}_cc_{self._device_id}_{self._sensor_type}"
         
-        # Set up device info
-        device_name = f"Outback Charge Controller {self._device_id} ({self._entry_id})"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"cc_{self._mac_address}_{self._device_id}")},
-            name=device_name,
-            manufacturer="Outback Power",
-            model="Charge Controller",
-        )
+        # Set up device info if not provided
+        if self._device_info is None:
+            device_name = f"Outback Charge Controller {self._device_id} ({self._entry_id})"
+            self._attr_device_info = DeviceInfo(
+                identifiers={(DOMAIN, f"cc_{self._mac_address}_{self._device_id}")},
+                name=device_name,
+                manufacturer="Outback Power",
+                model="Charge Controller",
+            )
 
     @property
     def native_value(self):
@@ -310,13 +364,14 @@ class OutbackCombinedSensor(OutbackBaseSensor):
         self.entity_id = f"sensor.mate3_{entry_id_id}_{self._sensor_type}"
         self._attr_unique_id = f"{DOMAIN}_{self._mac_address}_{self._sensor_type}"
         
-        # Set up device info
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"mate3_{self._mac_address}")},
-            name=f"Outback MATE3 ({self._entry_id})",
-            manufacturer="Outback Power",
-            model="MATE3",
-        )
+        # Set up device info if not provided
+        if self._device_info is None:
+            self._attr_device_info = DeviceInfo(
+                identifiers={(DOMAIN, f"mate3_{self._mac_address}")},
+                name=f"Outback MATE3 ({self._entry_id})",
+                manufacturer="Outback Power",
+                model="MATE3",
+            )
 
     @property
     def native_value(self):
