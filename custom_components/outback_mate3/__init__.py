@@ -38,17 +38,42 @@ CONFIG_SCHEMA = vol.Schema(
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Outback MATE3 from a config entry."""
-    _LOGGER.debug("Setting up Outback MATE3 integration")
-    hass.data.setdefault(DOMAIN, {})
+    _LOGGER.debug("Setting up Outback MATE3 integration with entry: %s", entry.as_dict())
     
-    mate3 = OutbackMate3(hass, entry.data[CONF_PORT], entry.entry_id)
+    # Initialize data storage
+    if DOMAIN not in hass.data:
+        hass.data[DOMAIN] = {}
+    
+    # Create MATE3 instance
+    mate3 = OutbackMate3(hass, entry)
     hass.data[DOMAIN][entry.entry_id] = mate3
-
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     
-    _LOGGER.debug("Starting UDP listener")
-    mate3.start_listening()
+    # Set up UDP server
+    server = await asyncio.start_server(
+        mate3.handle_connection,
+        host="0.0.0.0",
+        port=entry.data[CONF_PORT],
+    )
     
+    # Store server for cleanup
+    mate3.server = server
+    
+    # Set up sensor platform
+    await hass.config_entries.async_forward_entry_setup(entry, Platform.SENSOR)
+    
+    # Create initial discovery info for MATE3
+    discovery_info = {
+        "device_type": "mate3",
+        "entry_id": entry.entry_id,
+        "mac_address": "default"  # Will be updated when first message arrives
+    }
+    hass.data[DOMAIN][f"{entry.entry_id}_discovery"] = discovery_info
+    
+    entry.async_on_unload(
+        entry.add_update_listener(async_update_listener)
+    )
+    
+    _LOGGER.debug("Outback MATE3 integration setup complete")
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -64,7 +89,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 class OutbackMate3(DataUpdateCoordinator):
     """Main class for Outback MATE3 integration."""
 
-    def __init__(self, hass: HomeAssistant, port: int, entry_id: str):
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry):
         """Initialize the MATE3 integration."""
         super().__init__(
             hass,
@@ -72,7 +97,8 @@ class OutbackMate3(DataUpdateCoordinator):
             name=DOMAIN,
         )
         self.hass = hass
-        self.port = port
+        self.entry = entry
+        self.port = entry.data[CONF_PORT]
         self._socket = None
         self._running = False
         self._add_entities_callback = None
@@ -80,9 +106,9 @@ class OutbackMate3(DataUpdateCoordinator):
         self.charge_controllers: Dict[str, Dict[int, dict]] = {}  # mac_address -> {device_id -> data}
         self.inverters: Dict[str, Dict[int, dict]] = {}  # mac_address -> {device_id -> data}
         self.discovered_devices: Set[str] = set()  # Set of "mac_address_type_id" strings
-        self._entry_id = entry_id
+        self.server = None
         self.device_data = {}
-        _LOGGER.debug("Initialized OutbackMate3 with port %d", port)
+        _LOGGER.debug("Initialized OutbackMate3 with port %d", self.port)
 
     async def async_setup_entry(self, hass: HomeAssistant, entry: ConfigEntry) -> bool:
         """Set up Outback MATE3 from a config entry."""
@@ -132,7 +158,7 @@ class OutbackMate3(DataUpdateCoordinator):
                 remote_ip = addr[0]
                 
                 await self.hass.async_add_executor_job(
-                    self._process_data, data, self._entry_id
+                    self._process_data, data, self.entry.entry_id
                 )
             except BlockingIOError:
                 await asyncio.sleep(0.1)
@@ -233,6 +259,81 @@ class OutbackMate3(DataUpdateCoordinator):
                     
         except Exception as e:
             _LOGGER.error("Error processing data: %s", str(e))
+
+    async def handle_connection(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
+        """Handle incoming UDP data."""
+        try:
+            data = await reader.read(1024)
+            message = data.decode().strip()
+            _LOGGER.debug("Processing message: %s", message)
+            
+            # Only process messages that start with MAC address format [XXXXXX-XXXXXX]
+            if not re.match(r'^\[[0-9A-F]{6}-[0-9A-F]{6}\]', message):
+                _LOGGER.debug("Skipping message without MAC address format")
+                return
+            
+            # Split into header and device messages
+            try:
+                header = message[1:15]  # Extract MAC address without brackets
+                mac_address = header.replace('-', '')
+                
+                # Update discovery info with actual MAC address if needed
+                entry_id = list(self.hass.config_entries.async_entries(DOMAIN))[0].entry_id
+                discovery_info = self.hass.data[DOMAIN].get(f"{entry_id}_discovery")
+                if discovery_info and discovery_info["mac_address"] == "default":
+                    discovery_info["mac_address"] = mac_address
+                    _LOGGER.debug("Updated discovery info with MAC address: %s", mac_address)
+                    
+                    # Force sensor setup if this is the first message
+                    if self._add_entities_callback:
+                        _LOGGER.debug("Setting up sensors for first time with MAC: %s", mac_address)
+                        await self.setup_sensors(mac_address)
+                
+                # Process device data
+                device_data = message[16:].split(',')
+                if len(device_data) >= 2:
+                    device_type = device_data[0]
+                    device_no = int(device_data[1])
+                    
+                    if device_type in ["1", "2"]:
+                        self._process_inverter(device_no, device_data, mac_address)
+                    elif device_type in ["4", "5"]:
+                        self._process_charge_controller(device_no, device_data, mac_address)
+                    
+            except (IndexError, ValueError) as e:
+                _LOGGER.warning("Error processing message: %s", str(e))
+                
+        except Exception as e:
+            _LOGGER.error("Error handling connection: %s", str(e))
+        finally:
+            writer.close()
+            await writer.wait_closed()
+            
+    async def setup_sensors(self, mac_address: str) -> None:
+        """Set up sensors for the first time."""
+        if self._add_entities_callback:
+            _LOGGER.debug("Setting up MATE3 entities for %s", mac_address)
+            # Create inverter sensors for device 1 (assuming at least one inverter)
+            inverter_sensors = [
+                OutbackInverterSensor(
+                    self, mac_address, 1, name, sensor_type, device_class, unit, state_class
+                )
+                for name, sensor_type, device_class, unit, state_class in INVERTER_SENSORS
+            ]
+            
+            # Create charge controller sensors for device 1 (assuming at least one CC)
+            cc_sensors = [
+                OutbackChargeControllerSensor(
+                    self, mac_address, 1, name, sensor_type, device_class, unit, state_class
+                )
+                for name, sensor_type, device_class, unit, state_class in CHARGE_CONTROLLER_SENSORS
+            ]
+            
+            # Add all sensors
+            self._add_entities_callback(inverter_sensors + cc_sensors, True)
+            self._add_entities_callback = None  # Clear callback after use
 
     def _process_inverter(self, device_no, values, mac_address):
         """Process inverter data."""
