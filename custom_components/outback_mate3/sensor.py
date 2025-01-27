@@ -36,58 +36,58 @@ async def async_setup_entry(
     mate3.set_add_entities_callback(async_add_entities)
 
 
-def create_device_entities(mate3: OutbackMate3, remote_ip: str, device_type: int, device_id: int) -> List[SensorEntity]:
+def create_device_entities(mate3: OutbackMate3, mac_address: str, device_type: int, device_id: int) -> List[SensorEntity]:
     """Create entities for a newly discovered device."""
     entities = []
     
     if device_type == 6:  # Inverter
-        _LOGGER.debug("Creating sensors for inverter %d from IP %s", device_id, remote_ip)
+        _LOGGER.debug("Creating sensors for inverter %d from MAC %s", device_id, mac_address)
         entities.extend([
             # Combined measurements
-            OutbackInverterSensor(mate3, remote_ip, device_id, "total_inverter_current", "Total Inverter Current",
+            OutbackInverterSensor(mate3, mac_address, device_id, "total_inverter_current", "Total Inverter Current",
                                 SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
-            OutbackInverterSensor(mate3, remote_ip, device_id, "total_charger_current", "Total Charger Current",
+            OutbackInverterSensor(mate3, mac_address, device_id, "total_charger_current", "Total Charger Current",
                                 SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
-            OutbackInverterSensor(mate3, remote_ip, device_id, "grid_current", "Grid Current",
+            OutbackInverterSensor(mate3, mac_address, device_id, "grid_current", "Grid Current",
                                 SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
-            OutbackInverterSensor(mate3, remote_ip, device_id, "ac_input_voltage", "AC Input Voltage",
+            OutbackInverterSensor(mate3, mac_address, device_id, "ac_input_voltage", "AC Input Voltage",
                                 SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
-            OutbackInverterSensor(mate3, remote_ip, device_id, "ac_output_voltage", "AC Output Voltage",
+            OutbackInverterSensor(mate3, mac_address, device_id, "ac_output_voltage", "AC Output Voltage",
                                 SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
             
             # Power measurements
-            OutbackInverterSensor(mate3, remote_ip, device_id, "inverter_power", "Inverter Power",
+            OutbackInverterSensor(mate3, mac_address, device_id, "inverter_power", "Inverter Power",
                                 SensorDeviceClass.POWER, UnitOfPower.WATT),
-            OutbackInverterSensor(mate3, remote_ip, device_id, "charger_power", "Charger Power",
+            OutbackInverterSensor(mate3, mac_address, device_id, "charger_power", "Charger Power",
                                 SensorDeviceClass.POWER, UnitOfPower.WATT),
-            OutbackInverterSensor(mate3, remote_ip, device_id, "grid_power", "Grid Power",
+            OutbackInverterSensor(mate3, mac_address, device_id, "grid_power", "Grid Power",
                                 SensorDeviceClass.POWER, UnitOfPower.WATT),
 
             # Mode sensors
-            OutbackInverterSensor(mate3, remote_ip, device_id, "inverter_mode", "Inverter Mode",
+            OutbackInverterSensor(mate3, mac_address, device_id, "inverter_mode", "Inverter Mode",
                                 SensorDeviceClass.ENUM, None),
-            OutbackInverterSensor(mate3, remote_ip, device_id, "ac_mode", "AC Mode",
+            OutbackInverterSensor(mate3, mac_address, device_id, "ac_mode", "AC Mode",
                                 SensorDeviceClass.ENUM, None),
         ])
     elif device_type == 3:  # Charge Controller
-        _LOGGER.debug("Creating sensors for charge controller %d from IP %s", device_id, remote_ip)
+        _LOGGER.debug("Creating sensors for charge controller %d from MAC %s", device_id, mac_address)
         entities.extend([
-            OutbackChargeControllerSensor(mate3, remote_ip, device_id, "pv_current", "PV Current",
+            OutbackChargeControllerSensor(mate3, mac_address, device_id, "pv_current", "PV Current",
                                         SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
-            OutbackChargeControllerSensor(mate3, remote_ip, device_id, "pv_voltage", "PV Voltage",
+            OutbackChargeControllerSensor(mate3, mac_address, device_id, "pv_voltage", "PV Voltage",
                                         SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
-            OutbackChargeControllerSensor(mate3, remote_ip, device_id, "pv_power", "PV Power",
+            OutbackChargeControllerSensor(mate3, mac_address, device_id, "pv_power", "PV Power",
                                         SensorDeviceClass.POWER, UnitOfPower.WATT),
-            OutbackChargeControllerSensor(mate3, remote_ip, device_id, "output_current", "Output Current",
+            OutbackChargeControllerSensor(mate3, mac_address, device_id, "output_current", "Output Current",
                                         SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
-            OutbackChargeControllerSensor(mate3, remote_ip, device_id, "battery_voltage", "Battery Voltage",
+            OutbackChargeControllerSensor(mate3, mac_address, device_id, "battery_voltage", "Battery Voltage",
                                         SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
-            OutbackChargeControllerSensor(mate3, remote_ip, device_id, "charge_mode", "Charge Mode",
+            OutbackChargeControllerSensor(mate3, mac_address, device_id, "charge_mode", "Charge Mode",
                                         SensorDeviceClass.ENUM, None),
         ])
 
-    _LOGGER.debug("Created %d entities for device type %d, id %d from IP %s", 
-                 len(entities), device_type, device_id, remote_ip)
+    _LOGGER.debug("Created %d entities for device type %d, id %d from MAC %s", 
+                 len(entities), device_type, device_id, mac_address)
     return entities
 
 
@@ -97,7 +97,7 @@ class OutbackBaseSensor(CoordinatorEntity, SensorEntity):
     def __init__(
             self,
             mate3: OutbackMate3,
-            remote_ip: str,
+            mac_address: str,
             device_id: int,
             sensor_type: str,
             name: str,
@@ -107,25 +107,25 @@ class OutbackBaseSensor(CoordinatorEntity, SensorEntity):
         """Initialize the sensor."""
         super().__init__(mate3)
         self._mate3 = mate3
-        self._remote_ip = remote_ip
+        self._mac_address = mac_address
         self._device_id = device_id
         self._sensor_type = sensor_type
         
-        # Create entity_id friendly IP (replace dots with underscores)
-        ip_id = remote_ip.replace('.', '_')
+        # Create entity_id friendly MAC (replace dots with underscores)
+        mac_id = mac_address.replace('.', '_')
         
         # Set entity name and ID
         self._attr_has_entity_name = True
         self._attr_name = name
-        self.entity_id = f"sensor.mate3_{ip_id}_{self._get_device_type()}_{device_id}_{sensor_type}"
+        self.entity_id = f"sensor.mate3_{mac_id}_{self._get_device_type()}_{device_id}_{sensor_type}"
         
         self._attr_device_class = device_class
         self._attr_native_unit_of_measurement = unit
         if device_class not in [SensorDeviceClass.ENUM]:
             self._attr_state_class = SensorStateClass.MEASUREMENT
-        self._attr_unique_id = f"{DOMAIN}_{remote_ip}_{device_id}_{sensor_type}"
-        _LOGGER.debug("Initialized sensor %s for device %d from IP %s", 
-                     sensor_type, device_id, remote_ip)
+        self._attr_unique_id = f"{DOMAIN}_{mac_address}_{device_id}_{sensor_type}"
+        _LOGGER.debug("Initialized sensor %s for device %d from MAC %s", 
+                     sensor_type, device_id, mac_address)
 
     def _get_device_type(self) -> str:
         """Get the device type string."""
@@ -138,7 +138,7 @@ class OutbackInverterSensor(OutbackBaseSensor):
     def __init__(
             self,
             mate3: OutbackMate3,
-            remote_ip: str,
+            mac_address: str,
             device_id: int,
             sensor_type: str,
             name: str,
@@ -146,13 +146,13 @@ class OutbackInverterSensor(OutbackBaseSensor):
             unit: str | None,
         ) -> None:
         """Initialize the inverter sensor."""
-        super().__init__(mate3, remote_ip, device_id, sensor_type, name, device_class, unit)
+        super().__init__(mate3, mac_address, device_id, sensor_type, name, device_class, unit)
         
         # Set up device info
-        ip_id = remote_ip.replace('.', '_')
-        device_name = f"Outback Inverter {device_id} ({remote_ip})"
+        mac_id = mac_address.replace('.', '_')
+        device_name = f"Outback Inverter {device_id} ({mac_address})"
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"inverter_{remote_ip}_{device_id}")},
+            identifiers={(DOMAIN, f"inverter_{mac_address}_{device_id}")},
             name=device_name,
             manufacturer="Outback Power",
             model="Radian Inverter",
@@ -165,20 +165,20 @@ class OutbackInverterSensor(OutbackBaseSensor):
     @property
     def native_value(self):
         """Return the state of the sensor."""
-        if (self._remote_ip in self._mate3.inverters and 
-            self._device_id in self._mate3.inverters[self._remote_ip]):
-            value = self._mate3.inverters[self._remote_ip][self._device_id].get(self._sensor_type)
-            _LOGGER.debug("Inverter sensor %s for device %d from IP %s value: %s", 
-                         self._sensor_type, self._device_id, self._remote_ip, value)
+        if (self._mac_address in self._mate3.inverters and 
+            self._device_id in self._mate3.inverters[self._mac_address]):
+            value = self._mate3.inverters[self._mac_address][self._device_id].get(self._sensor_type)
+            _LOGGER.debug("Inverter sensor %s for device %d from MAC %s value: %s", 
+                         self._sensor_type, self._device_id, self._mac_address, value)
             return value
         return None
 
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return (self._remote_ip in self._mate3.inverters and 
-                self._device_id in self._mate3.inverters[self._remote_ip] and
-                self._sensor_type in self._mate3.inverters[self._remote_ip][self._device_id])
+        return (self._mac_address in self._mate3.inverters and 
+                self._device_id in self._mate3.inverters[self._mac_address] and
+                self._sensor_type in self._mate3.inverters[self._mac_address][self._device_id])
 
 
 class OutbackChargeControllerSensor(OutbackBaseSensor):
@@ -187,7 +187,7 @@ class OutbackChargeControllerSensor(OutbackBaseSensor):
     def __init__(
             self,
             mate3: OutbackMate3,
-            remote_ip: str,
+            mac_address: str,
             device_id: int,
             sensor_type: str,
             name: str,
@@ -195,13 +195,13 @@ class OutbackChargeControllerSensor(OutbackBaseSensor):
             unit: str | None,
         ) -> None:
         """Initialize the charge controller sensor."""
-        super().__init__(mate3, remote_ip, device_id, sensor_type, name, device_class, unit)
+        super().__init__(mate3, mac_address, device_id, sensor_type, name, device_class, unit)
         
         # Set up device info
-        ip_id = remote_ip.replace('.', '_')
-        device_name = f"Outback Charge Controller {device_id} ({remote_ip})"
+        mac_id = mac_address.replace('.', '_')
+        device_name = f"Outback Charge Controller {device_id} ({mac_address})"
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"charge_controller_{remote_ip}_{device_id}")},
+            identifiers={(DOMAIN, f"charge_controller_{mac_address}_{device_id}")},
             name=device_name,
             manufacturer="Outback Power",
             model="Charge Controller",
@@ -214,17 +214,17 @@ class OutbackChargeControllerSensor(OutbackBaseSensor):
     @property
     def native_value(self):
         """Return the state of the sensor."""
-        if (self._remote_ip in self._mate3.charge_controllers and 
-            self._device_id in self._mate3.charge_controllers[self._remote_ip]):
-            value = self._mate3.charge_controllers[self._remote_ip][self._device_id].get(self._sensor_type)
-            _LOGGER.debug("Charge controller sensor %s for device %d from IP %s value: %s", 
-                         self._sensor_type, self._device_id, self._remote_ip, value)
+        if (self._mac_address in self._mate3.charge_controllers and 
+            self._device_id in self._mate3.charge_controllers[self._mac_address]):
+            value = self._mate3.charge_controllers[self._mac_address][self._device_id].get(self._sensor_type)
+            _LOGGER.debug("Charge controller sensor %s for device %d from MAC %s value: %s", 
+                         self._sensor_type, self._device_id, self._mac_address, value)
             return value
         return None
 
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return (self._remote_ip in self._mate3.charge_controllers and 
-                self._device_id in self._mate3.charge_controllers[self._remote_ip] and
-                self._sensor_type in self._mate3.charge_controllers[self._remote_ip][self._device_id])
+        return (self._mac_address in self._mate3.charge_controllers and 
+                self._device_id in self._mate3.charge_controllers[self._mac_address] and
+                self._sensor_type in self._mate3.charge_controllers[self._mac_address][self._device_id])

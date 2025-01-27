@@ -37,6 +37,8 @@ CONFIG_SCHEMA = vol.Schema(
     extra=vol.ALLOW_EXTRA,
 )
 
+MAC_PATTERN = re.compile(r'\[([0-9A-F]{6})-([0-9A-F]{6})\]')
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Outback MATE3 from a config entry."""
     _LOGGER.debug("Setting up Outback MATE3 integration")
@@ -77,10 +79,10 @@ class OutbackMate3(DataUpdateCoordinator):
         self._socket = None
         self._running = False
         self._add_entities_callback = None
-        self.device_counts: Dict[str, Dict[int, int]] = {}  # IP -> {device_type -> count}
-        self.charge_controllers: Dict[str, Dict[int, dict]] = {}  # IP -> {device_id -> data}
-        self.inverters: Dict[str, Dict[int, dict]] = {}  # IP -> {device_id -> data}
-        self.discovered_devices: Set[str] = set()  # Set of "ip_type_id" strings
+        self.device_counts: Dict[str, Dict[int, int]] = {}  # MAC -> {device_type -> count}
+        self.charge_controllers: Dict[str, Dict[int, dict]] = {}  # MAC -> {device_id -> data}
+        self.inverters: Dict[str, Dict[int, dict]] = {}  # MAC -> {device_id -> data}
+        self.discovered_devices: Set[str] = set()  # Set of "mac_type_id" strings
         _LOGGER.debug("Initialized OutbackMate3 with port %d", port)
 
     def set_add_entities_callback(self, callback: AddEntitiesCallback) -> None:
@@ -129,39 +131,48 @@ class OutbackMate3(DataUpdateCoordinator):
         """Process received data."""
         try:
             metrics = data.decode('utf-8')
+            
+            # Extract MAC address from the start of the data line
+            mac_match = MAC_PATTERN.match(metrics)
+            if not mac_match:
+                _LOGGER.error("Could not find MAC address in data: %s", metrics)
+                return
+            
+            mac_address = mac_match.group(1) + mac_match.group(2)
+            
             header, *devices = re.split(']<|><|>', metrics)
             devices = list(filter(lambda x: x.startswith('0'), devices))
 
             _LOGGER.debug("Processing %d devices from IP %s", len(devices), remote_ip)
-            if remote_ip not in self.device_counts:
-                self.device_counts[remote_ip] = {}
-            self.device_counts[remote_ip].clear()
+            if mac_address not in self.device_counts:
+                self.device_counts[mac_address] = {}
+            self.device_counts[mac_address].clear()
             
             for device in devices:
-                self._process_device(device, remote_ip)
+                self._process_device(device, mac_address)
         except Exception as e:
             _LOGGER.error("Error processing data: %s", str(e))
 
-    def _process_device(self, device, remote_ip):
+    def _process_device(self, device, mac_address):
         """Process individual device data."""
         values = list(device.split(","))
         device_type = int(values[1])
-        no = self.device_counts[remote_ip].get(device_type, 0) + 1
-        self.device_counts[remote_ip][device_type] = no
+        no = self.device_counts[mac_address].get(device_type, 0) + 1
+        self.device_counts[mac_address][device_type] = no
 
-        device_key = f"{remote_ip}_{device_type}_{no}"
+        device_key = f"{mac_address}_{device_type}_{no}"
         is_new_device = device_key not in self.discovered_devices
 
-        _LOGGER.debug("Processing device type %d, number %d from IP %s", device_type, no, remote_ip)
+        _LOGGER.debug("Processing device type %d, number %d from MAC %s", device_type, no, mac_address)
 
         if device_type == 6:  # Inverter
-            if remote_ip not in self.inverters:
-                self.inverters[remote_ip] = {}
-            self._process_inverter(no, values, remote_ip)
+            if mac_address not in self.inverters:
+                self.inverters[mac_address] = {}
+            self._process_inverter(no, values, mac_address)
         elif device_type == 3:  # Charge Controller
-            if remote_ip not in self.charge_controllers:
-                self.charge_controllers[remote_ip] = {}
-            self._process_charge_controller(no, values, remote_ip)
+            if mac_address not in self.charge_controllers:
+                self.charge_controllers[mac_address] = {}
+            self._process_charge_controller(no, values, mac_address)
         else:
             _LOGGER.warning("Unknown device type: %s", device_type)
             return
@@ -170,19 +181,19 @@ class OutbackMate3(DataUpdateCoordinator):
             self.discovered_devices.add(device_key)
             if self._add_entities_callback:
                 from .sensor import create_device_entities
-                entities = create_device_entities(self, remote_ip, device_type, no)
+                entities = create_device_entities(self, mac_address, device_type, no)
                 self.hass.async_create_task(self._add_entities_callback(entities))
 
-    def _process_inverter(self, no, values, remote_ip):
+    def _process_inverter(self, no, values, mac_address):
         """Process inverter data."""
-        if no not in self.inverters[remote_ip]:
-            self.inverters[remote_ip][no] = {
+        if no not in self.inverters[mac_address]:
+            self.inverters[mac_address][no] = {
                 'inverter_mode': 'unknown',  # Initialize mode sensors
                 'ac_mode': 'unknown'
             }
-            _LOGGER.debug("Created new inverter with ID %d for IP %s", no, remote_ip)
+            _LOGGER.debug("Created new inverter with ID %d for MAC %s", no, mac_address)
 
-        inv = self.inverters[remote_ip][no]
+        inv = self.inverters[mac_address][no]
 
         # L1 values
         l1_inverter_current = float(values[2])
@@ -250,17 +261,17 @@ class OutbackMate3(DataUpdateCoordinator):
             2: 'ac-use',
         }.get(ac_mode, 'unknown')
 
-        _LOGGER.debug("Updated inverter %d values for IP %s", no, remote_ip)
+        _LOGGER.debug("Updated inverter %d values for MAC %s", no, mac_address)
 
-    def _process_charge_controller(self, no, values, remote_ip):
+    def _process_charge_controller(self, no, values, mac_address):
         """Process charge controller data."""
-        if no not in self.charge_controllers[remote_ip]:
-            self.charge_controllers[remote_ip][no] = {
+        if no not in self.charge_controllers[mac_address]:
+            self.charge_controllers[mac_address][no] = {
                 'charge_mode': 'unknown'  # Initialize mode sensor
             }
-            _LOGGER.debug("Created new charge controller with ID %d for IP %s", no, remote_ip)
+            _LOGGER.debug("Created new charge controller with ID %d for MAC %s", no, mac_address)
             
-        cc = self.charge_controllers[remote_ip][no]
+        cc = self.charge_controllers[mac_address][no]
         
         pv_current = float(values[4])
         pv_voltage = float(values[5])
@@ -281,4 +292,4 @@ class OutbackMate3(DataUpdateCoordinator):
             4: 'eq',
         }.get(charge_mode, 'unknown')
 
-        _LOGGER.debug("Updated charge controller %d values for IP %s", no, remote_ip)
+        _LOGGER.debug("Updated charge controller %d values for MAC %s", no, mac_address)
