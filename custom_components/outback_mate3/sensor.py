@@ -102,6 +102,21 @@ async def async_setup_entry(
                     )
                 )
         
+        # Add system-wide sensors
+        system_entities = [
+            OutbackSystemSensor(mate3, "total_solar_power", "Total Solar Power",
+                              SensorDeviceClass.POWER, UnitOfPower.WATT),
+            OutbackSystemSensor(mate3, "total_grid_power", "Total Grid Power",
+                              SensorDeviceClass.POWER, UnitOfPower.WATT),
+            OutbackSystemSensor(mate3, "total_solar_energy", "Total Solar Energy",
+                              SensorDeviceClass.ENERGY, UnitOfEnergy.KILO_WATT_HOUR),
+            OutbackSystemSensor(mate3, "total_grid_energy_import", "Total Grid Energy Import",
+                              SensorDeviceClass.ENERGY, UnitOfEnergy.KILO_WATT_HOUR),
+            OutbackSystemSensor(mate3, "total_grid_energy_export", "Total Grid Energy Export",
+                              SensorDeviceClass.ENERGY, UnitOfEnergy.KILO_WATT_HOUR),
+        ]
+        entities.extend(system_entities)
+        
         if entities:
             _LOGGER.debug("Adding %d entities for MATE3 %s", len(entities), mac_address)
             async_add_entities(entities)
@@ -439,3 +454,62 @@ class OutbackCombinedSensor(OutbackBaseSensor):
     def available(self) -> bool:
         """Return True if entity is available."""
         return self._mate3.has_aggregated_value(self._sensor_type)
+
+
+class OutbackSystemSensor(OutbackBaseSensor):
+    """Representation of an Outback system-wide sensor."""
+
+    def __init__(
+            self,
+            mate3: OutbackMate3,
+            sensor_type: str,
+            name: str,
+            device_class: SensorDeviceClass | None,
+            unit: str | None,
+        ) -> None:
+        """Initialize the system sensor."""
+        super().__init__(mate3, "system", 0, sensor_type, name, device_class, unit)
+        
+        # Set up device info for the system device
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, "system")},
+            name="Outback MATE3 System",
+            manufacturer="Outback Power",
+            model="MATE3 System",
+        )
+        
+        if device_class == SensorDeviceClass.ENERGY:
+            self._attr_state_class = SensorStateClass.TOTAL_INCREASING
+        else:
+            self._attr_state_class = SensorStateClass.MEASUREMENT
+
+    @property
+    def native_value(self):
+        """Return the state of the sensor."""
+        try:
+            if self._sensor_type == "total_solar_power":
+                return sum(float(data.get("pv_power", 0)) 
+                         for ip in self._mate3.charge_controllers 
+                         for data in self._mate3.charge_controllers[ip].values())
+            elif self._sensor_type == "total_grid_power":
+                return sum(float(data.get("grid_power", 0))
+                         for ip in self._mate3.inverters
+                         for data in self._mate3.inverters[ip].values())
+            elif self._sensor_type == "total_solar_energy":
+                # Convert Wh to kWh
+                return sum(float(data.get("pv_power", 0)) / 1000.0
+                         for ip in self._mate3.charge_controllers
+                         for data in self._mate3.charge_controllers[ip].values())
+            elif self._sensor_type == "total_grid_energy_import":
+                # Only sum positive grid power (import) and convert to kWh
+                return sum(max(0, float(data.get("grid_power", 0))) / 1000.0
+                         for ip in self._mate3.inverters
+                         for data in self._mate3.inverters[ip].values())
+            elif self._sensor_type == "total_grid_energy_export":
+                # Only sum negative grid power (export) and convert to kWh
+                return sum(max(0, -float(data.get("grid_power", 0))) / 1000.0
+                         for ip in self._mate3.inverters
+                         for data in self._mate3.inverters[ip].values())
+        except (ValueError, TypeError):
+            return None
+        return None

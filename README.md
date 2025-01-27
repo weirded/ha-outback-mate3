@@ -3,7 +3,7 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub Release][releases-shield]][releases]
 
-A Home Assistant integration for the Outback MATE3 system controller.
+Monitor your Outback Power Systems MATE3 controller in Home Assistant. This integration receives UDP streaming data directly from your MATE3 controller, providing real-time insights into your solar power system's performance.
 
 ## Installation
 
@@ -25,13 +25,27 @@ A Home Assistant integration for the Outback MATE3 system controller.
 1. Go to Settings -> Devices & Services
 2. Click "Add Integration"
 3. Search for "Outback MATE3"
-4. Enter the IP address and port (default: 57027) of your MATE3
+4. Enter the UDP port number (default: 57027)
+
+### MATE3 Configuration
+
+1. Access your MATE3 controller's web interface
+2. Navigate to the Data Stream configuration
+3. Enable UDP streaming
+4. Set the destination IP to your Home Assistant IP address
+5. Set the port to match your configuration (default: 57027)
 
 ## Available Sensors
 
-### Inverter Sensors
-Each inverter in your system will have the following sensors:
+### System-wide Sensors
+- Total Solar Power (W)
+- Total Grid Power (W)
+- Total Solar Energy (kWh)
+- Total Grid Energy Import (kWh)
+- Total Grid Energy Export (kWh)
 
+### Inverter Sensors
+Each inverter in your system will have:
 - Current (A)
 - Charger Current (A)
 - Grid Current (A)
@@ -40,21 +54,27 @@ Each inverter in your system will have the following sensors:
 - Power (W)
 - Charger Power (W)
 - Grid Power (W)
-- Operating Mode (text)
-- AC Mode (text)
+- Operating Mode
+- AC Mode
 
 ### Charge Controller Sensors
-Each charge controller in your system will have the following sensors:
-
+Each charge controller will have:
 - Solar Current (A)
 - Solar Voltage (V)
 - Battery Voltage (V)
 - Solar Power (W)
-- Charge Mode (text)
+- Charge Mode
+
+## Energy Dashboard Integration
+
+This integration supports the Home Assistant Energy Dashboard with the following metrics:
+- Grid Power Import/Export
+- Solar Production
+- Total Energy Monitoring
 
 ## Troubleshooting
 
-If you're not seeing any sensors:
+If you're not seeing any data:
 1. Check that your MATE3 is accessible at the configured IP address and port
 2. Check the Home Assistant logs for any error messages
 3. Make sure your MATE3 is sending data (you should see messages in the logs)
