@@ -40,13 +40,83 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str, device_type: i
     """Create entities for a newly discovered device."""
     entities = []
     
+    # Create combined sensors if this is the first device for this MAC
+    if f"combined_{mac_address}" not in mate3.discovered_devices:
+        _LOGGER.debug("Creating combined sensors for MAC %s", mac_address)
+        entities.extend([
+            OutbackCombinedSensor(
+                mate3,
+                mac_address,
+                "total_grid_power",
+                "Total Grid Power",
+                SensorDeviceClass.POWER,
+                UnitOfPower.WATT,
+            ),
+            OutbackCombinedSensor(
+                mate3,
+                mac_address,
+                "total_grid_current",
+                "Total Grid Current",
+                SensorDeviceClass.CURRENT,
+                UnitOfElectricCurrent.AMPERE,
+            ),
+            OutbackCombinedSensor(
+                mate3,
+                mac_address,
+                "total_charger_power",
+                "Total Charger Power",
+                SensorDeviceClass.POWER,
+                UnitOfPower.WATT,
+            ),
+            OutbackCombinedSensor(
+                mate3,
+                mac_address,
+                "total_charger_current",
+                "Total Charger Current",
+                SensorDeviceClass.CURRENT,
+                UnitOfElectricCurrent.AMPERE,
+            ),
+            OutbackCombinedSensor(
+                mate3,
+                mac_address,
+                "total_inverter_power",
+                "Total Inverter Power",
+                SensorDeviceClass.POWER,
+                UnitOfPower.WATT,
+            ),
+            OutbackCombinedSensor(
+                mate3,
+                mac_address,
+                "total_inverter_current",
+                "Total Inverter Current",
+                SensorDeviceClass.CURRENT,
+                UnitOfElectricCurrent.AMPERE,
+            ),
+            OutbackCombinedSensor(
+                mate3,
+                mac_address,
+                "total_cc_output_current",
+                "Total Charge Controller Output Current",
+                SensorDeviceClass.CURRENT,
+                UnitOfElectricCurrent.AMPERE,
+            ),
+            OutbackCombinedSensor(
+                mate3,
+                mac_address,
+                "total_cc_output_power",
+                "Total Charge Controller Output Power",
+                SensorDeviceClass.POWER,
+                UnitOfPower.WATT,
+            ),
+        ])
+        mate3.discovered_devices.add(f"combined_{mac_address}")
+
     if device_type == 6:  # Inverter
         _LOGGER.debug("Creating sensors for inverter %d from MAC %s", device_id, mac_address)
         entities.extend([
-            # Combined measurements
-            OutbackInverterSensor(mate3, mac_address, device_id, "total_inverter_current", "Total Inverter Current",
+            OutbackInverterSensor(mate3, mac_address, device_id, "current", "Current",
                                 SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
-            OutbackInverterSensor(mate3, mac_address, device_id, "total_charger_current", "Total Charger Current",
+            OutbackInverterSensor(mate3, mac_address, device_id, "charger_current", "Charger Current",
                                 SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
             OutbackInverterSensor(mate3, mac_address, device_id, "grid_current", "Grid Current",
                                 SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
@@ -54,16 +124,12 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str, device_type: i
                                 SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
             OutbackInverterSensor(mate3, mac_address, device_id, "ac_output_voltage", "AC Output Voltage",
                                 SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
-            
-            # Power measurements
             OutbackInverterSensor(mate3, mac_address, device_id, "inverter_power", "Inverter Power",
                                 SensorDeviceClass.POWER, UnitOfPower.WATT),
             OutbackInverterSensor(mate3, mac_address, device_id, "charger_power", "Charger Power",
                                 SensorDeviceClass.POWER, UnitOfPower.WATT),
             OutbackInverterSensor(mate3, mac_address, device_id, "grid_power", "Grid Power",
                                 SensorDeviceClass.POWER, UnitOfPower.WATT),
-
-            # Mode sensors
             OutbackInverterSensor(mate3, mac_address, device_id, "inverter_mode", "Inverter Mode",
                                 SensorDeviceClass.ENUM, None),
             OutbackInverterSensor(mate3, mac_address, device_id, "ac_mode", "AC Mode",
@@ -84,6 +150,8 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str, device_type: i
                                         SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
             OutbackChargeControllerSensor(mate3, mac_address, device_id, "charge_mode", "Charge Mode",
                                         SensorDeviceClass.ENUM, None),
+            OutbackChargeControllerSensor(mate3, mac_address, device_id, "output_power", "Output Power",
+                                        SensorDeviceClass.POWER, UnitOfPower.WATT),
         ])
 
     _LOGGER.debug("Created %d entities for device type %d, id %d from MAC %s", 
@@ -132,31 +200,64 @@ class OutbackBaseSensor(CoordinatorEntity, SensorEntity):
         raise NotImplementedError
 
 
-class OutbackInverterSensor(OutbackBaseSensor):
-    """Representation of an Outback inverter sensor."""
+class OutbackCombinedSensor(CoordinatorEntity, SensorEntity):
+    """Representation of an Outback combined metrics sensor."""
 
     def __init__(
-            self,
-            mate3: OutbackMate3,
-            mac_address: str,
-            device_id: int,
-            sensor_type: str,
-            name: str,
-            device_class: SensorDeviceClass | None,
-            unit: str | None,
-        ) -> None:
-        """Initialize the inverter sensor."""
-        super().__init__(mate3, mac_address, device_id, sensor_type, name, device_class, unit)
+        self,
+        mate3: OutbackMate3,
+        mac_address: str,
+        sensor_type: str,
+        name: str,
+        device_class: SensorDeviceClass | None,
+        unit: str | None,
+    ) -> None:
+        """Initialize the combined sensor."""
+        super().__init__(mate3)
+        self._mate3 = mate3
+        self._mac_address = mac_address
+        self._sensor_type = sensor_type
+        
+        # Create entity_id friendly MAC (replace dots with underscores)
+        mac_id = mac_address.replace('.', '_')
+        device_name = f"Outback System {mac_address}"
+        
+        # Set entity name and ID
+        self._attr_has_entity_name = True
+        self._attr_name = name
+        self.entity_id = f"sensor.mate3_{mac_id}_system_{sensor_type}"
+
+        self._attr_device_class = device_class
+        self._attr_native_unit_of_measurement = unit
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_unique_id = f"{DOMAIN}_{mac_address}_system_{sensor_type}"
         
         # Set up device info
-        mac_id = mac_address.replace('.', '_')
-        device_name = f"Outback Inverter {device_id} ({mac_address})"
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"inverter_{mac_address}_{device_id}")},
+            identifiers={(DOMAIN, f"system_{mac_address}")},
             name=device_name,
             manufacturer="Outback Power",
-            model="Radian Inverter",
+            model="Combined System Metrics",
         )
+
+    @property
+    def native_value(self):
+        """Return the state of the sensor."""
+        if self._mac_address in self._mate3.combined_metrics:
+            return self._mate3.combined_metrics[self._mac_address].get(self._sensor_type)
+        return None
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return (
+            self._mac_address in self._mate3.combined_metrics
+            and self._sensor_type in self._mate3.combined_metrics[self._mac_address]
+        )
+
+
+class OutbackInverterSensor(OutbackBaseSensor):
+    """Representation of an Outback inverter sensor."""
 
     def _get_device_type(self) -> str:
         """Get the device type string."""
@@ -183,29 +284,6 @@ class OutbackInverterSensor(OutbackBaseSensor):
 
 class OutbackChargeControllerSensor(OutbackBaseSensor):
     """Representation of an Outback charge controller sensor."""
-
-    def __init__(
-            self,
-            mate3: OutbackMate3,
-            mac_address: str,
-            device_id: int,
-            sensor_type: str,
-            name: str,
-            device_class: SensorDeviceClass | None,
-            unit: str | None,
-        ) -> None:
-        """Initialize the charge controller sensor."""
-        super().__init__(mate3, mac_address, device_id, sensor_type, name, device_class, unit)
-        
-        # Set up device info
-        mac_id = mac_address.replace('.', '_')
-        device_name = f"Outback Charge Controller {device_id} ({mac_address})"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"charge_controller_{mac_address}_{device_id}")},
-            name=device_name,
-            manufacturer="Outback Power",
-            model="Charge Controller",
-        )
 
     def _get_device_type(self) -> str:
         """Get the device type string."""

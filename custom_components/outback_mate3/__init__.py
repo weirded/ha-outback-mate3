@@ -83,6 +83,7 @@ class OutbackMate3(DataUpdateCoordinator):
         self.charge_controllers: Dict[str, Dict[int, dict]] = {}  # MAC -> {device_id -> data}
         self.inverters: Dict[str, Dict[int, dict]] = {}  # MAC -> {device_id -> data}
         self.discovered_devices: Set[str] = set()  # Set of "mac_type_id" strings
+        self.combined_metrics: Dict[str, dict] = {}  # MAC -> combined metrics
         _LOGGER.debug("Initialized OutbackMate3 with port %d", port)
 
     def set_add_entities_callback(self, callback: AddEntitiesCallback) -> None:
@@ -135,7 +136,7 @@ class OutbackMate3(DataUpdateCoordinator):
             # Extract MAC address from the start of the data line
             mac_match = MAC_PATTERN.match(metrics)
             if not mac_match:
-                _LOGGER.error("Could not find MAC address in data: %s", metrics)
+                _LOGGER.debug("Could not find MAC address in data: %s", metrics)
                 return
             
             mac_address = mac_match.group(1) + mac_match.group(2)
@@ -148,8 +149,49 @@ class OutbackMate3(DataUpdateCoordinator):
                 self.device_counts[mac_address] = {}
             self.device_counts[mac_address].clear()
             
+            # Initialize combined metrics for this MAC
+            if mac_address not in self.combined_metrics:
+                self.combined_metrics[mac_address] = {}
+            
+            combined = {
+                'total_grid_power': 0.0,
+                'total_grid_current': 0.0,
+                'total_charger_power': 0.0,
+                'total_charger_current': 0.0,
+                'total_inverter_power': 0.0,
+                'total_inverter_current': 0.0,
+                'total_cc_output_current': 0.0,
+                'total_cc_output_power': 0.0,
+            }
+            
+            # Process each device and accumulate totals
             for device in devices:
                 self._process_device(device, mac_address)
+            
+            # Calculate combined metrics for inverters
+            for inv_data in self.inverters.get(mac_address, {}).values():
+                combined['total_grid_power'] += float(inv_data.get('grid_power', 0))
+                combined['total_grid_current'] += float(inv_data.get('grid_current', 0))
+                combined['total_charger_power'] += float(inv_data.get('charger_power', 0))
+                combined['total_charger_current'] += float(inv_data.get('charger_current', 0))
+                combined['total_inverter_power'] += float(inv_data.get('inverter_power', 0))
+                combined['total_inverter_current'] += float(inv_data.get('total_inverter_current', 0))
+            
+            # Calculate combined metrics for charge controllers
+            for cc_data in self.charge_controllers.get(mac_address, {}).values():
+                output_current = float(cc_data.get('output_current', 0))
+                battery_voltage = float(cc_data.get('battery_voltage', 0))
+                output_power = output_current * battery_voltage
+                
+                # Store the calculated output power
+                cc_data['output_power'] = output_power
+                
+                combined['total_cc_output_current'] += output_current
+                combined['total_cc_output_power'] += output_power
+            
+            # Update the combined metrics
+            self.combined_metrics[mac_address] = combined
+            
         except Exception as e:
             _LOGGER.error("Error processing data: %s", str(e))
 
