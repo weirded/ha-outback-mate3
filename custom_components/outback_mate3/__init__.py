@@ -360,7 +360,7 @@ class OutbackMate3(DataUpdateCoordinator):
         
         pv_current = float(values[4])
         pv_voltage = float(values[5])
-        battery_voltage = float(values[6])  # Already in proper units
+        battery_voltage = float(values[11])/10
         cc['pv_current'] = pv_current
         cc['pv_voltage'] = pv_voltage
         cc['pv_power'] = pv_voltage * pv_current
@@ -368,7 +368,7 @@ class OutbackMate3(DataUpdateCoordinator):
         cc['output_current'] = float(values[3]) + (float(values[7]) / 10)
         cc['battery_voltage'] = battery_voltage
 
-        charge_mode = int(values[8])
+        charge_mode = int(values[10])
         cc['charge_mode'] = {
             0: 'silent',
             1: 'float',
