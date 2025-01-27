@@ -158,6 +158,8 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str, device_type: i
                                 SensorDeviceClass.ENUM, None),
             OutbackInverterSensor(mate3, mac_address, device_id, "ac_mode", "AC Mode",
                                 SensorDeviceClass.ENUM, None),
+            OutbackInverterSensor(mate3, mac_address, device_id, "grid_mode", "Grid Mode",
+                                SensorDeviceClass.ENUM, None),
         ])
     elif device_type == 3:  # Charge Controller
         _LOGGER.debug("Creating sensors for charge controller %d from MAC %s", device_id, mac_address)

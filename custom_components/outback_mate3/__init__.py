@@ -4,7 +4,7 @@ import logging
 import socket
 import re
 from datetime import datetime
-from typing import Dict, Set
+from typing import Dict, Set, List
 
 import voluptuous as vol
 
@@ -238,6 +238,10 @@ class OutbackMate3(DataUpdateCoordinator):
         except Exception as e:
             _LOGGER.error("Error processing data: %s", str(e))
 
+    def is_bit_set(byte, bit_position):
+        return (byte & (1 << bit_position)) != 0
+
+
     def _process_device(self, device, mac_address):
         """Process individual device data."""
         values = list(device.split(","))
@@ -280,21 +284,27 @@ class OutbackMate3(DataUpdateCoordinator):
 
         inv = self.inverters[mac_address][no]
 
+        # Check for 240V and grid/generator
+        misc = int(values[20])
+        is_240v = is_bit_set(misc, 7)
+        ac_factor = 2 if is_240v else 1
+        is_grid = is_bit_set(misc, 6)
+
         # L1 values
         l1_inverter_current = float(values[2])
         l1_charger_current = float(values[3])
         l1_buy_current = float(values[4])
         l1_sell_current = float(values[5])
-        l1_ac_input_voltage = float(values[6])
-        l1_ac_output_voltage = float(values[8])
+        l1_ac_input_voltage = float(values[6]) * ac_factor
+        l1_ac_output_voltage = float(values[8]) * ac_factor
 
         # L2 values
         l2_inverter_current = float(values[2 + 7])
         l2_charger_current = float(values[3 + 7])
         l2_buy_current = float(values[4 + 7])
         l2_sell_current = float(values[5 + 7])
-        l2_ac_input_voltage = float(values[6 + 7])
-        l2_ac_output_voltage = float(values[8 + 7])
+        l2_ac_input_voltage = float(values[6 + 7]) * ac_factor
+        l2_ac_output_voltage = float(values[8 + 7]) * ac_factor
 
         # Combined measurements
         inv['total_inverter_current'] = l1_inverter_current + l2_inverter_current
@@ -320,10 +330,10 @@ class OutbackMate3(DataUpdateCoordinator):
         # Process modes
         inverter_mode = int(values[16])
         inv['inverter_mode'] = {
+            3: 'charging',
             0: 'off',
             1: 'search',
             2: 'inverting',
-            3: 'charging',
             4: 'silent',
             5: 'floating',
             6: 'equalizing',
@@ -345,6 +355,8 @@ class OutbackMate3(DataUpdateCoordinator):
             1: 'ac-drop',
             2: 'ac-use',
         }.get(ac_mode, 'unknown')
+
+        inv['grid_mode'] = 'grid' if is_grid else 'generator'
 
         _LOGGER.debug("Updated inverter %d values for MAC %s", no, mac_address)
 
