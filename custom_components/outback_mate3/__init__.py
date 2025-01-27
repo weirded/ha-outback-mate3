@@ -84,6 +84,7 @@ class OutbackMate3(DataUpdateCoordinator):
         self.inverters: Dict[str, Dict[int, dict]] = {}  # MAC -> {device_id -> data}
         self.discovered_devices: Set[str] = set()  # Set of "mac_type_id" strings
         self.combined_metrics: Dict[str, dict] = {}  # MAC -> combined metrics
+        self._last_updates: Dict[str, datetime] = {}  # MAC -> last update time
         _LOGGER.debug("Initialized OutbackMate3 with port %d", port)
 
     def set_add_entities_callback(self, callback: AddEntitiesCallback) -> None:
@@ -119,11 +120,6 @@ class OutbackMate3(DataUpdateCoordinator):
                     remote_ip = addr[0]
                     _LOGGER.debug("Received UDP data from %s: %s", remote_ip, data.decode('utf-8'))
                     self._process_data(data, remote_ip)
-                    self.async_set_updated_data(None)
-                    _LOGGER.debug("Current devices for IP %s - Inverters: %s, Charge Controllers: %s", 
-                                remote_ip, 
-                                list(self.inverters.get(remote_ip, {}).keys()), 
-                                list(self.charge_controllers.get(remote_ip, {}).keys()))
             except Exception as e:
                 _LOGGER.error("Error receiving data: %s", str(e))
                 await asyncio.sleep(1)
@@ -140,6 +136,12 @@ class OutbackMate3(DataUpdateCoordinator):
                 return
             
             mac_address = mac_match.group(1) + mac_match.group(2)
+            
+            # Check if we should process this message based on time since last update
+            now = datetime.now()
+            last_update = self._last_updates.get(mac_address)
+            if last_update and (now - last_update).total_seconds() < 30:
+                return
             
             header, *devices = re.split(']<|><|>', metrics)
             devices = list(filter(lambda x: x.startswith('0'), devices))
@@ -228,8 +230,10 @@ class OutbackMate3(DataUpdateCoordinator):
             else:
                 combined['avg_battery_voltage'] = None
             
-            # Update the combined metrics
+            # Update the combined metrics and last update time
             self.combined_metrics[mac_address] = combined
+            self._last_updates[mac_address] = now
+            self.async_set_updated_data(None)
             
         except Exception as e:
             _LOGGER.error("Error processing data: %s", str(e))
