@@ -17,10 +17,9 @@ from homeassistant.const import (
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-_LOGGER = logging.getLogger(__name__)
+from .const import DOMAIN, DEFAULT_PORT
 
-DOMAIN = "outback_mate3"
-DEFAULT_PORT = 57027
+_LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.SENSOR]
 

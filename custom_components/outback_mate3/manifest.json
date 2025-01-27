@@ -1,7 +1,7 @@
 {
   "domain": "outback_mate3",
   "name": "Outback MATE3",
-  "version": "1.0.14",
+  "version": "1.0.15",
   "documentation": "https://github.com/weirded/ha-outback-mate3",
   "dependencies": [],
   "codeowners": ["@weirded"],
