@@ -1,40 +1,77 @@
 # Home Assistant Outback MATE3 Integration
 
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)
+[![GitHub Release][releases-shield]][releases]
+[![License][license-shield]](LICENSE)
+
+> **Warning**: This is an early release provided as-is. Works for me but YMMW. 
+
 This custom component integrates the Outback MATE3 system controller with Home Assistant, providing real-time monitoring of Outback power system components including inverters and charge controllers.
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=weirded&repository=ha-outback-mate3&category=integration)
 
 ## Features
 
-- Real-time monitoring of Outback MATE3 devices via UDP
+- Real-time monitoring of Outback MATE3 devices via UDP streaming
 - Support for multiple inverters and charge controllers
 - Energy monitoring compatible with Home Assistant's Energy Dashboard
 - System-wide power and energy metrics
+- Per-leg (L1/L2) power calculations for accurate monitoring
 
 ## Installation
 
+### HACS (Recommended)
+
+1. Click the HACS badge above to open HACS
+2. Click on "Custom Repositories"
+3. Add this repository URL and select "Integration" as the category
+4. Install the "Outback MATE3" integration
+5. Restart Home Assistant
+3. Add the integration through the Home Assistant UI (Settings -> Devices & Services -> Add Integration -> Outback MATE3)
+
+### Manual Installation
 1. Copy the `custom_components/outback_mate3` directory to your Home Assistant configuration directory
 2. Restart Home Assistant
 3. Add the integration through the Home Assistant UI (Settings -> Devices & Services -> Add Integration -> Outback MATE3)
+
+## Configuration
+
+### MATE3 Setup
+
+The integration uses the MATE3's UDP streaming protocol. You'll need to configure your MATE3 to send data to your Home Assistant instance:
+
+##### On your MATE3 display:
+- Press the LOCK button
+- Enter user code 141
+- Navigate to Settings > System > Data Stream
+- Enable Data Stream
+- Set Protocol to "UDP"
+- Set IP address to your Home Assistant IP address
+- Set Port to 57027 (default)
+- Save settings
+
+You should now see your system and components in Home Assistant.
 
 ## Available Sensors
 
 ### System Device
 Combined metrics for your entire Outback system:
-- From Grid (W) - Positive for consumption, negative for production
-- Solar Production (W) - Always positive (production)
-- From Battery (W) - Positive for discharge, negative for charge
+- From Grid (W) - Power from/to grid (positive = consumption, negative = production)
+- Solar Production (W) - Total solar production
+- From Battery (W) - Battery power flow (positive = discharge, negative = charge)
 - To Loads (W) - Total power to loads (From Grid + From Battery)
-- Battery Voltage (V) - System battery voltage
+- Battery Voltage (V) - System battery voltage (averaged from charge controllers)
 - Solar Production Energy (kWh) - Daily solar production
 
 ### Inverter Device
 Per-inverter metrics:
-- Current (A)
-- Charger Current (A)
-- Buy Current (A)
-- Sell Current (A)
-- AC Input Voltage (V)
-- AC Output Voltage (V)
-- Battery Voltage (V)
+- L1/L2 Grid Power (W) - Power from/to grid per leg
+- L1/L2 Inverter Power (W) - Inverter output power per leg
+- L1/L2 Charger Power (W) - Charger input power per leg
+- L1/L2 AC Input Voltage (V) - AC input voltage per leg
+- L1/L2 AC Output Voltage (V) - AC output voltage per leg
+- L1/L2 Buy Current (A) - Grid buy current per leg
+- L1/L2 Sell Current (A) - Grid sell current per leg
 
 ### Charge Controller Device
 Per-charge controller metrics:
@@ -57,25 +94,22 @@ To use this integration with Home Assistant's Energy Dashboard:
 
 The integration will automatically track power values over time and calculate energy usage for the dashboard.
 
-## Configuration
-
-The integration requires:
-1. MATE3 IP address
-2. UDP port (default: 57027)
-
-For optimal performance, configure your MATE3 to:
-1. Enable UDP notifications
-2. Set the UDP port to match your configuration
-3. Set an appropriate update frequency (recommended: 1 second)
-
 ## Troubleshooting
 
 If you're not seeing data:
 1. Verify MATE3 network connectivity
 2. Check UDP port configuration
-3. Ensure UDP notifications are enabled on MATE3
+3. Ensure UDP streaming is enabled on MATE3
 4. Check Home Assistant logs for any error messages
 
 ## Support
 
 For bugs and feature requests, please open an issue on GitHub.
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+[releases-shield]: https://img.shields.io/github/release/weirded/ha-outback-mate3.svg?style=for-the-badge
+[releases]: https://github.com/weirded/ha-outback-mate3/releases
+[license-shield]: https://img.shields.io/github/license/weirded/ha-outback-mate3.svg?style=for-the-badge
