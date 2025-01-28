@@ -182,19 +182,25 @@ class OutbackMate3(DataUpdateCoordinator):
             
             # Calculate combined metrics for inverters
             for inv_data in self.inverters.get(mac_address, {}).values():
-                combined['total_grid_power'] += float(inv_data.get('grid_power', 0))
-                combined['total_grid_current'] += float(inv_data.get('grid_current', 0))
-                combined['total_charger_power'] += float(inv_data.get('charger_power', 0))
-                combined['total_charger_current'] += float(inv_data.get('charger_current', 0))
-                combined['total_inverter_power'] += float(inv_data.get('inverter_power', 0))
-                combined['total_inverter_current'] += float(inv_data.get('total_inverter_current', 0))
+                combined['total_grid_power'] += inv_data.get('grid_power', 0)
+                combined['total_grid_current'] += inv_data.get('l1_grid_power', 0) + inv_data.get('l2_grid_power', 0)
+                combined['total_charger_power'] += inv_data.get('charger_power', 0)
+                combined['total_charger_current'] += inv_data.get('l1_charger_current', 0) + inv_data.get('l2_charger_current', 0)
+                combined['total_inverter_power'] += inv_data.get('inverter_power', 0)
+                combined['total_inverter_current'] += inv_data.get('l1_inverter_current', 0) + inv_data.get('l2_inverter_current', 0)
                 
                 # Add voltages for averaging
-                if 'ac_input_voltage' in inv_data:
-                    combined['avg_ac_input_voltage'] += float(inv_data['ac_input_voltage'])
+                if 'l1_ac_input_voltage' in inv_data:
+                    combined['avg_ac_input_voltage'] += float(inv_data['l1_ac_input_voltage'])
                     voltage_counts['ac_input'] += 1
-                if 'ac_output_voltage' in inv_data:
-                    combined['avg_ac_output_voltage'] += float(inv_data['ac_output_voltage'])
+                if 'l2_ac_input_voltage' in inv_data:
+                    combined['avg_ac_input_voltage'] += float(inv_data['l2_ac_input_voltage'])
+                    voltage_counts['ac_input'] += 1
+                if 'l1_ac_output_voltage' in inv_data:
+                    combined['avg_ac_output_voltage'] += float(inv_data['l1_ac_output_voltage'])
+                    voltage_counts['ac_output'] += 1
+                if 'l2_ac_output_voltage' in inv_data:
+                    combined['avg_ac_output_voltage'] += float(inv_data['l2_ac_output_voltage'])
                     voltage_counts['ac_output'] += 1
             
             # Calculate combined metrics for charge controllers
@@ -235,6 +241,9 @@ class OutbackMate3(DataUpdateCoordinator):
             self._last_updates[mac_address] = now
             self.async_set_updated_data(None)
             
+            # Update energy tracking timestamp
+            now = datetime.now()
+            
         except Exception as e:
             _LOGGER.error("Error processing data: %s", str(e))
 
@@ -269,25 +278,20 @@ class OutbackMate3(DataUpdateCoordinator):
             self.discovered_devices.add(device_key)
             if self._add_entities_callback:
                 from .sensor import create_device_entities
-                entities = create_device_entities(self, mac_address, device_type, no)
-                self.hass.async_create_task(self._add_entities_callback(entities))
+                entities = create_device_entities(self, mac_address)
+                if entities and self._add_entities_callback is not None:
+                    self._add_entities_callback(entities)
 
     def _process_inverter(self, no, values, mac_address):
         """Process inverter data."""
+        if mac_address not in self.inverters:
+            self.inverters[mac_address] = {}
         if no not in self.inverters[mac_address]:
-            self.inverters[mac_address][no] = {
-                'inverter_mode': 'unknown',  # Initialize mode sensors
-                'ac_mode': 'unknown'
-            }
-            _LOGGER.debug("Created new inverter with ID %d for MAC %s", no, mac_address)
-
+            self.inverters[mac_address][no] = {}
         inv = self.inverters[mac_address][no]
 
-        # Check for 240V and grid/generator
-        misc = int(values[20])
-        is_240v = self._is_bit_set(misc, 7)
-        ac_factor = 2 if is_240v else 1
-        is_grid = self._is_bit_set(misc, 6)
+        # AC factor (120V = 1.0, 230V = 2.0)
+        ac_factor = 2.0 if float(values[6]) > 150.0 else 1.0
 
         # L1 values
         l1_inverter_current = float(values[2])
@@ -297,9 +301,6 @@ class OutbackMate3(DataUpdateCoordinator):
         l1_ac_input_voltage = float(values[6]) * ac_factor
         l1_ac_output_voltage = float(values[8]) * ac_factor
 
-        # Battery voltage from field 12
-        inv['battery_voltage'] = float(values[12]) / 10.0
-
         # L2 values
         l2_inverter_current = float(values[2 + 7])
         l2_charger_current = float(values[3 + 7])
@@ -308,30 +309,51 @@ class OutbackMate3(DataUpdateCoordinator):
         l2_ac_input_voltage = float(values[6 + 7]) * ac_factor
         l2_ac_output_voltage = float(values[8 + 7]) * ac_factor
 
-        # Combined measurements
-        inv['current'] = l1_inverter_current + l2_inverter_current
-        inv['charger_current'] = l1_charger_current + l2_charger_current
-        
-        # Combined measurements for system metrics
-        inv['total_inverter_current'] = l1_inverter_current + l2_inverter_current
-        inv['total_charger_current'] = l1_charger_current + l2_charger_current
-        
-        # Combine buy/sell into grid current (buy is positive, sell is negative)
-        total_buy = l1_buy_current + l2_buy_current
-        total_sell = l1_sell_current + l2_sell_current
-        inv['grid_current'] = total_buy if total_buy > 0 else -total_sell
-        
-        # Average voltages (they should be the same for both legs)
-        inv['ac_input_voltage'] = (l1_ac_input_voltage + l2_ac_input_voltage) / 2
-        inv['ac_output_voltage'] = (l1_ac_output_voltage + l2_ac_output_voltage) / 2
+        # Calculate per-leg powers
+        # For buy/sell: positive = buying (consuming), negative = selling (producing)
+        l1_buy_power = l1_buy_current * l1_ac_input_voltage
+        l1_sell_power = -l1_sell_current * l1_ac_output_voltage
+        l1_grid_power = l1_buy_power + l1_sell_power
 
-        # Calculate power values
-        inv['inverter_power'] = (l1_inverter_current + l2_inverter_current) * ((l1_ac_output_voltage + l2_ac_output_voltage) / 2)
-        inv['charger_power'] = (l1_charger_current + l2_charger_current) * ((l1_ac_input_voltage + l2_ac_input_voltage) / 2)
-        
-        # Grid power (buy is positive, sell is negative)
-        grid_voltage = (l1_ac_input_voltage + l2_ac_input_voltage) / 2  # Use input voltage for both buy and sell
-        inv['grid_power'] = inv['grid_current'] * grid_voltage
+        l2_buy_power = l2_buy_current * l2_ac_input_voltage
+        l2_sell_power = -l2_sell_current * l2_ac_output_voltage
+        l2_grid_power = l2_buy_power + l2_sell_power
+
+        # Calculate per-leg inverter/charger powers
+        l1_inverter_power = l1_inverter_current * l1_ac_output_voltage
+        l1_charger_power = l1_charger_current * l1_ac_input_voltage
+
+        l2_inverter_power = l2_inverter_current * l2_ac_output_voltage
+        l2_charger_power = l2_charger_current * l2_ac_input_voltage
+
+        # Store all values
+        inv.update({
+            'l1_inverter_current': l1_inverter_current,
+            'l1_charger_current': l1_charger_current,
+            'l1_buy_current': l1_buy_current,
+            'l1_sell_current': l1_sell_current,
+            'l1_ac_input_voltage': l1_ac_input_voltage,
+            'l1_ac_output_voltage': l1_ac_output_voltage,
+            'l1_grid_power': l1_grid_power,
+            'l1_inverter_power': l1_inverter_power,
+            'l1_charger_power': l1_charger_power,
+
+            'l2_inverter_current': l2_inverter_current,
+            'l2_charger_current': l2_charger_current,
+            'l2_buy_current': l2_buy_current,
+            'l2_sell_current': l2_sell_current,
+            'l2_ac_input_voltage': l2_ac_input_voltage,
+            'l2_ac_output_voltage': l2_ac_output_voltage,
+            'l2_grid_power': l2_grid_power,
+            'l2_inverter_power': l2_inverter_power,
+            'l2_charger_power': l2_charger_power,
+
+            # Combined values
+            'grid_power': l1_grid_power + l2_grid_power,
+            'inverter_power': l1_inverter_power + l2_inverter_power,
+            'charger_power': l1_charger_power + l2_charger_power,
+            'battery_voltage': float(values[12]),  # Already in correct voltage, no need to divide by 10
+        })
 
         # Process modes
         inverter_mode = int(values[16])
@@ -362,30 +384,39 @@ class OutbackMate3(DataUpdateCoordinator):
             2: 'ac-use',
         }.get(ac_mode, 'unknown')
 
-        inv['grid_mode'] = 'grid' if is_grid else 'generator'
+        inv['grid_mode'] = 'grid' if self._is_bit_set(int(values[20]), 6) else 'generator'
 
         _LOGGER.debug("Updated inverter %d values for MAC %s", no, mac_address)
 
     def _process_charge_controller(self, no, values, mac_address):
         """Process charge controller data."""
+        if mac_address not in self.charge_controllers:
+            self.charge_controllers[mac_address] = {}
         if no not in self.charge_controllers[mac_address]:
-            self.charge_controllers[mac_address][no] = {
-                'charge_mode': 'unknown'  # Initialize mode sensor
-            }
-            _LOGGER.debug("Created new charge controller with ID %d for MAC %s", no, mac_address)
-            
+            self.charge_controllers[mac_address][no] = {}
         cc = self.charge_controllers[mac_address][no]
-        
+
+        # Process values
         pv_current = float(values[4])
         pv_voltage = float(values[5])
-        battery_voltage = float(values[11])/10
-        cc['pv_current'] = pv_current
-        cc['pv_voltage'] = pv_voltage
-        cc['pv_power'] = pv_voltage * pv_current
+        output_current = float(values[3])
+        battery_voltage = float(values[11]) / 10.0  # Values come in as 10x actual voltage
 
-        cc['output_current'] = float(values[3]) + (float(values[7]) / 10)
-        cc['battery_voltage'] = battery_voltage
+        # Calculate power values
+        pv_power = pv_current * pv_voltage
+        output_power = output_current * battery_voltage
 
+        # Store values
+        cc.update({
+            'pv_current': pv_current,
+            'pv_voltage': pv_voltage,
+            'output_current': output_current,
+            'output_power': output_power,
+            'battery_voltage': battery_voltage,
+            'kwh_today': float(values[13]),
+        })
+        
+        # Get charge mode
         charge_mode = int(values[10])
         cc['charge_mode'] = {
             0: 'silent',

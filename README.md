@@ -1,122 +1,81 @@
-# Outback MATE3 Integration for Home Assistant
+# Home Assistant Outback MATE3 Integration
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
-[![GitHub Release][releases-shield]][releases]
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-
-Monitor your Outback Power Systems MATE3 controller in Home Assistant. This integration receives UDP streaming data directly from your MATE3 controller, providing real-time insights into your solar power system's performance.
+This custom component integrates the Outback MATE3 system controller with Home Assistant, providing real-time monitoring of Outback power system components including inverters and charge controllers.
 
 ## Features
 
-### Inverter Monitoring
-- Real-time power output monitoring
-- L1 and L2 current, voltage, and power metrics
-- Charging and buying/selling current tracking
-- Inverter mode and AC source status
-- Detailed operational state information
-
-### Charge Controller Monitoring
-- PV array current, voltage, and power
-- Battery charging metrics
-- Real-time charging mode status
-- Output current monitoring
+- Real-time monitoring of Outback MATE3 devices via UDP
+- Support for multiple inverters and charge controllers
+- Energy monitoring compatible with Home Assistant's Energy Dashboard
+- System-wide power and energy metrics
 
 ## Installation
 
-### HACS (Recommended)
-
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=weirded&repository=ha-outback-mate3&category=integration)
-
-1. Click the button above or manually add `https://github.com/weirded/ha-outback-mate3` as a custom repository in HACS
-2. Click Install
-3. Restart Home Assistant
-
-### Manual Installation
-
-1. Copy the `custom_components/outback_mate3` directory to your Home Assistant's `custom_components` directory
+1. Copy the `custom_components/outback_mate3` directory to your Home Assistant configuration directory
 2. Restart Home Assistant
-
-## Configuration
-
-1. Go to Settings -> Devices & Services
-2. Click "Add Integration"
-3. Search for "Outback MATE3"
-4. Enter the UDP port number (default: 57027)
-
-### MATE3 Configuration
-
-1. Access your MATE3 controller's web interface
-2. Navigate to the Data Stream configuration
-3. Enable UDP streaming
-4. Set the destination IP to your Home Assistant IP address
-5. Set the port to match your configuration (default: 57027)
+3. Add the integration through the Home Assistant UI (Settings -> Devices & Services -> Add Integration -> Outback MATE3)
 
 ## Available Sensors
 
-### Combined System Metrics
-- Total Grid Power (W)
-- Total Grid Current (A)
-- Total Charger Power (W)
-- Total Charger Current (A)
-- Total Inverter Power (W)
-- Total Inverter Current (A)
-- Total Charge Controller Output Current (A)
-- Total Charge Controller Output Power (W)
-- Average AC Input Voltage (V)
-- Average AC Output Voltage (V)
-- Average Battery Voltage (V)
+### System Device
+Combined metrics for your entire Outback system:
+- From Grid (W) - Positive for consumption, negative for production
+- Solar Production (W) - Always positive (production)
+- From Battery (W) - Positive for discharge, negative for charge
+- To Loads (W) - Total power to loads (From Grid + From Battery)
+- Battery Voltage (V) - System battery voltage
+- Solar Production Energy (kWh) - Daily solar production
 
-### Inverter Sensors
-Each inverter in your system will have:
+### Inverter Device
+Per-inverter metrics:
 - Current (A)
 - Charger Current (A)
-- Grid Current (A)
+- Buy Current (A)
+- Sell Current (A)
 - AC Input Voltage (V)
 - AC Output Voltage (V)
-- Inverter Power (W)
-- Charger Power (W)
-- Grid Power (W)
-- Inverter Mode
-- AC Mode (no-ac, ac-drop, ac-use)
-- Grid Mode (grid, generator)
 - Battery Voltage (V)
 
-### Charge Controller Sensors
-Each charge controller will have:
+### Charge Controller Device
+Per-charge controller metrics:
 - PV Current (A)
 - PV Voltage (V)
-- PV Power (W)
 - Output Current (A)
-- Battery Voltage (V)
-- Charge Mode
 - Output Power (W)
+- Battery Voltage (V)
+- Daily kWh
 
-## Energy Dashboard Integration
+## Energy Dashboard Setup
 
-This integration supports the Home Assistant Energy Dashboard with the following metrics:
-- Grid Power Import/Export
-- Solar Production
-- Total Energy Monitoring
+To use this integration with Home Assistant's Energy Dashboard:
+
+1. Go to Settings -> Energy
+2. Add the following sensors:
+   - Grid consumption/production: "From Grid" (handles both consumption and production)
+   - Solar production: "Solar Production"
+   - Home battery storage: "From Battery"
+
+The integration will automatically track power values over time and calculate energy usage for the dashboard.
+
+## Configuration
+
+The integration requires:
+1. MATE3 IP address
+2. UDP port (default: 57027)
+
+For optimal performance, configure your MATE3 to:
+1. Enable UDP notifications
+2. Set the UDP port to match your configuration
+3. Set an appropriate update frequency (recommended: 1 second)
 
 ## Troubleshooting
 
-If you're not seeing any data:
-1. Check that your MATE3 is accessible at the configured IP address and port
-2. Check the Home Assistant logs for any error messages
-3. Make sure your MATE3 is sending data (you should see messages in the logs)
+If you're not seeing data:
+1. Verify MATE3 network connectivity
+2. Check UDP port configuration
+3. Ensure UDP notifications are enabled on MATE3
+4. Check Home Assistant logs for any error messages
 
 ## Support
 
-Please open an issue on GitHub if you encounter any problems or have feature requests.
-
-## License
-
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
-## Credits
-
-- Outback Power Systems for their excellent documentation on the MATE3 data stream protocol
-- The Home Assistant community for their continued support and inspiration
-
-[releases-shield]: https://img.shields.io/github/v/release/weirded/ha-outback-mate3?style=flat
-[releases]: https://github.com/weirded/ha-outback-mate3/releases
+For bugs and feature requests, please open an issue on GitHub.
