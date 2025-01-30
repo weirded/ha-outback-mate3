@@ -99,9 +99,7 @@ The integration will automatically track power values over time and calculate en
 
 If you're not seeing data:
 1. Verify MATE3 network connectivity
-2. Check UDP port configuration
-3. Ensure UDP streaming is enabled on MATE3
-4. Check Home Assistant logs for any error messages
+2. Enable debug logging and check Home Assistant logs for any error messages
 
 ## Support
 
