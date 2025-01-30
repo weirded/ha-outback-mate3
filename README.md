@@ -41,14 +41,15 @@ This custom component integrates the Outback MATE3 system controller with Home A
 The integration uses the MATE3's UDP streaming protocol. You'll need to configure your MATE3 to send data to your Home Assistant instance:
 
 ##### On your MATE3 display:
+
+<img width="333" alt="image" src="https://github.com/user-attachments/assets/901fe6d2-e2d2-4d18-b52b-91fd214d74fe" />
+
 - Press the LOCK button
 - Enter user code 141
 - Navigate to Settings > System > Data Stream
-- Enable Data Stream
-- Set Protocol to "UDP"
+- Enable `Network Data Stream`
 - Set IP address to your Home Assistant IP address
 - Set Port to 57027 (default)
-- Save settings
 
 You should now see your system and components in Home Assistant.
 
