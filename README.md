@@ -47,9 +47,9 @@ The integration uses the MATE3's UDP streaming protocol. You'll need to configur
 - Press the LOCK button
 - Enter user code 141
 - Navigate to Settings > System > Data Stream
-- Enable `Network Data Stream`
-- Set IP address to your Home Assistant IP address
-- Set Port to 57027 (default)
+- Ensure `Network Data Stream` shows `Enabled`
+- Ensure `Destination IP` is the IP address of your Home Assistant instance
+- Ensure `Destination Port` is the port you configured when installing the integration (`57027` by default)
 
 You should now see your system and components in Home Assistant.
 
