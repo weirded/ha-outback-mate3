@@ -4,7 +4,9 @@
 [![GitHub Release][releases-shield]][releases]
 [![License][license-shield]](LICENSE)
 
-> **Warning**: This is an early release provided as-is. Works for me but YMMW. 
+> ❗**NOTE**❗ This integration currently does not work with _Home Assistant Operating System_ installs and has only been confirmed to work on _supervised_ installs of Home Assistant. 
+
+> This is an early release provided as-is. Works for me but YMMW.
 
 This custom component integrates the Outback MATE3 system controller with Home Assistant, providing real-time monitoring of Outback power system components including inverters and charge controllers.
 
