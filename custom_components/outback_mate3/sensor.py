@@ -98,40 +98,78 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> List[Sensor
     for device_id, inverter in mate3.inverters[mac_address].items():
         _LOGGER.debug("Creating sensors for inverter %d from MAC %s", device_id, mac_address)
         entities.extend([
-            OutbackInverterSensor(mate3, mac_address, device_id, "current", "Current",
+            # Current sensors
+            # L1 current sensors
+            OutbackInverterSensor(mate3, mac_address, device_id, "l1_inverter_current", "L1 Inverter Current",
                                 SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
-            OutbackInverterSensor(mate3, mac_address, device_id, "charger_current", "Charger Current",
+            OutbackInverterSensor(mate3, mac_address, device_id, "l1_charger_current", "L1 Charger Current",
                                 SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
             OutbackInverterSensor(mate3, mac_address, device_id, "l1_buy_current", "L1 Buy Current",
                                 SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
             OutbackInverterSensor(mate3, mac_address, device_id, "l1_sell_current", "L1 Sell Current",
                                 SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
+            # L2 current sensors
+            OutbackInverterSensor(mate3, mac_address, device_id, "l2_inverter_current", "L2 Inverter Current",
+                                SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
+            OutbackInverterSensor(mate3, mac_address, device_id, "l2_charger_current", "L2 Charger Current",
+                                SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
             OutbackInverterSensor(mate3, mac_address, device_id, "l2_buy_current", "L2 Buy Current",
                                 SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
             OutbackInverterSensor(mate3, mac_address, device_id, "l2_sell_current", "L2 Sell Current",
                                 SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
+            # Combined current sensors (L1 + L2)
+            OutbackInverterSensor(mate3, mac_address, device_id, "inverter_current", "Total Inverter Current",
+                                SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
+            OutbackInverterSensor(mate3, mac_address, device_id, "charger_current", "Total Charger Current",
+                                SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
+            
+            # Voltage sensors
+            # L1 voltage sensors
             OutbackInverterSensor(mate3, mac_address, device_id, "l1_ac_input_voltage", "L1 AC Input Voltage",
                                 SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
             OutbackInverterSensor(mate3, mac_address, device_id, "l1_ac_output_voltage", "L1 AC Output Voltage",
                                 SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
+            # L2 voltage sensors
             OutbackInverterSensor(mate3, mac_address, device_id, "l2_ac_input_voltage", "L2 AC Input Voltage",
                                 SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
             OutbackInverterSensor(mate3, mac_address, device_id, "l2_ac_output_voltage", "L2 AC Output Voltage",
                                 SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
+            # Combined voltage sensors (L1 + L2)
+            OutbackInverterSensor(mate3, mac_address, device_id, "total_ac_input_voltage", "Total AC Input Voltage",
+                                SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
+            OutbackInverterSensor(mate3, mac_address, device_id, "total_ac_output_voltage", "Total AC Output Voltage",
+                                SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
+            
+            # Power sensors
+            # L1 power sensors
             OutbackInverterSensor(mate3, mac_address, device_id, "l1_grid_power", "L1 Grid Power",
-                                SensorDeviceClass.POWER, UnitOfPower.WATT),
-            OutbackInverterSensor(mate3, mac_address, device_id, "l2_grid_power", "L2 Grid Power",
                                 SensorDeviceClass.POWER, UnitOfPower.WATT),
             OutbackInverterSensor(mate3, mac_address, device_id, "l1_inverter_power", "L1 Inverter Power",
                                 SensorDeviceClass.POWER, UnitOfPower.WATT),
-            OutbackInverterSensor(mate3, mac_address, device_id, "l2_inverter_power", "L2 Inverter Power",
-                                SensorDeviceClass.POWER, UnitOfPower.WATT),
             OutbackInverterSensor(mate3, mac_address, device_id, "l1_charger_power", "L1 Charger Power",
+                                SensorDeviceClass.POWER, UnitOfPower.WATT),
+            # L2 power sensors
+            OutbackInverterSensor(mate3, mac_address, device_id, "l2_grid_power", "L2 Grid Power",
+                                SensorDeviceClass.POWER, UnitOfPower.WATT),
+            OutbackInverterSensor(mate3, mac_address, device_id, "l2_inverter_power", "L2 Inverter Power",
                                 SensorDeviceClass.POWER, UnitOfPower.WATT),
             OutbackInverterSensor(mate3, mac_address, device_id, "l2_charger_power", "L2 Charger Power",
                                 SensorDeviceClass.POWER, UnitOfPower.WATT),
+            # Combined power sensors (L1 + L2)
+            OutbackInverterSensor(mate3, mac_address, device_id, "grid_power", "Total Grid Power",
+                                SensorDeviceClass.POWER, UnitOfPower.WATT),
+            OutbackInverterSensor(mate3, mac_address, device_id, "inverter_power", "Total Inverter Power",
+                                SensorDeviceClass.POWER, UnitOfPower.WATT),
+            OutbackInverterSensor(mate3, mac_address, device_id, "charger_power", "Total Charger Power",
+                                SensorDeviceClass.POWER, UnitOfPower.WATT),
             OutbackInverterSensor(mate3, mac_address, device_id, "battery_voltage", "Battery Voltage",
                                 SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
+            OutbackInverterSensor(mate3, mac_address, device_id, "inverter_mode", "Inverter Mode",
+                                SensorDeviceClass.ENUM, None),
+            OutbackInverterSensor(mate3, mac_address, device_id, "ac_mode", "AC Mode",
+                                SensorDeviceClass.ENUM, None),
+            OutbackInverterSensor(mate3, mac_address, device_id, "grid_mode", "Grid Mode",
+                                SensorDeviceClass.ENUM, None),
         ])
 
     # Add charge controller sensors

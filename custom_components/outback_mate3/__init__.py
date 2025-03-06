@@ -326,6 +326,10 @@ class OutbackMate3(DataUpdateCoordinator):
         l2_inverter_power = l2_inverter_current * l2_ac_output_voltage
         l2_charger_power = l2_charger_current * l2_ac_input_voltage
 
+        # Calculate total input and output voltages
+        total_ac_input_voltage = l1_ac_input_voltage + l2_ac_input_voltage
+        total_ac_output_voltage = l1_ac_output_voltage + l2_ac_output_voltage
+
         # Store all values
         inv.update({
             'l1_inverter_current': l1_inverter_current,
@@ -352,6 +356,10 @@ class OutbackMate3(DataUpdateCoordinator):
             'grid_power': l1_grid_power + l2_grid_power,
             'inverter_power': l1_inverter_power + l2_inverter_power,
             'charger_power': l1_charger_power + l2_charger_power,
+            'inverter_current': l1_inverter_current + l2_inverter_current,
+            'charger_current': l1_charger_current + l2_charger_current,
+            'total_ac_input_voltage': total_ac_input_voltage,
+            'total_ac_output_voltage': total_ac_output_voltage,
             'battery_voltage': float(values[12]),  # Already in correct voltage, no need to divide by 10
         })
 
@@ -412,6 +420,7 @@ class OutbackMate3(DataUpdateCoordinator):
             'pv_voltage': pv_voltage,
             'output_current': output_current,
             'output_power': output_power,
+            'pv_power': pv_power,
             'battery_voltage': battery_voltage,
             'kwh_today': float(values[13]),
         })
