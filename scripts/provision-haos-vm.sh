@@ -32,6 +32,14 @@ HAOS_VERSION="${HAOS_VERSION:-}"
 IMAGE_CACHE="${IMAGE_CACHE:-/var/lib/vz/template/iso}"
 START_AFTER_PROVISION="${START_AFTER_PROVISION:-1}"
 
+# Deterministic MAC derived from VMID so DHCP keeps handing out the same IP
+# across re-provisions. `02:` prefix marks it as locally-administered; `AD:DA`
+# is a project-scoped tag ("AddON"); last 3 bytes are the VMID in hex.
+if [[ -z "${MAC:-}" ]]; then
+  printf -v _mac_tail "%06X" "$VMID"
+  MAC="02:AD:DA:${_mac_tail:0:2}:${_mac_tail:2:2}:${_mac_tail:4:2}"
+fi
+
 log() { printf '[%(%H:%M:%S)T] %s\n' -1 "$*" >&2; }
 
 command -v qm >/dev/null || { echo "qm not found; run on a Proxmox host" >&2; exit 2; }
@@ -82,7 +90,7 @@ trap cleanup_on_error ERR
 
 # --- Create VM shell -------------------------------------------------------
 
-log "Creating VM $VMID ($VMNAME) on $STORAGE, ${MEM_MB}MB RAM, ${CORES} cores, HAOS $HAOS_VERSION"
+log "Creating VM $VMID ($VMNAME) on $STORAGE, ${MEM_MB}MB RAM, ${CORES} cores, MAC $MAC, HAOS $HAOS_VERSION"
 qm create "$VMID" \
   -machine q35 \
   -bios ovmf \
@@ -93,7 +101,7 @@ qm create "$VMID" \
   -memory "$MEM_MB" \
   -name "$VMNAME" \
   -tags "ha-outback-mate3,test" \
-  -net0 "virtio,bridge=${BRIDGE}" \
+  -net0 "virtio,bridge=${BRIDGE},macaddr=${MAC}" \
   -onboot 0 \
   -ostype l26 \
   -scsihw virtio-scsi-pci \

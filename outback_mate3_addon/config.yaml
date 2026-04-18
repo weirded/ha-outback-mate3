@@ -14,6 +14,8 @@ arch:
 startup: services
 boot: auto
 host_network: true
+# Disable Docker's tini init so s6-overlay (from the base image) can run as pid 1.
+init: false
 options:
   udp_port: 57027
   ws_port: 8099
