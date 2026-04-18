@@ -18,6 +18,7 @@ from aiohttp import ClientWebSocketResponse, WSMsgType
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
@@ -58,6 +59,49 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         mate3 = hass.data[DOMAIN].pop(entry.entry_id)
         await mate3.stop()
     return unload_ok
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, entry: ConfigEntry, device: dr.DeviceEntry
+) -> bool:
+    """Allow users to remove stale MATE3 devices via the UI.
+
+    Returns True if the device is no longer part of the current known state
+    (i.e. not in self.inverters / self.charge_controllers); returning False
+    would block the delete button in HA.
+    """
+    mate3: OutbackMate3 | None = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if mate3 is None:
+        return True
+
+    # Identifiers look like ("outback_mate3", "inverter_<MAC>_<index>")
+    # or ("outback_mate3", "system"). If the device still matches a live
+    # (mac, kind, index), refuse — the user is likely removing something
+    # that'll immediately re-appear on the next update.
+    for domain, identifier in device.identifiers:
+        if domain != DOMAIN:
+            continue
+        if identifier == "system":
+            # System device is global and regenerates from any known MAC.
+            return not (mate3.inverters or mate3.charge_controllers)
+        parts = identifier.split("_")
+        if len(parts) < 3:
+            continue
+        kind = "_".join(parts[:-2])
+        mac = parts[-2]
+        try:
+            index = int(parts[-1])
+        except ValueError:
+            continue
+        if kind == "inverter" and mac in mate3.inverters and index in mate3.inverters[mac]:
+            return False
+        if (
+            kind == "charge_controller"
+            and mac in mate3.charge_controllers
+            and index in mate3.charge_controllers[mac]
+        ):
+            return False
+    return True
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

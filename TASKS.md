@@ -122,3 +122,6 @@ _Each completed item is annotated with `(vX.Y.Z-devN)` — the add-on / integrat
 - [x] B4 - let's make the version of the add-on and integration match always. _(2.0.0-dev1)_
 - [x] B5 - while we develop, let's append a .devN suffix to the version and increment N on each turn, so that I can see when we are running a newer version. _(2.0.0-dev1)_
 - [x] B6 - after each turn, update TASKS.md, noting the specific version that fixed the task. We are going to use tasks.md to derive a changelog. _(2.0.0-dev1)_
+- [ ] B7 - let's mimick https://github.com/weirded/distributed-esphome in terms of: license, buy me a coffee, style/format of readme and docs.md and the installation instructions (including that nice button) - obviously correcting for the specifics of our add-on.
+- [x] B8 - allow orphan MATE3 devices (e.g. from test-fixture traffic) to be removed via HA's Delete Device button, by implementing `async_remove_config_entry_device`. Returns True unless the device is currently present in `mate3.inverters` / `mate3.charge_controllers`. _(2.0.0-dev3)_
+- [ ]  
