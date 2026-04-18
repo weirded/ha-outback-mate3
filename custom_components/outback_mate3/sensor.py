@@ -95,11 +95,6 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> List[Sensor
 
     mate3.discovered_devices.add(f"combined_{mac_address}")
 
-    # Diagnostic sensors derived from the MATE3 HTTP config poll (firmware,
-    # data stream target, SD card log mode). These just read from
-    # mate3.config_by_mac and show `unavailable` until the first poll lands.
-    entities.extend(_config_system_sensors(mate3, mac_address))
-
     # Add inverter sensors
     for device_id, inverter in mate3.inverters[mac_address].items():
         _LOGGER.debug("Creating sensors for inverter %d from MAC %s", device_id, mac_address)
@@ -177,7 +172,6 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> List[Sensor
             OutbackInverterSensor(mate3, mac_address, device_id, "grid_mode", "Grid Mode",
                                 SensorDeviceClass.ENUM, None),
         ])
-        entities.extend(_config_inverter_sensors(mate3, mac_address, device_id))
 
     # Add charge controller sensors
     for device_id, charge_controller in mate3.charge_controllers[mac_address].items():
@@ -198,9 +192,30 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> List[Sensor
             OutbackChargeControllerSensor(mate3, mac_address, device_id, "output_power", "Output Power",
                                         SensorDeviceClass.POWER, UnitOfPower.WATT),
         ])
-        entities.extend(_config_charge_controller_sensors(mate3, mac_address, device_id))
 
     _LOGGER.debug("Created %d entities for MAC %s", len(entities), mac_address)
+    return entities
+
+
+def create_config_entities(mate3: "OutbackMate3", mac_address: str) -> List[SensorEntity]:
+    """Diagnostic entities derived from the HTTP CONFIG.xml poll.
+
+    Only called after the first ``config_snapshot`` arrives for a MAC, so the
+    integration never shows phantom "unavailable" config entities when the
+    MATE3's HTTP endpoint is unreachable.
+    """
+    config = mate3.config_by_mac.get(mac_address)
+    if config is None:
+        return []
+    entities: List[SensorEntity] = []
+    entities.extend(_config_system_sensors(mate3, mac_address))
+    # Iterate the config's own port-order lists — this doesn't depend on
+    # whether we've seen a UDP frame for each device yet.
+    for idx, _ in enumerate(config.get("inverters", []), start=1):
+        entities.extend(_config_inverter_sensors(mate3, mac_address, idx))
+    for idx, _ in enumerate(config.get("charge_controllers", []), start=1):
+        entities.extend(_config_charge_controller_sensors(mate3, mac_address, idx))
+    _LOGGER.debug("Created %d config entities for MAC %s", len(entities), mac_address)
     return entities
 
 
@@ -533,6 +548,84 @@ _SYSTEM_CONFIG_SENSORS = [
     ("generator_kw", "Generator Rating", _sys("generator_kw"), "kW", None, False),
     ("max_inverter_output_kw", "Max Inverter Output", _sys("max_inverter_output_kw"), "kW", None, False),
     ("max_charger_output_kw", "Max Charger Output", _sys("max_charger_output_kw"), "kW", None, False),
+
+    # --- Phase 15: system-wide setpoints & coordination (via MATE3 block) ---
+
+    # Low SOC thresholds
+    ("low_soc_warning_percentage", "Low SOC Warning", _m3("low_soc_warning_percentage"), "%", None, False),
+    ("low_soc_error_percentage", "Low SOC Error", _m3("low_soc_error_percentage"), "%", None, False),
+
+    # Coordination
+    ("cc_float_coordination_mode", "CC Float Coordination",
+     _m3("cc_float_coordination_mode"), None, None, False),
+    ("multi_phase_coordination_mode", "Multi-Phase Coordination",
+     _m3("multi_phase_coordination_mode"), None, None, False),
+
+    # AC coupling
+    ("ac_coupled_control_mode", "AC Coupled Control",
+     _m3("ac_coupled_control_mode"), None, None, False),
+    ("ac_coupled_control_aux_output", "AC Coupled AUX Output",
+     _m3("ac_coupled_control_aux_output"), None, None, False),
+
+    # Global CC output cap
+    ("global_cc_control_mode", "Global CC Output Control",
+     _m3("global_cc_control_mode"), None, None, False),
+    ("global_cc_max_charge_rate", "Global CC Max Charge Rate",
+     _m3("global_cc_max_charge_rate"),
+     UnitOfElectricCurrent.AMPERE, SensorDeviceClass.CURRENT, False),
+
+    # SunSpec / Modbus / Time zone
+    ("sunspec_mode", "SunSpec Server", _m3("sunspec_mode"), None, None, False),
+    ("sunspec_port", "SunSpec Port", _m3("sunspec_port"), None, None, False),
+    ("time_zone_raw", "MATE3 Time Zone (raw)", _m3("time_zone_raw"), None, None, False),
+
+    # FNDC
+    ("fndc_charge_term_mode", "FNDC Charge Term Control",
+     _m3("fndc_charge_term_mode"), None, None, False),
+    ("fndc_sell_mode", "FNDC Sell Control", _m3("fndc_sell_mode"), None, None, False),
+
+    # Grid Mode Schedules 1/2/3
+    ("grid_mode_schedule_1_mode", "Grid Mode Schedule 1",
+     _m3("grid_mode_schedule_1_mode"), None, None, False),
+    ("grid_mode_schedule_1_enable_hour", "Grid Mode Schedule 1 Hour",
+     _m3("grid_mode_schedule_1_enable_hour"), None, None, False),
+    ("grid_mode_schedule_1_enable_min", "Grid Mode Schedule 1 Minute",
+     _m3("grid_mode_schedule_1_enable_min"), None, None, False),
+    ("grid_mode_schedule_2_mode", "Grid Mode Schedule 2",
+     _m3("grid_mode_schedule_2_mode"), None, None, False),
+    ("grid_mode_schedule_2_enable_hour", "Grid Mode Schedule 2 Hour",
+     _m3("grid_mode_schedule_2_enable_hour"), None, None, False),
+    ("grid_mode_schedule_2_enable_min", "Grid Mode Schedule 2 Minute",
+     _m3("grid_mode_schedule_2_enable_min"), None, None, False),
+    ("grid_mode_schedule_3_mode", "Grid Mode Schedule 3",
+     _m3("grid_mode_schedule_3_mode"), None, None, False),
+    ("grid_mode_schedule_3_enable_hour", "Grid Mode Schedule 3 Hour",
+     _m3("grid_mode_schedule_3_enable_hour"), None, None, False),
+    ("grid_mode_schedule_3_enable_min", "Grid Mode Schedule 3 Minute",
+     _m3("grid_mode_schedule_3_enable_min"), None, None, False),
+
+    # High Battery Transfer
+    ("hvt_mode", "HVT Mode", _m3("hvt_mode"), None, None, False),
+    ("hvt_disconnect_voltage", "HVT Disconnect Voltage", _m3("hvt_disconnect_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("hvt_disconnect_delay", "HVT Disconnect Delay", _m3("hvt_disconnect_delay"), None, None, False),
+    ("hvt_reconnect_voltage", "HVT Reconnect Voltage", _m3("hvt_reconnect_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("hvt_reconnect_delay", "HVT Reconnect Delay", _m3("hvt_reconnect_delay"), None, None, False),
+    ("hvt_soc_connect_pct", "HVT Reconnect SOC", _m3("hvt_soc_connect_pct"), "%", None, False),
+    ("hvt_soc_disconnect_pct", "HVT Disconnect SOC", _m3("hvt_soc_disconnect_pct"), "%", None, False),
+
+    # Load Grid Transfer (load shedding)
+    ("lgt_mode", "Load-Grid Transfer", _m3("lgt_mode"), None, None, False),
+    ("lgt_load_threshold_kw", "Load-Grid Threshold", _m3("lgt_load_threshold_kw"), "kW", None, False),
+    ("lgt_connect_delay", "Load-Grid Connect Delay", _m3("lgt_connect_delay"), None, None, False),
+    ("lgt_disconnect_delay", "Load-Grid Disconnect Delay", _m3("lgt_disconnect_delay"), None, None, False),
+    ("lgt_low_battery_connect_voltage", "Load-Grid Low Battery Connect",
+     _m3("lgt_low_battery_connect_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("lgt_high_battery_disconnect_voltage", "Load-Grid High Battery Disconnect",
+     _m3("lgt_high_battery_disconnect_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
 ]
 
 # Per-inverter config sensors. Getter is called with (config, index).

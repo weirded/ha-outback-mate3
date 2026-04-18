@@ -60,6 +60,69 @@ def test_mate3_network_fields(config):
     assert m["http_port"] == 80
 
 
+# --- Phase 15: system-wide setpoints and coordination ---------------------
+
+def test_low_soc_thresholds(config):
+    m = config["mate3"]
+    assert m["low_soc_warning_percentage"] == 60
+    assert m["low_soc_error_percentage"] == 50
+
+
+def test_coordination_modes(config):
+    m = config["mate3"]
+    assert m["cc_float_coordination_mode"] == "Enabled"
+    assert m["multi_phase_coordination_mode"] == "Disabled"
+
+
+def test_ac_coupled_control(config):
+    m = config["mate3"]
+    assert m["ac_coupled_control_mode"] == "Disabled"
+    assert m["ac_coupled_control_aux_output"] == 1
+
+
+def test_global_cc_output_control(config):
+    m = config["mate3"]
+    assert m["global_cc_control_mode"] == "Disabled"
+    # 300 in XML tenths = 30.0 A
+    assert m["global_cc_max_charge_rate"] == 30.0
+
+
+def test_sunspec_settings(config):
+    m = config["mate3"]
+    assert m["sunspec_port"] == 502
+
+
+def test_fndc_controls(config):
+    m = config["mate3"]
+    assert m["fndc_charge_term_mode"] == "Disabled"
+    assert m["fndc_sell_mode"] == "Disabled"
+
+
+def test_grid_mode_schedules(config):
+    m = config["mate3"]
+    assert m["grid_mode_schedule_1_mode"] == "Grid Tied"
+    assert m["grid_mode_schedule_1_enable_hour"] == 7
+    assert m["grid_mode_schedule_2_mode"] == "GridZero"
+    assert m["grid_mode_schedule_2_enable_hour"] == 19
+
+
+def test_high_battery_transfer(config):
+    m = config["mate3"]
+    assert m["hvt_mode"] == "Disabled"
+    assert m["hvt_disconnect_voltage"] == 52.0
+    assert m["hvt_reconnect_voltage"] == 48.0
+    assert m["hvt_soc_disconnect_pct"] == 90
+    assert m["hvt_soc_connect_pct"] == 60
+
+
+def test_load_grid_transfer(config):
+    m = config["mate3"]
+    assert m["lgt_mode"] == "Disabled"
+    assert m["lgt_load_threshold_kw"] == 1
+    assert m["lgt_low_battery_connect_voltage"] == 48.4
+    assert m["lgt_high_battery_disconnect_voltage"] == 56.0
+
+
 # --- inverters -------------------------------------------------------------
 
 def test_inverter_count(config):

@@ -140,6 +140,11 @@ class OutbackMate3(DataUpdateCoordinator):
         # Device keys we've already announced to HA via the add-entities callback.
         # Same format as the legacy code so user-facing unique IDs don't change.
         self.discovered_devices: set[str] = set()
+        # MACs we've already created config-derived diagnostic entities for;
+        # we wait for the first successful config_snapshot before materializing
+        # them so there are no permanently-unavailable phantoms when the
+        # MATE3's HTTP endpoint is unreachable.
+        self._config_entities_created: set[str] = set()
 
         self._connected = False
 
@@ -235,11 +240,22 @@ class OutbackMate3(DataUpdateCoordinator):
             _LOGGER.debug("Malformed config_snapshot payload: %r", payload)
             return
         self.config_by_mac[mac] = config
-        # Entity creation for config sensors happens via create_device_entities
-        # on the normal device-discovery path; once those entities exist they
-        # just re-read config_by_mac on every refresh. If config arrived
-        # before any device_added for this MAC, they'll attach when devices
-        # come in.
+
+        # First config_snapshot for this MAC → materialize the config-derived
+        # diagnostic entities. Later snapshots just update state through
+        # async_set_updated_data (the entities read config_by_mac on every
+        # refresh). This gating ensures we never create phantom config
+        # entities for MATE3s whose HTTP endpoint we can't reach.
+        if mac in self._config_entities_created:
+            return
+        if self._add_entities_callback is None:
+            return
+        self._config_entities_created.add(mac)
+        from .sensor import create_config_entities
+
+        entities = create_config_entities(self, mac)
+        if entities:
+            self._add_entities_callback(entities)
 
     def _apply_device(self, payload: dict[str, Any], *, emit_discovery: bool) -> None:
         mac = payload["mac"]

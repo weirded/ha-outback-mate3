@@ -115,6 +115,82 @@ def _parse_mate3(root: ET.Element) -> dict[str, Any]:
                 "data_stream_port": _int(network.find("Data_Stream_Port")),
             }
         )
+
+    # --- system-wide setpoints / coordination / transfer thresholds ---
+
+    # Low SOC thresholds
+    out["low_soc_warning_percentage"] = _int(remote.find("Low_SOC_Warning_Percentage"))
+    out["low_soc_error_percentage"] = _int(remote.find("Low_SOC_Error_Percentage"))
+
+    # Coordination modes
+    ccf = remote.find("CC_Float_Coordination")
+    if ccf is not None:
+        out["cc_float_coordination_mode"] = ccf.get("Mode")
+    mpc = remote.find("Multi_Phase_Coordination")
+    if mpc is not None:
+        out["multi_phase_coordination_mode"] = mpc.get("Mode")
+
+    # AC Coupled Control
+    acc = remote.find("AC_Coupled_Control")
+    if acc is not None:
+        out["ac_coupled_control_mode"] = acc.get("Mode")
+        out["ac_coupled_control_aux_output"] = _int(acc.find("AUX_Output"))
+
+    # Global CC output cap
+    gcc = remote.find("Global_Charge_Controller_Output_Control")
+    if gcc is not None:
+        out["global_cc_control_mode"] = gcc.get("Mode")
+        out["global_cc_max_charge_rate"] = _amp_tenths(gcc.find("Max_Charge_Rate"))
+
+    # SunSpec / Time zone
+    nopts = remote.find("Network_Options")
+    if nopts is not None:
+        out["sunspec_mode"] = _text(nopts.find("SunSpec"))
+        out["sunspec_port"] = _int(nopts.find("SunSpec_Port"))
+        out["time_zone_raw"] = _int(nopts.find("Time_Zone"))
+
+    # FNDC (FlexNet DC) integration
+    fndc_ct = remote.find("FNDC_Charge_Term_Control")
+    if fndc_ct is not None:
+        out["fndc_charge_term_mode"] = fndc_ct.get("Mode")
+    fndc_sell = remote.find("FNDC_Sell_Control")
+    if fndc_sell is not None:
+        out["fndc_sell_mode"] = fndc_sell.get("Mode")
+
+    # Grid Mode Schedules 1, 2, 3
+    for n in (1, 2, 3):
+        gms = remote.find(f"Grid_Mode_Schedule_{n}")
+        if gms is None:
+            continue
+        out[f"grid_mode_schedule_{n}_mode"] = gms.get("Mode")
+        out[f"grid_mode_schedule_{n}_enable_hour"] = _int(gms.find("Enable_Hour"))
+        out[f"grid_mode_schedule_{n}_enable_min"] = _int(gms.find("Enable_Min"))
+
+    # High Battery Transfer (HVT / LVC / SOC)
+    hvt = remote.find("High_Battery_Transfer")
+    if hvt is not None:
+        out["hvt_mode"] = hvt.get("Mode")
+        hvd = hvt.find("High_Voltage_Disconnect")
+        if hvd is not None:
+            out["hvt_disconnect_voltage"] = _volt_tenths(hvd.find("Voltage"))
+            out["hvt_disconnect_delay"] = _int(hvd.find("Delay"))
+        lvc = hvt.find("Low_Voltage_Connect")
+        if lvc is not None:
+            out["hvt_reconnect_voltage"] = _volt_tenths(lvc.find("Voltage"))
+            out["hvt_reconnect_delay"] = _int(lvc.find("Delay"))
+        out["hvt_soc_connect_pct"] = _int(hvt.find("SOC_Connect_Percentage"))
+        out["hvt_soc_disconnect_pct"] = _int(hvt.find("SOC_Disconnect_Percentage"))
+
+    # Load Grid Transfer (load shedding)
+    lgt = remote.find("Load_Grid_Transfer")
+    if lgt is not None:
+        out["lgt_mode"] = lgt.get("Mode")
+        out["lgt_load_threshold_kw"] = _int(lgt.find("Load_Threshold_KW"))
+        out["lgt_connect_delay"] = _int(lgt.find("Load_Connect_Delay"))
+        out["lgt_disconnect_delay"] = _int(lgt.find("Load_Disconnect_Delay"))
+        out["lgt_low_battery_connect_voltage"] = _volt_tenths(lgt.find("Low_Battery_Connect"))
+        out["lgt_high_battery_disconnect_voltage"] = _volt_tenths(lgt.find("High_Battery_Disconnect"))
+
     return {k: v for k, v in out.items() if v is not None}
 
 
