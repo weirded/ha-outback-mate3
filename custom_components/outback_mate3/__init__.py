@@ -27,7 +27,7 @@ DOMAIN = "outback_mate3"
 PLATFORMS = [Platform.SENSOR]
 
 CONF_URL = "url"
-DEFAULT_URL = "ws://a0d7b954-outback-mate3:8099/ws"
+DEFAULT_URL = "ws://local-outback-mate3:8099/ws"
 
 KIND_INVERTER = "inverter"
 KIND_CHARGE_CONTROLLER = "charge_controller"

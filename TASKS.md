@@ -99,12 +99,12 @@ _Goal: a pure Python module with no HA imports that both the add-on will use and
 
 When the add-on is running, HA should automatically surface the integration under **Settings → Devices & Services → Discovered**, pre-filled with the add-on's WebSocket URL. No manual config flow needed.
 
-- [ ] **12.1** Add `hassio_api: true` and `discovery: [outback_mate3]` to `outback_mate3_addon/config.yaml`. The first grants the add-on permission to talk to Supervisor; the second declares which service names it may announce.
-- [ ] **12.2** Implement discovery announce in `outback_mate3_addon/src/main.py`. On startup, if `SUPERVISOR_TOKEN` is set, POST to `http://supervisor/discovery` with `{"service": "outback_mate3", "config": {"host": "<addon-hostname>", "port": <ws_port>}}`. Store the returned UUID. On graceful shutdown, DELETE `/discovery/{uuid}`. Failures log and continue — running outside HA (plain Docker) must still work.
-- [ ] **12.3** Set `"hassio": true` in `custom_components/outback_mate3/manifest.json` so HA routes Hass.io discovery events for our service name to this integration.
-- [ ] **12.4** Implement `async_step_hassio(discovery_info: HassioServiceInfo)` in `custom_components/outback_mate3/config_flow.py`. Build the WS URL from `discovery_info.config`, set a stable unique_id so repeated announces don't create duplicates (and update the URL if it changed), show a confirmation step.
-- [ ] **12.5** Add strings for the `hassio_confirm` step to `custom_components/outback_mate3/translations/en.json`.
-- [ ] **12.6** Verify end-to-end on the HAOS test VM: after `./scripts/install-addon.sh`, a "Discovered: Outback MATE3" notification appears in HA within a few seconds; clicking through auto-creates an entry with the correct WS URL.
+- [x] **12.1** Add `hassio_api: true` and `discovery: [outback_mate3]` to `outback_mate3_addon/config.yaml`. The first grants the add-on permission to talk to Supervisor; the second declares which service names it may announce.
+- [x] **12.2** Implement discovery announce in `outback_mate3_addon/src/main.py`. On startup, if `SUPERVISOR_TOKEN` is set, POST to `http://supervisor/discovery` with `{"service": "outback_mate3", "config": {"host": "<addon-hostname>", "port": <ws_port>}}`. Store the returned UUID. On graceful shutdown, DELETE `/discovery/{uuid}`. Failures log and continue — running outside HA (plain Docker) must still work.
+- [x] **12.3** Set `"hassio": true` in `custom_components/outback_mate3/manifest.json` so HA routes Hass.io discovery events for our service name to this integration.
+- [x] **12.4** Implement `async_step_hassio(discovery_info: HassioServiceInfo)` in `custom_components/outback_mate3/config_flow.py`. Build the WS URL from `discovery_info.config`, set a stable unique_id so repeated announces don't create duplicates (and update the URL if it changed), show a confirmation step.
+- [x] **12.5** Add strings for the `hassio_confirm` step to `custom_components/outback_mate3/translations/en.json`.
+- [x] **12.6** Verify end-to-end on the HAOS test VM: after `./scripts/install-addon.sh`, a "Discovered: Outback MATE3" notification appears in HA within a few seconds; clicking through auto-creates an entry with the correct WS URL.
 
 ## Phase 13 — Nice-to-haves (defer unless small and obvious)
 

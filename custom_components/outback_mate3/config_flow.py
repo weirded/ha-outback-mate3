@@ -9,6 +9,7 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 
 from . import CONF_URL, DEFAULT_URL, DOMAIN
 
@@ -42,6 +43,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 2
 
+    def __init__(self) -> None:
+        self._discovered_url: str | None = None
+        self._discovered_name: str | None = None
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -68,4 +73,42 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=errors,
+        )
+
+    async def async_step_hassio(
+        self, discovery_info: HassioServiceInfo
+    ) -> FlowResult:
+        """Handle auto-discovery from the Outback MATE3 Supervisor add-on."""
+        host = discovery_info.config["host"]
+        port = discovery_info.config["port"]
+        url = f"ws://{host}:{port}/ws"
+
+        # One config entry per add-on installation. Subsequent announces with
+        # a changed URL (e.g. different port) should update the existing entry
+        # rather than create a duplicate or be silently ignored.
+        await self.async_set_unique_id(f"hassio_{discovery_info.slug}")
+        self._abort_if_unique_id_configured(updates={CONF_URL: url})
+
+        self._discovered_url = url
+        self._discovered_name = discovery_info.name
+        # Label the entry nicely in the "Discovered" card.
+        self.context["title_placeholders"] = {"name": discovery_info.name}
+        return await self.async_step_hassio_confirm()
+
+    async def async_step_hassio_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Ask the user to confirm the discovered add-on before adding it."""
+        assert self._discovered_url is not None
+        if user_input is not None:
+            return self.async_create_entry(
+                title=self._discovered_name or "Outback MATE3",
+                data={CONF_URL: self._discovered_url},
+            )
+        return self.async_show_form(
+            step_id="hassio_confirm",
+            description_placeholders={
+                "name": self._discovered_name or "Outback MATE3",
+                "url": self._discovered_url,
+            },
         )

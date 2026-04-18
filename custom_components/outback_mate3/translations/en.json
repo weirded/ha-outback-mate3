@@ -1,5 +1,6 @@
 {
     "config": {
+        "flow_title": "{name}",
         "step": {
             "user": {
                 "title": "Outback MATE3 Setup",
@@ -7,6 +8,10 @@
                 "data": {
                     "url": "Add-on WebSocket URL"
                 }
+            },
+            "hassio_confirm": {
+                "title": "Outback MATE3 discovered",
+                "description": "The Outback MATE3 add-on is running. Add it to Home Assistant so it can stream telemetry to this integration via {url}?"
             }
         },
         "error": {

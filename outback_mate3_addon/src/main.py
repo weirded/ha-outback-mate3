@@ -14,6 +14,7 @@ import signal
 
 from aiohttp import web
 
+from src import discovery
 from src.state import DeviceRegistry
 from src.udp_listener import start_listener
 from src.ws_server import WSServer
@@ -67,6 +68,8 @@ async def run() -> None:
 
     transport = await start_listener("0.0.0.0", udp_port, registry, server)
 
+    discovery_uuid = await discovery.announce(ws_port)
+
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
@@ -75,6 +78,7 @@ async def run() -> None:
     await stop.wait()
 
     _LOGGER.info("Shutdown signal received; closing transports")
+    await discovery.withdraw(discovery_uuid)
     transport.close()
     await server.close_all()
     await runner.cleanup()

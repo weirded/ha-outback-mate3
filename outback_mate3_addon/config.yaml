@@ -16,6 +16,12 @@ boot: auto
 host_network: true
 # Disable Docker's tini init so s6-overlay (from the base image) can run as pid 1.
 init: false
+# Grant access to the Supervisor API — needed so the add-on can announce its
+# WebSocket endpoint to the integration via Hass.io discovery.
+hassio_api: true
+# Whitelists the service name(s) we may announce.
+discovery:
+  - outback_mate3
 options:
   udp_port: 57027
   ws_port: 8099
