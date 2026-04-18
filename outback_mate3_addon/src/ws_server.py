@@ -16,7 +16,7 @@ from typing import Any
 
 from aiohttp import WSMsgType, web
 
-from src.state import DeviceAdded, DeviceRegistry, Event, StateUpdated
+from src.state import ConfigSnapshot, DeviceAdded, DeviceRegistry, Event, StateUpdated
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,6 +42,12 @@ def event_to_message(event: Event) -> dict[str, Any]:
             "index": event.index,
             "state": event.state,
         }
+    if isinstance(event, ConfigSnapshot):
+        return {
+            "type": "config_snapshot",
+            "mac": event.mac,
+            "config": event.config,
+        }
     raise TypeError(f"Unknown event type: {type(event).__name__}")
 
 
@@ -62,6 +68,10 @@ class WSServer:
         await ws.prepare(request)
 
         await ws.send_json({"type": "snapshot", "devices": self._registry.snapshot()})
+        # Replay the last known config for each MAC so new clients get the
+        # full picture without having to wait for the next poll interval.
+        for mac, config in self._registry.configs().items():
+            await ws.send_json({"type": "config_snapshot", "mac": mac, "config": config})
 
         self._clients.add(ws)
         peer = request.remote or "unknown"

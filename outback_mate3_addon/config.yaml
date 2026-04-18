@@ -1,5 +1,5 @@
 name: "Outback MATE3"
-version: "2.0.0-dev4"
+version: "2.0.0-dev5"
 slug: outback_mate3
 description: >-
   Listens for Outback MATE3 UDP streaming telemetry and relays parsed device
@@ -27,8 +27,10 @@ options:
   ws_port: 8099
   log_level: info
   min_update_interval_s: 30
+  config_poll_interval_s: 300
 schema:
   udp_port: port
   ws_port: port
   log_level: list(trace|debug|info|notice|warning|error|fatal)
   min_update_interval_s: float(0,)
+  config_poll_interval_s: float(0,)

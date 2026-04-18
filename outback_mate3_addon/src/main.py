@@ -14,7 +14,7 @@ import signal
 
 from aiohttp import web
 
-from src import discovery
+from src import config_poller, discovery
 from src.state import DeviceRegistry
 from src.udp_listener import start_listener
 from src.ws_server import WSServer
@@ -50,11 +50,12 @@ async def run() -> None:
     ws_port = _env_int("WS_PORT", 8099)
     log_level = os.environ.get("LOG_LEVEL", "info")
     min_interval = _env_float("MIN_UPDATE_INTERVAL_S", 30.0)
+    config_poll_interval = _env_float("CONFIG_POLL_INTERVAL_S", 300.0)
 
     _configure_logging(log_level)
     _LOGGER.info(
-        "Starting Outback MATE3 relay: UDP :%d → WS :%d (throttle %.1fs)",
-        udp_port, ws_port, min_interval,
+        "Starting Outback MATE3 relay: UDP :%d → WS :%d (throttle %.1fs, config poll %.0fs)",
+        udp_port, ws_port, min_interval, config_poll_interval,
     )
 
     registry = DeviceRegistry(min_update_interval_s=min_interval)
@@ -75,6 +76,10 @@ async def run() -> None:
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stop.set)
 
+    poller = asyncio.create_task(
+        config_poller.run(registry, server, config_poll_interval, stop)
+    )
+
     await stop.wait()
 
     _LOGGER.info("Shutdown signal received; closing transports")
@@ -82,6 +87,11 @@ async def run() -> None:
     transport.close()
     await server.close_all()
     await runner.cleanup()
+    poller.cancel()
+    try:
+        await poller
+    except asyncio.CancelledError:
+        pass
 
 
 if __name__ == "__main__":

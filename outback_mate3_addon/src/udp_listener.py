@@ -68,7 +68,7 @@ async def start_listener(
         _LOGGER.debug(
             "Parsed %d device updates from %s", len(updates), remote_ip
         )
-        events = registry.apply(updates)
+        events = registry.apply(updates, remote_ip=remote_ip)
         if not events:
             _LOGGER.debug(
                 "Registry produced no events for %s (likely throttled)", remote_ip

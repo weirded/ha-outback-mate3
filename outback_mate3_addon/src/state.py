@@ -41,7 +41,15 @@ class StateUpdated:
     state: dict[str, Any]
 
 
-Event = DeviceAdded | StateUpdated
+@dataclass(frozen=True)
+class ConfigSnapshot:
+    """Latest parsed CONFIG.xml for a MATE3, pushed on every successful poll."""
+
+    mac: str
+    config: dict[str, Any]
+
+
+Event = DeviceAdded | StateUpdated | ConfigSnapshot
 
 
 class DeviceRegistry:
@@ -54,8 +62,13 @@ class DeviceRegistry:
         self._clock = clock
         self._devices: dict[DeviceKey, dict[str, Any]] = {}
         self._last_update: dict[str, datetime] = {}
+        # Last remote IP per MAC — used by the HTTP config poller to reach
+        # the MATE3 without needing extra configuration.
+        self._source_ips: dict[str, str] = {}
+        # Latest parsed CONFIG.xml per MAC.
+        self._last_configs: dict[str, dict[str, Any]] = {}
 
-    def apply(self, updates: Iterable[DeviceUpdate]) -> list[Event]:
+    def apply(self, updates: Iterable[DeviceUpdate], remote_ip: str | None = None) -> list[Event]:
         """Ingest a frame's worth of updates. Return events describing the change.
 
         If the frame arrives within ``min_update_interval_s`` of the last accepted
@@ -75,6 +88,8 @@ class DeviceRegistry:
         if last is not None and (now - last).total_seconds() < self._min_interval:
             return []
         self._last_update[mac] = now
+        if remote_ip is not None:
+            self._source_ips[mac] = remote_ip
 
         events: list[Event] = []
         for update in updates:
@@ -97,6 +112,29 @@ class DeviceRegistry:
             {"mac": mac, "kind": kind, "index": index, "state": dict(state)}
             for (mac, kind, index), state in self._devices.items()
         ]
+
+    # --- source-IP / config tracking ---------------------------------------
+
+    def source_ip(self, mac: str) -> str | None:
+        return self._source_ips.get(mac)
+
+    def known_sources(self) -> list[tuple[str, str]]:
+        """All (mac, remote_ip) pairs we've seen so far."""
+        return list(self._source_ips.items())
+
+    def set_config(self, mac: str, config: dict[str, Any]) -> bool:
+        """Store a parsed CONFIG.xml for a MAC. Returns True if different from the last."""
+        prev = self._last_configs.get(mac)
+        if prev == config:
+            return False
+        self._last_configs[mac] = config
+        return True
+
+    def config(self, mac: str) -> dict[str, Any] | None:
+        return self._last_configs.get(mac)
+
+    def configs(self) -> dict[str, dict[str, Any]]:
+        return dict(self._last_configs)
 
     # --- Introspection helpers (used by tests) ---
 

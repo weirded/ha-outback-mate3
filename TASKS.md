@@ -101,13 +101,13 @@ The UDP stream gives live readings. The MATE3's web server at `http://<mate3>/CO
 
 Architecture: the **add-on** polls (it already knows the MATE3 IP from every UDP packet's source), then pushes a new `config_snapshot` event (full curated state on WS connect + every poll) and, if we want, a `config_updated` diff event. The integration stays a reactive WS client.
 
-- [ ] **14.1** Add-on: track `last_seen_remote_ip` per MAC in `DeviceRegistry`; this becomes the candidate MATE3 HTTP host. Expose as a method the poller uses.
-- [ ] **14.2** Add-on: new `src/mate3_http.py` with `async fetch_config(host)` → parsed dict of curated values (see below). Uses aiohttp; 8 s timeout; logs + returns None on unreachable.
-- [ ] **14.3** Add-on: poller task on a 5-min interval (configurable via `config_poll_interval_s` in add-on options, default `300`, `0` disables). Runs after first UDP packet arrives so the host is known.
-- [ ] **14.4** Add-on: extend the WS protocol with `config_snapshot` (sent on client connect immediately after `snapshot`, and on every successful poll) and `config_updated` (fires only when parsed dict diverges from the previous). Event shape: `{"type":"config_snapshot", "mac":"...", "config": { ... }}`.
-- [ ] **14.5** Integration: handle `config_snapshot` / `config_updated`. Store on `OutbackMate3.config_by_mac[mac]`. Trigger refresh so entity attributes re-read.
-- [ ] **14.6** Integration: new `OutbackConfigSensor` class (or extension of existing) for the handful of values that deserve standalone entities — firmware versions, data-stream config, SD card log mode. Everything else becomes attributes on existing `Outback System` / `Outback Inverter N` / `Outback Charge Controller N` devices.
-- [ ] **14.7** Tests: unit test the XML parser against a captured `CONFIG.xml` (obfuscated), and against malformed / partial / empty responses. Add a fixture.
+- [x] **14.1** Add-on: track `last_seen_remote_ip` per MAC in `DeviceRegistry`; this becomes the candidate MATE3 HTTP host. Expose as a method the poller uses. _(2.0.0-dev5)_
+- [x] **14.2** Add-on: new `src/mate3_http.py` with `async fetch_config(host)` → parsed dict of curated values (see below). Uses aiohttp; 8 s timeout; logs + returns None on unreachable. _(2.0.0-dev5)_
+- [x] **14.3** Add-on: poller task on a 5-min interval (configurable via `config_poll_interval_s` in add-on options, default `300`, `0` disables). Runs after first UDP packet arrives so the host is known. _(2.0.0-dev5)_
+- [x] **14.4** Add-on: extend the WS protocol with `config_snapshot` (sent on client connect immediately after `snapshot`, and on every successful poll) and `config_updated` (fires only when parsed dict diverges from the previous). Event shape: `{"type":"config_snapshot", "mac":"...", "config": { ... }}`. _(2.0.0-dev5)_
+- [x] **14.5** Integration: handle `config_snapshot` / `config_updated`. Store on `OutbackMate3.config_by_mac[mac]`. Trigger refresh so entity attributes re-read. _(2.0.0-dev5)_
+- [x] **14.6** Integration: new `OutbackConfigSensor` class (or extension of existing) for the handful of values that deserve standalone entities — firmware versions, data-stream config, SD card log mode. Everything else becomes attributes on existing `Outback System` / `Outback Inverter N` / `Outback Charge Controller N` devices. _(2.0.0-dev5)_
+- [x] **14.7** Tests: unit test the XML parser against a captured `CONFIG.xml` (obfuscated), and against malformed / partial / empty responses. Add a fixture. _(2.0.0-dev5)_
 
 ### Curated value list (what to pull, where it lands)
 

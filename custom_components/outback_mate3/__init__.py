@@ -134,6 +134,8 @@ class OutbackMate3(DataUpdateCoordinator):
         # Per-MAC state dicts that sensor.py reads from directly.
         self.inverters: dict[str, dict[int, dict[str, Any]]] = {}
         self.charge_controllers: dict[str, dict[int, dict[str, Any]]] = {}
+        # Per-MAC parsed CONFIG.xml (firmware, nameplate, setpoints).
+        self.config_by_mac: dict[str, dict[str, Any]] = {}
 
         # Device keys we've already announced to HA via the add-entities callback.
         # Same format as the legacy code so user-facing unique IDs don't change.
@@ -219,10 +221,25 @@ class OutbackMate3(DataUpdateCoordinator):
             self._apply_device(msg, emit_discovery=True)
         elif mtype == "state_updated":
             self._apply_device(msg, emit_discovery=False)
+        elif mtype == "config_snapshot":
+            self._apply_config(msg)
         else:
             _LOGGER.debug("Ignoring unknown WS message type %r", mtype)
             return
         self.async_set_updated_data(None)
+
+    def _apply_config(self, payload: dict[str, Any]) -> None:
+        mac = payload.get("mac")
+        config = payload.get("config")
+        if not mac or not isinstance(config, dict):
+            _LOGGER.debug("Malformed config_snapshot payload: %r", payload)
+            return
+        self.config_by_mac[mac] = config
+        # Entity creation for config sensors happens via create_device_entities
+        # on the normal device-discovery path; once those entities exist they
+        # just re-read config_by_mac on every refresh. If config arrived
+        # before any device_added for this MAC, they'll attach when devices
+        # come in.
 
     def _apply_device(self, payload: dict[str, Any], *, emit_discovery: bool) -> None:
         mac = payload["mac"]

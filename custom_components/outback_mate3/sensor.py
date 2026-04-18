@@ -11,6 +11,7 @@ from homeassistant.components.sensor import (
     RestoreSensor,
 )
 from homeassistant.const import (
+    EntityCategory,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
     UnitOfPower,
@@ -94,6 +95,11 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> List[Sensor
 
     mate3.discovered_devices.add(f"combined_{mac_address}")
 
+    # Diagnostic sensors derived from the MATE3 HTTP config poll (firmware,
+    # data stream target, SD card log mode). These just read from
+    # mate3.config_by_mac and show `unavailable` until the first poll lands.
+    entities.extend(_config_system_sensors(mate3, mac_address))
+
     # Add inverter sensors
     for device_id, inverter in mate3.inverters[mac_address].items():
         _LOGGER.debug("Creating sensors for inverter %d from MAC %s", device_id, mac_address)
@@ -171,6 +177,7 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> List[Sensor
             OutbackInverterSensor(mate3, mac_address, device_id, "grid_mode", "Grid Mode",
                                 SensorDeviceClass.ENUM, None),
         ])
+        entities.extend(_config_inverter_sensors(mate3, mac_address, device_id))
 
     # Add charge controller sensors
     for device_id, charge_controller in mate3.charge_controllers[mac_address].items():
@@ -191,6 +198,7 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> List[Sensor
             OutbackChargeControllerSensor(mate3, mac_address, device_id, "output_power", "Output Power",
                                         SensorDeviceClass.POWER, UnitOfPower.WATT),
         ])
+        entities.extend(_config_charge_controller_sensors(mate3, mac_address, device_id))
 
     _LOGGER.debug("Created %d entities for MAC %s", len(entities), mac_address)
     return entities
@@ -370,6 +378,146 @@ class OutbackChargeControllerSensor(OutbackBaseSensor):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return (self._mac_address in self._mate3.charge_controllers and 
+        return (self._mac_address in self._mate3.charge_controllers and
                 self._device_id in self._mate3.charge_controllers[self._mac_address] and
                 self._sensor_type in self._mate3.charge_controllers[self._mac_address][self._device_id])
+
+
+# -----------------------------------------------------------------------------
+# Diagnostic sensors derived from the MATE3 HTTP config poll
+# -----------------------------------------------------------------------------
+
+
+class OutbackConfigDiagnosticSensor(CoordinatorEntity, SensorEntity):
+    """A string-valued diagnostic sensor read from OutbackMate3.config_by_mac.
+
+    Used for firmware versions, data stream target, SD card log mode — values
+    that come from the periodic HTTP CONFIG.xml poll, not the UDP stream.
+    """
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(
+        self,
+        mate3: "OutbackMate3",
+        mac_address: str,
+        device_kind: str,          # "system" | "inverter" | "charge_controller"
+        device_id: int,            # 0 for system; 1-based for inverter/cc
+        key: str,                  # short identifier for entity_id / unique_id
+        name: str,                 # user-visible short name
+        config_getter,             # callable(config_dict: dict) -> str | None
+        *,
+        is_firmware: bool = False, # if True, also populate device_info.sw_version
+    ) -> None:
+        super().__init__(mate3)
+        self._mate3 = mate3
+        self._mac_address = mac_address
+        self._device_kind = device_kind
+        self._device_id = device_id
+        self._key = key
+        self._config_getter = config_getter
+        self._is_firmware = is_firmware
+
+        mac_id = mac_address.replace(".", "_")
+        self._attr_name = name
+
+        if device_kind == "system":
+            self.entity_id = f"sensor.mate3_system_{key}"
+            self._attr_unique_id = f"{DOMAIN}_system_{key}"
+            device_info = DeviceInfo(
+                identifiers={(DOMAIN, "system")},
+                name="Outback System",
+                manufacturer="Outback Power",
+                model="System",
+            )
+        else:
+            self.entity_id = (
+                f"sensor.mate3_{mac_id}_{device_kind}_{device_id}_{key}"
+            )
+            self._attr_unique_id = (
+                f"{DOMAIN}_{mac_address}_{device_kind}_{device_id}_{key}"
+            )
+            device_info = DeviceInfo(
+                identifiers={(DOMAIN, f"{device_kind}_{mac_address}_{device_id}")},
+                name=f"Outback {device_kind.replace('_', ' ').title()} {device_id}",
+                manufacturer="Outback Power",
+                model=device_kind.replace("_", " ").title(),
+            )
+
+        # Surface firmware string on the device page too.
+        if is_firmware:
+            fw = self._read_value()
+            if fw is not None:
+                device_info["sw_version"] = str(fw)
+        self._attr_device_info = device_info
+
+    def _read_value(self):
+        config = self._mate3.config_by_mac.get(self._mac_address)
+        if config is None:
+            return None
+        try:
+            return self._config_getter(config)
+        except (IndexError, KeyError, TypeError):
+            return None
+
+    @property
+    def native_value(self):
+        v = self._read_value()
+        return None if v is None else str(v)
+
+    @property
+    def available(self) -> bool:
+        return self._read_value() is not None
+
+
+def _config_system_sensors(mate3: "OutbackMate3", mac: str) -> List[SensorEntity]:
+    """Three system-level diagnostic sensors derived from the config poll."""
+    return [
+        OutbackConfigDiagnosticSensor(
+            mate3, mac, "system", 0, "mate3_firmware", "MATE3 Firmware",
+            lambda c: c.get("mate3", {}).get("firmware"),
+            is_firmware=True,
+        ),
+        OutbackConfigDiagnosticSensor(
+            mate3, mac, "system", 0, "data_stream_target", "Data Stream Target",
+            lambda c: (
+                f"{c['mate3']['data_stream_ip']}:{c['mate3']['data_stream_port']}"
+                if c.get("mate3", {}).get("data_stream_ip")
+                and c.get("mate3", {}).get("data_stream_port")
+                else None
+            ),
+        ),
+        OutbackConfigDiagnosticSensor(
+            mate3, mac, "system", 0, "sd_card_log_mode", "SD Card Log Mode",
+            lambda c: c.get("mate3", {}).get("sd_card_log_mode"),
+        ),
+    ]
+
+
+def _config_inverter_sensors(
+    mate3: "OutbackMate3", mac: str, index: int
+) -> List[SensorEntity]:
+    """Per-inverter firmware sensor."""
+    return [
+        OutbackConfigDiagnosticSensor(
+            mate3, mac, "inverter", index, "firmware", "Firmware",
+            lambda c, i=index: (c.get("inverters") or [{}] * i)[i - 1].get("firmware")
+            if len(c.get("inverters") or []) >= i else None,
+            is_firmware=True,
+        ),
+    ]
+
+
+def _config_charge_controller_sensors(
+    mate3: "OutbackMate3", mac: str, index: int
+) -> List[SensorEntity]:
+    """Per-charge-controller firmware sensor."""
+    return [
+        OutbackConfigDiagnosticSensor(
+            mate3, mac, "charge_controller", index, "firmware", "Firmware",
+            lambda c, i=index: (c.get("charge_controllers") or [{}] * i)[i - 1].get("firmware")
+            if len(c.get("charge_controllers") or []) >= i else None,
+            is_firmware=True,
+        ),
+    ]
