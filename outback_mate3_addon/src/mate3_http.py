@@ -191,6 +191,92 @@ def _parse_mate3(root: ET.Element) -> dict[str, Any]:
         out["lgt_low_battery_connect_voltage"] = _volt_tenths(lgt.find("Low_Battery_Connect"))
         out["lgt_high_battery_disconnect_voltage"] = _volt_tenths(lgt.find("High_Battery_Disconnect"))
 
+    # --- Advanced Generator Start (~50 fields under one block) ---
+    ags = remote.find("Advance_Generator_Start")
+    if ags is not None:
+        out["ags_mode"] = ags.get("Mode")
+        out["ags_control"] = _text(ags.find("Control"))
+        out["ags_generator_type"] = _text(ags.find("Generator_Type"))
+        out["ags_port"] = _int(ags.find("Port"))
+        out["ags_cooldown_time"] = _int(ags.find("Cooldown_Time"))
+        out["ags_warmup_time"] = _int(ags.find("Warmup_Time"))
+        out["ags_fault_time"] = _int(ags.find("Fault_Time"))
+        out["ags_ac_input_reconnect_delay"] = _int(ags.find("AC_Input_Reconnect_Delay"))
+        out["ags_dc_generator_absorb_time"] = _int(ags.find("DC_Generator_Absorb_Time"))
+        out["ags_dc_generator_absorb_voltage"] = _volt_tenths(ags.find("DC_Generator_Absorb_Voltage"))
+        fndc_fc = ags.find("FNDC_Full_Charge")
+        if fndc_fc is not None:
+            out["ags_fndc_full_charge_mode"] = fndc_fc.get("Mode")
+            out["ags_fndc_full_charge_interval"] = _int(fndc_fc.find("Interval"))
+        gx = ags.find("Generator_Exercise")
+        if gx is not None:
+            out["ags_generator_exercise_mode"] = gx.get("Mode")
+            out["ags_generator_exercise_day"] = _text(gx.find("Day"))
+            out["ags_generator_exercise_interval"] = _int(gx.find("Interval"))
+            out["ags_generator_exercise_period"] = _int(gx.find("Period"))
+            out["ags_generator_exercise_sell_during"] = _text(gx.find("Sell_During_Exercise"))
+            out["ags_generator_exercise_start_hour"] = _int(gx.find("Start_Hour"))
+            out["ags_generator_exercise_start_min"] = _int(gx.find("Start_Min"))
+        ls = ags.find("Load_Start")
+        if ls is not None:
+            out["ags_load_start_mode"] = ls.get("Mode")
+            s, sp = ls.find("Start"), ls.find("Stop")
+            if s is not None:
+                out["ags_load_start_start_delay"] = _int(s.find("Delay"))
+                out["ags_load_start_start_load_kw"] = _int(s.find("Load_KW"))
+            if sp is not None:
+                out["ags_load_start_stop_delay"] = _int(sp.find("Delay"))
+                out["ags_load_start_stop_load_kw"] = _int(sp.find("Load_KW"))
+        # Must_Run and Quiet_Time share the same weekday/weekend start/stop layout.
+        for tag, prefix in [("Must_Run", "ags_must_run"), ("Quiet_Time", "ags_quiet_time")]:
+            el = ags.find(tag)
+            if el is None:
+                continue
+            out[f"{prefix}_mode"] = el.get("Mode")
+            for daykind in ("Weekday", "Weekend"):
+                d = el.find(daykind)
+                if d is None:
+                    continue
+                for kind in ("Start", "Stop"):
+                    for unit in ("Hour", "Min"):
+                        v = _int(d.find(f"{kind}_{unit}"))
+                        out[f"{prefix}_{daykind.lower()}_{kind.lower()}_{unit.lower()}"] = v
+        soc = ags.find("SOC_Start")
+        if soc is not None:
+            out["ags_soc_start_mode"] = soc.get("Mode")
+            out["ags_soc_start_start_percentage"] = _int(soc.find("Start_Percentage"))
+            out["ags_soc_start_stop_percentage"] = _int(soc.find("Stop_Percentage"))
+        for tag, prefix in [
+            ("Two_Min_Voltage_Start", "ags_two_min_voltage_start"),
+            ("Two_Hour_Voltage_Start", "ags_two_hour_voltage_start"),
+            ("Twenty_Four_Hour_Voltage_Start", "ags_twenty_four_hour_voltage_start"),
+        ]:
+            el = ags.find(tag)
+            if el is None:
+                continue
+            out[f"{prefix}_mode"] = el.get("Mode")
+            out[f"{prefix}_voltage"] = _volt_tenths(el.find("Voltage"))
+
+    # --- Grid Use time-of-use schedules (3 profiles) ---
+    for tag, prefix in [
+        ("Grid_Use", "grid_use"),
+        ("Grid_Use_P2", "grid_use_p2"),
+        ("Grid_Use_P3", "grid_use_p3"),
+    ]:
+        el = remote.find(tag)
+        if el is None:
+            continue
+        out[f"{prefix}_mode"] = el.get("Mode")
+        for daykind in ("Weekday", "Weekend"):
+            d = el.find(daykind)
+            if d is None:
+                continue
+            for stage in ("Drop", "Use"):
+                for unit in ("Hour", "Min"):
+                    v = _int(d.find(f"{stage}_{unit}"))
+                    if v is not None:
+                        out[f"{prefix}_{daykind.lower()}_{stage.lower()}_{unit.lower()}"] = v
+
     return {k: v for k, v in out.items() if v is not None}
 
 

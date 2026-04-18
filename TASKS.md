@@ -74,10 +74,10 @@ _Goal: a pure Python module with no HA imports that both the add-on will use and
 
 ## Phase 9 — Integration tests
 
-- [ ] **9.1** Set up `pytest-homeassistant-custom-component` in dev deps if not already configured.
-- [ ] **9.2** Write a pytest fixture that boots a local aiohttp WS server which replays a canned event stream (the same shape the add-on emits).
-- [ ] **9.3** Write a test that sets up the integration against the fixture, waits for entities to register, asserts the expected set of entities exist with the right unique IDs / device classes, and verifies state after a `state_updated` event.
-- [ ] **9.4** Write a reconnect test: kill the WS mid-stream, assert entities go `unavailable`, bring it back, assert state recovers from the new `snapshot`.
+- [x] **9.1** Set up `pytest-homeassistant-custom-component` in dev deps if not already configured. _(2.0.0-dev10)_
+- [x] **9.2** Write a pytest fixture that boots a local aiohttp WS server which replays a canned event stream (the same shape the add-on emits). _(2.0.0-dev10)_
+- [x] **9.3** Write a test that sets up the integration against the fixture, waits for entities to register, asserts the expected set of entities exist with the right unique IDs / device classes, and verifies state after a `state_updated` event. _(2.0.0-dev10)_
+- [x] **9.4** Write a reconnect test: kill the WS mid-stream, assert entities go `unavailable`, bring it back, assert state recovers from the new `snapshot`. _(2.0.0-dev10)_
 
 ## Phase 10 — Docs & release
 
@@ -179,8 +179,8 @@ Grouped by sub-block:
 - [x] **15.7** **Grid Mode Schedules 1/2/3**: 9 sensors. _(2.0.0-dev9)_
 - [x] **15.8** **High Battery Transfer (HVT/LVC)**: 7 sensors. _(2.0.0-dev9)_
 - [x] **15.9** **Load Grid Transfer (load shedding)**: 6 sensors. _(2.0.0-dev9)_
-- [ ] **15.10** **Advanced Generator Start (defer)**: 50+ leaves. Postpone until a user has AGS enabled and can verify values; capture as a grouped block with per-sub-feature diagnostic sensors at that point.
-- [ ] **15.11** **Grid Use / Grid_Use_P2 / Grid_Use_P3 schedules (defer)**: weekday/weekend drop/use hour schedules, mostly zeros unless user configures TOU. Same deferral as 15.10.
+- [x] **15.10** **Advanced Generator Start**: 51 diagnostic sensors (AGS top-level, FNDC Full Charge, Generator Exercise, Load Start, Must Run weekday/weekend, Quiet Time weekday/weekend, SOC Start, 2-min/2-hr/24-hr voltage starts). DC Generator Absorb Voltage + voltage-start voltages use `_volt_tenths`. _(2.0.0-dev10)_
+- [x] **15.11** **Grid Use / Grid_Use_P2 / Grid_Use_P3 schedules**: 27 diagnostic sensors across 3 profiles (each with mode + weekday/weekend × drop/use × hour/min). _(2.0.0-dev10)_
 - [x] **15.13** Only create config-derived diagnostic entities once the MATE3's HTTP endpoint has been reached at least once (first `config_snapshot`). Prevents a wall of permanently-unavailable entities when the MATE3 is HTTP-unreachable. _(2.0.0-dev9)_
 - [ ] **15.14** Flip config-derived diagnostic entities to `entity_registry_enabled_default=False` after confirming values populate correctly. Keeps the recorder quiet — users enable only the handful they care about.
 
@@ -214,4 +214,5 @@ _Each completed item is annotated with `(vX.Y.Z-devN)` — the add-on / integrat
 - [ ] B7 - let's mimick https://github.com/weirded/distributed-esphome in terms of: license, buy me a coffee, style/format of readme and docs.md and the installation instructions (including that nice button) - obviously correcting for the specifics of our add-on.
 - [x] B8 - allow orphan MATE3 devices (e.g. from test-fixture traffic) to be removed via HA's Delete Device button, by implementing `async_remove_config_entry_device`. Returns True unless the device is currently present in `mate3.inverters` / `mate3.charge_controllers`. _(2.0.0-dev3)_
 - [ ] B9 - now that HACS is gone, make the add-on bundle and deploy the integration into `/config/custom_components/outback_mate3/` on startup so users only have to install one thing. Needs `map: [homeassistant_config:rw]` in the add-on `config.yaml`, a bundled copy of `custom_components/outback_mate3/` inside the add-on's Docker build context, and a shell step in `run.sh` to copy/sync (idempotent — diff first, only overwrite + log when content changes so we don't spam restarts). Until then users install the integration manually per the README.
-- [ ]  
+- [ ] B10 - convert the IP addresses from the strange triple zero display format into a regular IP address format.
+- [ ] 

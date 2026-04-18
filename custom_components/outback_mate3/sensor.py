@@ -626,7 +626,126 @@ _SYSTEM_CONFIG_SENSORS = [
     ("lgt_high_battery_disconnect_voltage", "Load-Grid High Battery Disconnect",
      _m3("lgt_high_battery_disconnect_voltage"),
      UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+
+    # --- Phase 15.10: Advanced Generator Start (AGS) ---
+    ("ags_mode", "AGS", _m3("ags_mode"), None, None, False),
+    ("ags_control", "AGS Control", _m3("ags_control"), None, None, False),
+    ("ags_generator_type", "AGS Generator Type", _m3("ags_generator_type"), None, None, False),
+    ("ags_port", "AGS Port", _m3("ags_port"), None, None, False),
+    ("ags_cooldown_time", "AGS Cooldown Time", _m3("ags_cooldown_time"), None, None, False),
+    ("ags_warmup_time", "AGS Warmup Time", _m3("ags_warmup_time"), None, None, False),
+    ("ags_fault_time", "AGS Fault Time", _m3("ags_fault_time"), None, None, False),
+    ("ags_ac_input_reconnect_delay", "AGS AC Input Reconnect Delay",
+     _m3("ags_ac_input_reconnect_delay"), None, None, False),
+    ("ags_dc_generator_absorb_time", "AGS DC Generator Absorb Time",
+     _m3("ags_dc_generator_absorb_time"), None, None, False),
+    ("ags_dc_generator_absorb_voltage", "AGS DC Generator Absorb Voltage",
+     _m3("ags_dc_generator_absorb_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("ags_fndc_full_charge_mode", "AGS FNDC Full Charge",
+     _m3("ags_fndc_full_charge_mode"), None, None, False),
+    ("ags_fndc_full_charge_interval", "AGS FNDC Full Charge Interval",
+     _m3("ags_fndc_full_charge_interval"), "d", None, False),
+    # Generator Exercise
+    ("ags_generator_exercise_mode", "AGS Generator Exercise",
+     _m3("ags_generator_exercise_mode"), None, None, False),
+    ("ags_generator_exercise_day", "AGS Generator Exercise Day",
+     _m3("ags_generator_exercise_day"), None, None, False),
+    ("ags_generator_exercise_interval", "AGS Generator Exercise Interval",
+     _m3("ags_generator_exercise_interval"), None, None, False),
+    ("ags_generator_exercise_period", "AGS Generator Exercise Period",
+     _m3("ags_generator_exercise_period"), None, None, False),
+    ("ags_generator_exercise_sell_during", "AGS Sell During Exercise",
+     _m3("ags_generator_exercise_sell_during"), None, None, False),
+    ("ags_generator_exercise_start_hour", "AGS Generator Exercise Start Hour",
+     _m3("ags_generator_exercise_start_hour"), None, None, False),
+    ("ags_generator_exercise_start_min", "AGS Generator Exercise Start Min",
+     _m3("ags_generator_exercise_start_min"), None, None, False),
+    # Load Start
+    ("ags_load_start_mode", "AGS Load Start", _m3("ags_load_start_mode"), None, None, False),
+    ("ags_load_start_start_delay", "AGS Load Start Start Delay",
+     _m3("ags_load_start_start_delay"), None, None, False),
+    ("ags_load_start_start_load_kw", "AGS Load Start Start Load",
+     _m3("ags_load_start_start_load_kw"), "kW", None, False),
+    ("ags_load_start_stop_delay", "AGS Load Start Stop Delay",
+     _m3("ags_load_start_stop_delay"), None, None, False),
+    ("ags_load_start_stop_load_kw", "AGS Load Start Stop Load",
+     _m3("ags_load_start_stop_load_kw"), "kW", None, False),
+    # Must Run
+    ("ags_must_run_mode", "AGS Must Run", _m3("ags_must_run_mode"), None, None, False),
+    ("ags_must_run_weekday_start_hour", "AGS Must Run Weekday Start Hour",
+     _m3("ags_must_run_weekday_start_hour"), None, None, False),
+    ("ags_must_run_weekday_start_min", "AGS Must Run Weekday Start Min",
+     _m3("ags_must_run_weekday_start_min"), None, None, False),
+    ("ags_must_run_weekday_stop_hour", "AGS Must Run Weekday Stop Hour",
+     _m3("ags_must_run_weekday_stop_hour"), None, None, False),
+    ("ags_must_run_weekday_stop_min", "AGS Must Run Weekday Stop Min",
+     _m3("ags_must_run_weekday_stop_min"), None, None, False),
+    ("ags_must_run_weekend_start_hour", "AGS Must Run Weekend Start Hour",
+     _m3("ags_must_run_weekend_start_hour"), None, None, False),
+    ("ags_must_run_weekend_start_min", "AGS Must Run Weekend Start Min",
+     _m3("ags_must_run_weekend_start_min"), None, None, False),
+    ("ags_must_run_weekend_stop_hour", "AGS Must Run Weekend Stop Hour",
+     _m3("ags_must_run_weekend_stop_hour"), None, None, False),
+    ("ags_must_run_weekend_stop_min", "AGS Must Run Weekend Stop Min",
+     _m3("ags_must_run_weekend_stop_min"), None, None, False),
+    # Quiet Time
+    ("ags_quiet_time_mode", "AGS Quiet Time", _m3("ags_quiet_time_mode"), None, None, False),
+    ("ags_quiet_time_weekday_start_hour", "AGS Quiet Time Weekday Start Hour",
+     _m3("ags_quiet_time_weekday_start_hour"), None, None, False),
+    ("ags_quiet_time_weekday_start_min", "AGS Quiet Time Weekday Start Min",
+     _m3("ags_quiet_time_weekday_start_min"), None, None, False),
+    ("ags_quiet_time_weekday_stop_hour", "AGS Quiet Time Weekday Stop Hour",
+     _m3("ags_quiet_time_weekday_stop_hour"), None, None, False),
+    ("ags_quiet_time_weekday_stop_min", "AGS Quiet Time Weekday Stop Min",
+     _m3("ags_quiet_time_weekday_stop_min"), None, None, False),
+    ("ags_quiet_time_weekend_start_hour", "AGS Quiet Time Weekend Start Hour",
+     _m3("ags_quiet_time_weekend_start_hour"), None, None, False),
+    ("ags_quiet_time_weekend_start_min", "AGS Quiet Time Weekend Start Min",
+     _m3("ags_quiet_time_weekend_start_min"), None, None, False),
+    ("ags_quiet_time_weekend_stop_hour", "AGS Quiet Time Weekend Stop Hour",
+     _m3("ags_quiet_time_weekend_stop_hour"), None, None, False),
+    ("ags_quiet_time_weekend_stop_min", "AGS Quiet Time Weekend Stop Min",
+     _m3("ags_quiet_time_weekend_stop_min"), None, None, False),
+    # SOC Start
+    ("ags_soc_start_mode", "AGS SOC Start", _m3("ags_soc_start_mode"), None, None, False),
+    ("ags_soc_start_start_percentage", "AGS SOC Start %",
+     _m3("ags_soc_start_start_percentage"), "%", None, False),
+    ("ags_soc_start_stop_percentage", "AGS SOC Stop %",
+     _m3("ags_soc_start_stop_percentage"), "%", None, False),
+    # Voltage starts
+    ("ags_two_min_voltage_start_mode", "AGS 2-Min Voltage Start",
+     _m3("ags_two_min_voltage_start_mode"), None, None, False),
+    ("ags_two_min_voltage_start_voltage", "AGS 2-Min Voltage",
+     _m3("ags_two_min_voltage_start_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("ags_two_hour_voltage_start_mode", "AGS 2-Hour Voltage Start",
+     _m3("ags_two_hour_voltage_start_mode"), None, None, False),
+    ("ags_two_hour_voltage_start_voltage", "AGS 2-Hour Voltage",
+     _m3("ags_two_hour_voltage_start_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("ags_twenty_four_hour_voltage_start_mode", "AGS 24-Hour Voltage Start",
+     _m3("ags_twenty_four_hour_voltage_start_mode"), None, None, False),
+    ("ags_twenty_four_hour_voltage_start_voltage", "AGS 24-Hour Voltage",
+     _m3("ags_twenty_four_hour_voltage_start_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+
+    # --- Phase 15.11: Grid Use time-of-use (three profiles) ---
 ]
+# Generate the 19 Grid_Use sensors programmatically to avoid tedious repetition.
+for _prefix, _label in [("grid_use", "Grid Use"), ("grid_use_p2", "Grid Use P2"), ("grid_use_p3", "Grid Use P3")]:
+    _SYSTEM_CONFIG_SENSORS.append(
+        (f"{_prefix}_mode", f"{_label} Mode", _m3(f"{_prefix}_mode"), None, None, False)
+    )
+    for _day in ("weekday", "weekend"):
+        for _stage in ("drop", "use"):
+            for _unit, _unit_label in [("hour", "Hour"), ("min", "Min")]:
+                _key = f"{_prefix}_{_day}_{_stage}_{_unit}"
+                _name = f"{_label} {_day.capitalize()} {_stage.capitalize()} {_unit_label}"
+                _SYSTEM_CONFIG_SENSORS.append(
+                    (_key, _name, _m3(_key), None, None, False)
+                )
+
 
 # Per-inverter config sensors. Getter is called with (config, index).
 _INVERTER_CONFIG_SENSORS = [
