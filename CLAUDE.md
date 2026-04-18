@@ -24,22 +24,27 @@ Scripts:
 
 - `scripts/provision-haos-vm.sh` — provisions a fresh HAOS VM on pve
 - `scripts/onboard-haos.sh` — completes HA onboarding and mints a long-lived token
-- `scripts/install-addon.sh` — pushes local `outback_mate3_addon/` into the VM via
-  qemu-guest-agent and installs/rebuilds via `ha` CLI
+- `scripts/install-addon.sh` — pushes local `outback_mate3_addon/` into the VM
+  via qemu-guest-agent and installs/rebuilds via `ha` CLI
+- `scripts/install-integration.sh` — pushes local `custom_components/outback_mate3/`
+  into the VM and restarts HA core
 - `scripts/teardown-haos-vm.sh` — destroys the VM
 
-## Rule: keep pve-side scripts in sync
+## Standing rule — always push + commit after each turn
 
-Whenever `scripts/provision-haos-vm.sh` or `scripts/teardown-haos-vm.sh` changes
-in this repo, scp them to `pve:/root/` so the Proxmox host has the current
-version — those scripts are invoked either directly on pve or via short
-`ssh pve bash /root/<name>.sh` wrappers, and stale copies on pve are a known
-trap.
+After every turn that changes files in the repo:
 
-```sh
-scp scripts/provision-haos-vm.sh scripts/teardown-haos-vm.sh pve:/root/
-```
+1. **Deploy** to the test VM so changes are immediately visible:
 
-Run this after every turn that modifies either script. Other scripts
-(`onboard-haos.sh`, `install-addon.sh`) run locally and talk to pve over SSH,
-so they don't need to be copied.
+    ```sh
+    ./scripts/install-addon.sh          # if outback_mate3_addon/ changed
+    ./scripts/install-integration.sh    # if custom_components/outback_mate3/ changed
+    scp scripts/provision-haos-vm.sh scripts/teardown-haos-vm.sh pve:/root/
+                                        # if either of those two scripts changed
+    ```
+
+2. **Commit** the changes to the current branch (`weirded/ha-addon-plan`) with
+   a clear message.
+
+Do all three unless the user explicitly says not to. Changes the user can't
+see sitting on my disk don't count as delivered.
