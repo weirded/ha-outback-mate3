@@ -50,10 +50,10 @@ _Goal: a pure Python module with no HA imports that both the add-on will use and
 
 ## Phase 6 — Local add-on end-to-end sanity check
 
-- [ ] **6.1** `docker build` the add-on image locally.
-- [ ] **6.2** `docker run --network=host -e UDP_PORT=57027 -e WS_PORT=8099 <image>` — verify it starts.
-- [ ] **6.3** With a Python script, send a captured MATE3 fixture datagram over UDP.
-- [ ] **6.4** Connect with `wscat -c ws://localhost:8099/ws` and confirm the snapshot and subsequent `device_added` / `state_updated` events arrive correctly.
+- [x] **6.1** `docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/aarch64-base-python:3.12-alpine3.19 ...` — image built cleanly on Apple Silicon. This pass surfaced the `pre-enrolled-keys=1` / missing `build.yaml` / `init: false` / bashio "null" / macOS `._*` xattr bugs now fixed. _(pre-2.0.0-dev1)_
+- [x] **6.2** `docker run -d --rm --name outback-mate3-smoke --network=host -e UDP_PORT=57127 -e WS_PORT=8199 outback-mate3-addon:local` — container came up, logs show "Listening for MATE3 UDP on 0.0.0.0:57127" and "WebSocket server listening on 0.0.0.0:8199/ws". _(pre-2.0.0-dev1)_
+- [x] **6.3** Python one-liner sending `telemetry_00.bin` via `socket.sendto` to `127.0.0.1:57127` — datagram picked up, parser ran, events broadcast. _(pre-2.0.0-dev1)_
+- [x] **6.4** aiohttp WS client against `ws://127.0.0.1:8199/ws` — received empty snapshot on connect, then 4 `device_added` events (2 inverters + 2 charge controllers) with correct `kind` / `index` / `state`. _(pre-2.0.0-dev1)_
 
 ## Phase 7 — Integration: rewrite as WS client
 
@@ -74,10 +74,10 @@ _Goal: a pure Python module with no HA imports that both the add-on will use and
 
 ## Phase 9 — Integration tests
 
-- [ ] **9.1** Set up `pytest-homeassistant-custom-component` in dev deps if not already configured.
-- [ ] **9.2** Write a pytest fixture that boots a local aiohttp WS server which replays a canned event stream (the same shape the add-on emits).
-- [ ] **9.3** Write a test that sets up the integration against the fixture, waits for entities to register, asserts the expected set of entities exist with the right unique IDs / device classes, and verifies state after a `state_updated` event.
-- [ ] **9.4** Write a reconnect test: kill the WS mid-stream, assert entities go `unavailable`, bring it back, assert state recovers from the new `snapshot`.
+- [x] **9.1** PHACC installed; `pytest.ini` sets `asyncio_mode=auto`; `tests/conftest.py` loads the PHACC plugin + autouses `enable_custom_integrations`; `outback_mate3_addon/tests/conftest.py` re-enables sockets (PHACC ships pytest-socket which blocks the network). _(2.0.0-dev10)_
+- [x] **9.2** `_FakeAddOn` fixture in `tests/test_integration.py` — aiohttp `TestServer` exposing `/ws`, each new client receives a scripted list of canned messages, `broadcast()` fans out new messages to connected clients live. _(2.0.0-dev10)_
+- [x] **9.3** `test_snapshot_creates_udp_entities` + `test_state_updated_refreshes_entities` — after snapshot, inverter 1's `grid_power` reads 500; a `state_updated` mutates it to -300 and the entity reflects it. _(2.0.0-dev10)_
+- [x] **9.4** `test_reconnects_after_addon_drops_ws` — fake server closes all clients mid-stream, integration reconnects, the next snapshot payload (with `grid_power=999`) lands on the entity. Plus `test_config_snapshot_only_creates_diagnostics_after_poll` asserts the 15.13 gating via the entity registry (since config sensors are disabled-by-default per 15.14). _(2.0.0-dev10, updated 2.0.0-dev11)_
 
 ## Phase 10 — Docs & release
 
@@ -88,10 +88,10 @@ _Goal: a pure Python module with no HA imports that both the add-on will use and
 
 ## Phase 11 — End-to-end validation on real HA OS
 
-- [ ] **11.1** Install the add-on on an HA OS instance by adding this repo's URL to Supervisor. _(still pending — we've only validated sideload via `install-addon.sh`; the repo-URL store path is untested)_
-- [ ] **11.2** Install the integration via HACS on the same instance. _(still pending — we've only validated sideload via `install-integration.sh`)_
+- [ ] **11.1** Install the add-on on an HA OS instance by adding this repo's URL to Supervisor. _(gated on publishing to `main` — Supervisor's store clones the default branch, which as of 2.0.0-dev12 still has the pre-2.0 layout. Validated the store-level handshake: `ha store add https://github.com/weirded/ha-outback-mate3` correctly rejects "not a valid app repository" today, proving the check is active. Flip to done on the first run against a main-branch HEAD that contains `outback_mate3_addon/` + `repository.yaml`. Fast-forward `weirded/ha-addon-plan` → `main` whenever you're ready to cut the release.)_
+- [x] **11.2** ~~Install the integration via HACS~~ — HACS support removed in 2.0 (B7/10.3). The integration now ships bundled inside the add-on and gets deployed to `/config/custom_components/outback_mate3/` automatically on first add-on start (B9 / 2.0.0-dev12). Replaces this item entirely.
 - [x] **11.3** Configure MATE3 to stream to the HA host IP on port 57027. _(2.0.0-dev2, verified via tcpdump)_
-- [ ] **11.4** Verify entities appear with correct values; cross-check against the MATE3 display (and, if available, a Supervised install running the old version). _(partial — 150 → 78 entities populated with plausible values; no formal cross-check against MATE3 LCD yet)_
+- [x] **11.4** Verify entities appear with correct values; cross-check against the MATE3 display. _(2.0.0-dev10 — UDP-stream entities match live MATE3 values; every config-derived diagnostic sensor spot-checked against `http://<mate3>/CONFIG.xml` AND the Radian + CC settings screenshots from the MATE3 web UI: absorb V 55.2 / 55.4, low-batt cut-out 48.0 V, AC1 input size 200.0 A, CC output limit 80.0 A, MPPT upick 77 %, AUX PV trigger 140.0 V, Nite Light threshold 10.0 V, HVT disconnect 52.0 V, AGS DC Gen absorb 76.0 V, Grid_Use mode Disabled — all match. IP normalization from B10 verified: mate3_ip_address `192.168.0.64`, gateway `192.168.0.1`.)_
 - [x] **11.5** Restart the add-on; confirm integration reconnects and entities recover. _(2.0.0-dev3 — add-on restart this turn, integration reconnected, new snapshot applied)_
 - [x] **11.6** Restart HA Core; confirm integration reconnects and entities recover. _(2.0.0-dev1 — every `install-integration.sh` run issues `ha core restart` and the integration re-binds the add-on WS cleanly)_
 
@@ -179,10 +179,10 @@ Grouped by sub-block:
 - [x] **15.7** **Grid Mode Schedules 1/2/3**: 9 sensors. _(2.0.0-dev9)_
 - [x] **15.8** **High Battery Transfer (HVT/LVC)**: 7 sensors. _(2.0.0-dev9)_
 - [x] **15.9** **Load Grid Transfer (load shedding)**: 6 sensors. _(2.0.0-dev9)_
-- [ ] **15.10** **Advanced Generator Start (defer)**: 50+ leaves. Postpone until a user has AGS enabled and can verify values; capture as a grouped block with per-sub-feature diagnostic sensors at that point.
-- [ ] **15.11** **Grid Use / Grid_Use_P2 / Grid_Use_P3 schedules (defer)**: weekday/weekend drop/use hour schedules, mostly zeros unless user configures TOU. Same deferral as 15.10.
+- [x] **15.10** **Advanced Generator Start**: the full 51-leaf AGS block (enable mode, VDC/SOC/load/temp/exercise/quiet-time triggers, generator profile, run-limits, warm-up/cool-down, DC-gen absorb/float/bulk/EQ setpoints). Pulled as diagnostic sensors on the System device. Disabled-by-default per 15.14. _(2.0.0-dev11 — spot-checked against Radian AGS screen: DC-Gen absorb 76.0 V, bulk 74.4 V, float 65.0 V, max run 240 min, quiet-time 2200–0700, all match.)_
+- [x] **15.11** **Grid Use / Grid_Use_P2 / Grid_Use_P3 schedules**: Grid_Use enable, grid-use/grid-drop weekday+weekend hours, sell hours, voltage/SOC thresholds — all three profiles as 19 diagnostic sensors on the System device. Mostly zeros on systems without TOU configured, but the enum `grid_use_mode` gives a quick "Disabled" indicator without users having to enable the others. _(2.0.0-dev11 — Grid_Use mode reads "Disabled" on the test system, confirming the field is populated correctly even when the schedule is inactive.)_
 - [x] **15.13** Only create config-derived diagnostic entities once the MATE3's HTTP endpoint has been reached at least once (first `config_snapshot`). Prevents a wall of permanently-unavailable entities when the MATE3 is HTTP-unreachable. _(2.0.0-dev9)_
-- [ ] **15.14** Flip config-derived diagnostic entities to `entity_registry_enabled_default=False` after confirming values populate correctly. Keeps the recorder quiet — users enable only the handful they care about.
+- [x] **15.14** Flip config-derived diagnostic entities to `entity_registry_enabled_default=False` after confirming values populate correctly. Keeps the recorder quiet — users enable only the handful they care about. _(2.0.0-dev11 — `OutbackConfigDiagnosticSensor` base class sets `_attr_entity_registry_enabled_default = False`; every config-poll sensor inherits it. Firmware sensors stay enabled-by-default because they're the one set users actually want visible. Verified on VM 106: config sensors show as "Disabled" in the device page but the values are correct when enabled.)_
 
 ## Phase 12 — Hass.io discovery (auto-suggest the add-on to the integration)
 
