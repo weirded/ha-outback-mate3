@@ -27,19 +27,7 @@ On the MATE3 display:
 4. Set **Destination IP** to the IP of your Home Assistant host
 5. Set **Destination Port** to `udp_port` (default `57027`)
 
-## WebSocket protocol
-
-The add-on exposes one endpoint: `/ws`. On connect, it sends a single `snapshot` message listing all currently-known devices, then streams `device_added` and `state_updated` events as frames arrive:
-
-```json
-{ "type": "snapshot", "devices": [ { "mac": "...", "kind": "inverter", "index": 1, "state": { ... } }, ... ] }
-{ "type": "device_added", "mac": "...", "kind": "inverter", "index": 2, "state": { ... } }
-{ "type": "state_updated", "mac": "...", "kind": "inverter", "index": 1, "state": { ... } }
-```
-
-Ping/pong is handled at the aiohttp protocol layer (30 s interval).
-
 ## Troubleshooting
 
 - **No devices appear in HA** — check the add-on's log. You should see connection logs for the integration. If you see nothing from the MATE3 at all, verify the MATE3's Destination IP / Port and that the MATE3 is actually streaming.
-- **Integration shows "cannot connect"** — make sure the add-on is running and the integration's configured URL points at the add-on's host and `ws_port`. Default is `ws://a0d7b954-outback-mate3:8099/ws`.
+- **Integration shows "cannot connect"** — make sure the add-on is running and the integration's configured URL points at the add-on's host and `ws_port`. Default is `ws://local-outback-mate3:8099/ws`.

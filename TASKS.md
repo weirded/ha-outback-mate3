@@ -84,7 +84,7 @@ _Goal: a pure Python module with no HA imports that both the add-on will use and
 - [x] **10.1** Update `README.md`: remove the "does not work on HA OS" warning, add sections explaining the two-part install (add-on from repo URL, integration from HACS), and add a breaking-change note for existing users.
 - [x] **10.2** Add `outback_mate3_addon/README.md` explaining options, what to point MATE3 at (host IP:57027), and troubleshooting.
 - [ ] **10.3** Check `hacs.json` — it tracks the integration, not the add-on; likely no change needed.
-- [ ] **10.4** Write release notes / CHANGELOG for the 2.0 cut.
+- [x] **10.4** Write release notes / CHANGELOG for the 2.0 cut.
 
 ## Phase 11 — End-to-end validation on real HA OS
 
@@ -114,6 +114,6 @@ When the add-on is running, HA should automatically surface the integration unde
 
 ## Bugfixes/Tweaks
 
-- [ ] B1 - we don't need to describe the WebSocket protocol on docs.md.
-- [ ] B2 - we are missing a changelog; let's fix that. 
-- [ ] B3 - the add-on is missing the icon that we had for the integration before. Let's fix that also. 
+- [x] B1 - we don't need to describe the WebSocket protocol on docs.md.
+- [x] B2 - we are missing a changelog; let's fix that. 
+- [x] B3 - the add-on is missing the icon that we had for the integration before. Let's fix that also. 
