@@ -88,6 +88,7 @@ qm create "$VMID" \
   -bios ovmf \
   -tablet 0 \
   -localtime 1 \
+  -agent 1 \
   -cores "$CORES" \
   -memory "$MEM_MB" \
   -name "$VMNAME" \
