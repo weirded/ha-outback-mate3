@@ -1,0 +1,26 @@
+name: "Outback MATE3"
+version: "0.1.0"
+slug: outback_mate3
+description: >-
+  Listens for Outback MATE3 UDP streaming telemetry and relays parsed device
+  state to the Home Assistant Outback MATE3 integration over WebSocket.
+url: https://github.com/weirded/ha-outback-mate3
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+startup: services
+boot: auto
+host_network: true
+options:
+  udp_port: 57027
+  ws_port: 8099
+  log_level: info
+  min_update_interval_s: 30
+schema:
+  udp_port: port
+  ws_port: port
+  log_level: list(trace|debug|info|notice|warning|error|fatal)
+  min_update_interval_s: float(0,)
