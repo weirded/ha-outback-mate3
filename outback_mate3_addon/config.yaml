@@ -1,5 +1,5 @@
 name: "Outback MATE3"
-version: "2.0.0-dev11"
+version: "2.0.0-dev12"
 slug: outback_mate3
 description: >-
   Listens for Outback MATE3 UDP streaming telemetry and relays parsed device
@@ -22,6 +22,11 @@ hassio_api: true
 # Whitelists the service name(s) we may announce.
 discovery:
   - outback_mate3
+# Read-write mount of HA's /config. Used on startup to copy the bundled
+# companion integration into /homeassistant/custom_components/outback_mate3
+# so users only have to install the add-on (B9).
+map:
+  - homeassistant_config:rw
 options:
   udp_port: 57027
   ws_port: 8099

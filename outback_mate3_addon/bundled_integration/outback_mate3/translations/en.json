@@ -1,0 +1,27 @@
+{
+    "config": {
+        "flow_title": "{name}",
+        "step": {
+            "user": {
+                "title": "Outback MATE3 Setup",
+                "description": "Enter the WebSocket URL of the companion Outback MATE3 add-on. The default value works when the add-on is installed on the same Home Assistant instance.",
+                "data": {
+                    "url": "Add-on WebSocket URL"
+                }
+            },
+            "hassio_confirm": {
+                "title": "Outback MATE3 discovered",
+                "description": "The Outback MATE3 add-on is running. Add it to Home Assistant so it can stream telemetry to this integration via {url}?"
+            }
+        },
+        "error": {
+            "cannot_connect": "Could not connect to the add-on.",
+            "timeout": "Connection to the add-on timed out.",
+            "bad_handshake": "Connected, but did not receive a valid snapshot message.",
+            "unknown": "Unexpected error connecting to the add-on."
+        },
+        "abort": {
+            "already_configured": "This add-on URL is already configured."
+        }
+    }
+}

@@ -34,6 +34,33 @@ def _text(el: ET.Element | None) -> str | None:
     return t or None
 
 
+_IP_OCTETS = 4
+
+
+def _ipv4(el: ET.Element | None) -> str | None:
+    """Normalize CONFIG.xml's zero-padded IPs (``192.168.000.064``) to dotted-quad.
+
+    The MATE3 serializes every octet as three digits with leading zeros. That
+    renders oddly in HA's UI and breaks typical IP-address parsers. Convert to
+    the canonical ``192.168.0.64`` form. Values that don't look like an IPv4
+    address are returned unchanged (fail-open — don't mangle future MATE3
+    firmware behavior).
+    """
+    t = _text(el)
+    if t is None:
+        return None
+    parts = t.split(".")
+    if len(parts) != _IP_OCTETS:
+        return t
+    try:
+        ints = [int(p, 10) for p in parts]
+    except ValueError:
+        return t
+    if not all(0 <= i <= 255 for i in ints):
+        return t
+    return ".".join(str(i) for i in ints)
+
+
 def _int(el: ET.Element | None) -> int | None:
     t = _text(el)
     if t is None:
@@ -107,11 +134,11 @@ def _parse_mate3(root: ET.Element) -> dict[str, Any]:
         out.update(
             {
                 "dhcp": _text(network.find("DHCP")),
-                "ip_address": _text(network.find("IP_address")),
-                "netmask": _text(network.find("Netmask")),
-                "gateway": _text(network.find("Gateway")),
+                "ip_address": _ipv4(network.find("IP_address")),
+                "netmask": _ipv4(network.find("Netmask")),
+                "gateway": _ipv4(network.find("Gateway")),
                 "http_port": _int(network.find("HTTP_Port")),
-                "data_stream_ip": _text(network.find("Data_Stream_IP")),
+                "data_stream_ip": _ipv4(network.find("Data_Stream_IP")),
                 "data_stream_port": _int(network.find("Data_Stream_Port")),
             }
         )

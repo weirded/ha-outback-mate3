@@ -99,6 +99,9 @@ ha_cli() {
 
 # --- 1. Build tarball (exclude macOS AppleDouble metadata) ---------------
 
+log "Syncing bundled integration into add-on dir"
+./scripts/sync-bundled-integration.sh >/dev/null
+
 log "Packaging $ADDON_DIR"
 TARBALL=$(mktemp -t outback_mate3_addon.XXXXXX).tar
 trap 'rm -f "$TARBALL"' EXIT

@@ -60,6 +60,17 @@ def test_mate3_network_fields(config):
     assert m["http_port"] == 80
 
 
+def test_ipv4_normalization(config):
+    """B10: zero-padded XML IPs get converted to canonical dotted-quad."""
+    m = config["mate3"]
+    # Fixture has static IP 192.168.000.064, gateway 192.168.000.001,
+    # netmask 255.255.255.000, data-stream target 192.168.226.135.
+    assert m["ip_address"] == "192.168.0.64"
+    assert m["gateway"] == "192.168.0.1"
+    assert m["netmask"] == "255.255.255.0"
+    assert m["data_stream_ip"] == "192.168.226.135"
+
+
 # --- Phase 15: system-wide setpoints and coordination ---------------------
 
 def test_low_soc_thresholds(config):

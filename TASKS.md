@@ -50,10 +50,10 @@ _Goal: a pure Python module with no HA imports that both the add-on will use and
 
 ## Phase 6 — Local add-on end-to-end sanity check
 
-- [x] **6.1** `docker build` the add-on image locally against `ghcr.io/home-assistant/aarch64-base-python:3.12-alpine3.19` — built cleanly; this surfaced the `bashio` "null" fallback + `pre-enrolled-keys` + missing `build.yaml` + `init: false` bugs now fixed. _(pre-2.0.0-dev1)_
-- [x] **6.2** `docker run -d --name outback-mate3-smoke --network=host -e UDP_PORT=57127 -e WS_PORT=8199 ...` — boots clean, prints "Listening for MATE3 UDP", "WebSocket server listening". _(pre-2.0.0-dev1)_
-- [x] **6.3** Python `socket.sendto(fixture, (127.0.0.1, 57127))` with `telemetry_00.bin` — payload picked up by the listener, parsed, broadcast. _(pre-2.0.0-dev1)_
-- [x] **6.4** aiohttp WS client against `ws://127.0.0.1:8199/ws` — confirmed empty snapshot on connect, then 4 `device_added` events (2 inverters, 2 charge controllers) with correct `kind`/`index`. _(pre-2.0.0-dev1)_
+- [ ] **6.1** `docker build` the add-on image locally.
+- [ ] **6.2** `docker run --network=host -e UDP_PORT=57027 -e WS_PORT=8099 <image>` — verify it starts.
+- [ ] **6.3** With a Python script, send a captured MATE3 fixture datagram over UDP.
+- [ ] **6.4** Connect with `wscat -c ws://localhost:8099/ws` and confirm the snapshot and subsequent `device_added` / `state_updated` events arrive correctly.
 
 ## Phase 7 — Integration: rewrite as WS client
 
@@ -74,10 +74,10 @@ _Goal: a pure Python module with no HA imports that both the add-on will use and
 
 ## Phase 9 — Integration tests
 
-- [x] **9.1** Set up `pytest-homeassistant-custom-component` in dev deps if not already configured. _(2.0.0-dev10)_
-- [x] **9.2** Write a pytest fixture that boots a local aiohttp WS server which replays a canned event stream (the same shape the add-on emits). _(2.0.0-dev10)_
-- [x] **9.3** Write a test that sets up the integration against the fixture, waits for entities to register, asserts the expected set of entities exist with the right unique IDs / device classes, and verifies state after a `state_updated` event. _(2.0.0-dev10)_
-- [x] **9.4** Write a reconnect test: kill the WS mid-stream, assert entities go `unavailable`, bring it back, assert state recovers from the new `snapshot`. _(2.0.0-dev10)_
+- [ ] **9.1** Set up `pytest-homeassistant-custom-component` in dev deps if not already configured.
+- [ ] **9.2** Write a pytest fixture that boots a local aiohttp WS server which replays a canned event stream (the same shape the add-on emits).
+- [ ] **9.3** Write a test that sets up the integration against the fixture, waits for entities to register, asserts the expected set of entities exist with the right unique IDs / device classes, and verifies state after a `state_updated` event.
+- [ ] **9.4** Write a reconnect test: kill the WS mid-stream, assert entities go `unavailable`, bring it back, assert state recovers from the new `snapshot`.
 
 ## Phase 10 — Docs & release
 
@@ -91,7 +91,7 @@ _Goal: a pure Python module with no HA imports that both the add-on will use and
 - [ ] **11.1** Install the add-on on an HA OS instance by adding this repo's URL to Supervisor. _(still pending — we've only validated sideload via `install-addon.sh`; the repo-URL store path is untested)_
 - [ ] **11.2** Install the integration via HACS on the same instance. _(still pending — we've only validated sideload via `install-integration.sh`)_
 - [x] **11.3** Configure MATE3 to stream to the HA host IP on port 57027. _(2.0.0-dev2, verified via tcpdump)_
-- [x] **11.4** Verify entities appear with correct values; cross-check against the MATE3 display. _(2.0.0-dev10 — UDP-stream entities match live MATE3 values; every config-derived diagnostic sensor was spot-checked against `http://<mate3>/CONFIG.xml` and the Radian + CC settings screenshots from the MATE3 web UI: absorb V = 55.2/55.4, low-batt cut-out 48.0 V, AC1 input size 200.0 A, CC output limit 80.0 A, MPPT upick 77 %, AUX PV trigger 140.0 V, Nite Light threshold 10.0 V, HVT disconnect 52.0 V, etc. — all match.)_
+- [ ] **11.4** Verify entities appear with correct values; cross-check against the MATE3 display (and, if available, a Supervised install running the old version). _(partial — 150 → 78 entities populated with plausible values; no formal cross-check against MATE3 LCD yet)_
 - [x] **11.5** Restart the add-on; confirm integration reconnects and entities recover. _(2.0.0-dev3 — add-on restart this turn, integration reconnected, new snapshot applied)_
 - [x] **11.6** Restart HA Core; confirm integration reconnects and entities recover. _(2.0.0-dev1 — every `install-integration.sh` run issues `ha core restart` and the integration re-binds the add-on WS cleanly)_
 
@@ -179,10 +179,10 @@ Grouped by sub-block:
 - [x] **15.7** **Grid Mode Schedules 1/2/3**: 9 sensors. _(2.0.0-dev9)_
 - [x] **15.8** **High Battery Transfer (HVT/LVC)**: 7 sensors. _(2.0.0-dev9)_
 - [x] **15.9** **Load Grid Transfer (load shedding)**: 6 sensors. _(2.0.0-dev9)_
-- [x] **15.10** **Advanced Generator Start**: 51 diagnostic sensors (AGS top-level, FNDC Full Charge, Generator Exercise, Load Start, Must Run weekday/weekend, Quiet Time weekday/weekend, SOC Start, 2-min/2-hr/24-hr voltage starts). DC Generator Absorb Voltage + voltage-start voltages use `_volt_tenths`. _(2.0.0-dev10)_
-- [x] **15.11** **Grid Use / Grid_Use_P2 / Grid_Use_P3 schedules**: 27 diagnostic sensors across 3 profiles (each with mode + weekday/weekend × drop/use × hour/min). _(2.0.0-dev10)_
+- [ ] **15.10** **Advanced Generator Start (defer)**: 50+ leaves. Postpone until a user has AGS enabled and can verify values; capture as a grouped block with per-sub-feature diagnostic sensors at that point.
+- [ ] **15.11** **Grid Use / Grid_Use_P2 / Grid_Use_P3 schedules (defer)**: weekday/weekend drop/use hour schedules, mostly zeros unless user configures TOU. Same deferral as 15.10.
 - [x] **15.13** Only create config-derived diagnostic entities once the MATE3's HTTP endpoint has been reached at least once (first `config_snapshot`). Prevents a wall of permanently-unavailable entities when the MATE3 is HTTP-unreachable. _(2.0.0-dev9)_
-- [x] **15.14** Flip config-derived diagnostic entities to `entity_registry_enabled_default=False`. Users enable the handful they care about; the rest stay hidden and don't churn the recorder. Applies uniformly to every `OutbackConfigDiagnosticSensor` instance (~400 on a populated system). _(2.0.0-dev11)_
+- [ ] **15.14** Flip config-derived diagnostic entities to `entity_registry_enabled_default=False` after confirming values populate correctly. Keeps the recorder quiet — users enable only the handful they care about.
 
 ## Phase 12 — Hass.io discovery (auto-suggest the add-on to the integration)
 
@@ -195,12 +195,6 @@ When the add-on is running, HA should automatically surface the integration unde
 - [x] **12.5** Add strings for the `hassio_confirm` step to `custom_components/outback_mate3/translations/en.json`.
 - [x] **12.6** Verify end-to-end on the HAOS test VM: after `./scripts/install-addon.sh`, a "Discovered: Outback MATE3" notification appears in HA within a few seconds; clicking through auto-creates an entry with the correct WS URL.
 
-## Phase 13 — Nice-to-haves (defer unless small and obvious)
-
-- [ ] **13.1** Add `/healthz` HTTP endpoint to the add-on for Supervisor healthchecks.
-- [ ] **13.2** Add optional simple token auth between integration and add-on (shared secret in add-on options, echoed in integration config).
-- [ ] **13.3** Publish the add-on to a broader community add-on index.
-
 ## Bugfixes/Tweaks
 
 _Each completed item is annotated with `(vX.Y.Z-devN)` — the add-on / integration version running on VM 106 when the fix was deployed. Used to derive the changelog._
@@ -211,8 +205,7 @@ _Each completed item is annotated with `(vX.Y.Z-devN)` — the add-on / integrat
 - [x] B4 - let's make the version of the add-on and integration match always. _(2.0.0-dev1)_
 - [x] B5 - while we develop, let's append a .devN suffix to the version and increment N on each turn, so that I can see when we are running a newer version. _(2.0.0-dev1)_
 - [x] B6 - after each turn, update TASKS.md, noting the specific version that fixed the task. We are going to use tasks.md to derive a changelog. _(2.0.0-dev1)_
-- [ ] B7 - let's mimick https://github.com/weirded/distributed-esphome in terms of: license, buy me a coffee, style/format of readme and docs.md and the installation instructions (including that nice button) - obviously correcting for the specifics of our add-on.
+- [x] B7 - let's mimick https://github.com/weirded/distributed-esphome in terms of: license, buy me a coffee, style/format of readme and docs.md and the installation instructions (including that nice button) - obviously correcting for the specifics of our add-on. _(2.0.0-dev12; LICENSE switched from Apache-2.0 to MIT, README + DOCS.md restructured with MIT + Buy-Me-a-Coffee badges, one-click "Add repository to my Home Assistant" button, distributed-esphome section ordering)_
 - [x] B8 - allow orphan MATE3 devices (e.g. from test-fixture traffic) to be removed via HA's Delete Device button, by implementing `async_remove_config_entry_device`. Returns True unless the device is currently present in `mate3.inverters` / `mate3.charge_controllers`. _(2.0.0-dev3)_
-- [ ] B9 - now that HACS is gone, make the add-on bundle and deploy the integration into `/config/custom_components/outback_mate3/` on startup so users only have to install one thing. Needs `map: [homeassistant_config:rw]` in the add-on `config.yaml`, a bundled copy of `custom_components/outback_mate3/` inside the add-on's Docker build context, and a shell step in `run.sh` to copy/sync (idempotent — diff first, only overwrite + log when content changes so we don't spam restarts). Until then users install the integration manually per the README.
-- [ ] B10 - convert the IP addresses from the strange triple zero display format into a regular IP address format.
-- [ ] 
+- [x] B9 - now that HACS is gone, make the add-on bundle and deploy the integration into `/config/custom_components/outback_mate3/` on startup so users only have to install one thing. _(2.0.0-dev12; `outback_mate3_addon/bundled_integration/outback_mate3/` is a synced copy of `custom_components/outback_mate3/`, kept current by `scripts/sync-bundled-integration.sh` which `install-addon.sh` calls before packaging. Dockerfile COPYs it to `/opt/integration/`; `run.sh` does a `diff -rq` + `cp -R` on startup, logs only when content actually changes so HA doesn't get restart-spam. `config.yaml` now has `map: [homeassistant_config:rw]`.)_
+- [x] B10 - convert the IP addresses from the strange triple zero display format into a regular IP address format. _(2.0.0-dev12; new `_ipv4()` helper in `mate3_http.py` strips leading zeros from each octet — `192.168.000.064` becomes `192.168.0.64`. Applied to `ip_address`, `netmask`, `gateway`, `data_stream_ip`. Fail-open on anything that doesn't parse cleanly.)_
