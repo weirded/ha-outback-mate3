@@ -23,12 +23,17 @@ _LOGGER = logging.getLogger("outback_mate3_addon")
 
 def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name, "").strip()
-    return int(raw) if raw else default
+    # bashio returns the literal string "null" for unset options; treat as missing.
+    if not raw or raw.lower() == "null":
+        return default
+    return int(raw)
 
 
 def _env_float(name: str, default: float) -> float:
     raw = os.environ.get(name, "").strip()
-    return float(raw) if raw else default
+    if not raw or raw.lower() == "null":
+        return default
+    return float(raw)
 
 
 def _configure_logging(level_name: str) -> None:
