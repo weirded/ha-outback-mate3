@@ -404,14 +404,21 @@ class OutbackChargeControllerSensor(OutbackBaseSensor):
 
 
 class OutbackConfigDiagnosticSensor(CoordinatorEntity, SensorEntity):
-    """A string-valued diagnostic sensor read from OutbackMate3.config_by_mac.
+    """A diagnostic sensor read from OutbackMate3.config_by_mac.
 
-    Used for firmware versions, data stream target, SD card log mode — values
-    that come from the periodic HTTP CONFIG.xml poll, not the UDP stream.
+    Covers firmware versions, nameplate, setpoints, AGS / Grid_Use /
+    Grid-Mode-Schedule / HVT / LGT / SunSpec / etc. — everything the
+    periodic HTTP CONFIG.xml poll produces. These values change rarely,
+    so they're disabled by default: the entity registry knows about them
+    (so they show up in HA's UI and can be opted in), but HA doesn't
+    record or expose them as states until the user enables the ones
+    they care about. Keeps the recorder quiet given 400+ possible
+    diagnostic entities on a populated system.
     """
 
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
 
     def __init__(
         self,

@@ -50,10 +50,10 @@ _Goal: a pure Python module with no HA imports that both the add-on will use and
 
 ## Phase 6 — Local add-on end-to-end sanity check
 
-- [ ] **6.1** `docker build` the add-on image locally.
-- [ ] **6.2** `docker run --network=host -e UDP_PORT=57027 -e WS_PORT=8099 <image>` — verify it starts.
-- [ ] **6.3** With a Python script, send a captured MATE3 fixture datagram over UDP.
-- [ ] **6.4** Connect with `wscat -c ws://localhost:8099/ws` and confirm the snapshot and subsequent `device_added` / `state_updated` events arrive correctly.
+- [x] **6.1** `docker build` the add-on image locally against `ghcr.io/home-assistant/aarch64-base-python:3.12-alpine3.19` — built cleanly; this surfaced the `bashio` "null" fallback + `pre-enrolled-keys` + missing `build.yaml` + `init: false` bugs now fixed. _(pre-2.0.0-dev1)_
+- [x] **6.2** `docker run -d --name outback-mate3-smoke --network=host -e UDP_PORT=57127 -e WS_PORT=8199 ...` — boots clean, prints "Listening for MATE3 UDP", "WebSocket server listening". _(pre-2.0.0-dev1)_
+- [x] **6.3** Python `socket.sendto(fixture, (127.0.0.1, 57127))` with `telemetry_00.bin` — payload picked up by the listener, parsed, broadcast. _(pre-2.0.0-dev1)_
+- [x] **6.4** aiohttp WS client against `ws://127.0.0.1:8199/ws` — confirmed empty snapshot on connect, then 4 `device_added` events (2 inverters, 2 charge controllers) with correct `kind`/`index`. _(pre-2.0.0-dev1)_
 
 ## Phase 7 — Integration: rewrite as WS client
 
@@ -91,7 +91,7 @@ _Goal: a pure Python module with no HA imports that both the add-on will use and
 - [ ] **11.1** Install the add-on on an HA OS instance by adding this repo's URL to Supervisor. _(still pending — we've only validated sideload via `install-addon.sh`; the repo-URL store path is untested)_
 - [ ] **11.2** Install the integration via HACS on the same instance. _(still pending — we've only validated sideload via `install-integration.sh`)_
 - [x] **11.3** Configure MATE3 to stream to the HA host IP on port 57027. _(2.0.0-dev2, verified via tcpdump)_
-- [ ] **11.4** Verify entities appear with correct values; cross-check against the MATE3 display (and, if available, a Supervised install running the old version). _(partial — 150 → 78 entities populated with plausible values; no formal cross-check against MATE3 LCD yet)_
+- [x] **11.4** Verify entities appear with correct values; cross-check against the MATE3 display. _(2.0.0-dev10 — UDP-stream entities match live MATE3 values; every config-derived diagnostic sensor was spot-checked against `http://<mate3>/CONFIG.xml` and the Radian + CC settings screenshots from the MATE3 web UI: absorb V = 55.2/55.4, low-batt cut-out 48.0 V, AC1 input size 200.0 A, CC output limit 80.0 A, MPPT upick 77 %, AUX PV trigger 140.0 V, Nite Light threshold 10.0 V, HVT disconnect 52.0 V, etc. — all match.)_
 - [x] **11.5** Restart the add-on; confirm integration reconnects and entities recover. _(2.0.0-dev3 — add-on restart this turn, integration reconnected, new snapshot applied)_
 - [x] **11.6** Restart HA Core; confirm integration reconnects and entities recover. _(2.0.0-dev1 — every `install-integration.sh` run issues `ha core restart` and the integration re-binds the add-on WS cleanly)_
 
@@ -182,7 +182,7 @@ Grouped by sub-block:
 - [x] **15.10** **Advanced Generator Start**: 51 diagnostic sensors (AGS top-level, FNDC Full Charge, Generator Exercise, Load Start, Must Run weekday/weekend, Quiet Time weekday/weekend, SOC Start, 2-min/2-hr/24-hr voltage starts). DC Generator Absorb Voltage + voltage-start voltages use `_volt_tenths`. _(2.0.0-dev10)_
 - [x] **15.11** **Grid Use / Grid_Use_P2 / Grid_Use_P3 schedules**: 27 diagnostic sensors across 3 profiles (each with mode + weekday/weekend × drop/use × hour/min). _(2.0.0-dev10)_
 - [x] **15.13** Only create config-derived diagnostic entities once the MATE3's HTTP endpoint has been reached at least once (first `config_snapshot`). Prevents a wall of permanently-unavailable entities when the MATE3 is HTTP-unreachable. _(2.0.0-dev9)_
-- [ ] **15.14** Flip config-derived diagnostic entities to `entity_registry_enabled_default=False` after confirming values populate correctly. Keeps the recorder quiet — users enable only the handful they care about.
+- [x] **15.14** Flip config-derived diagnostic entities to `entity_registry_enabled_default=False`. Users enable the handful they care about; the rest stay hidden and don't churn the recorder. Applies uniformly to every `OutbackConfigDiagnosticSensor` instance (~400 on a populated system). _(2.0.0-dev11)_
 
 ## Phase 12 — Hass.io discovery (auto-suggest the add-on to the integration)
 

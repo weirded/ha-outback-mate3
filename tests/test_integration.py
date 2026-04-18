@@ -200,7 +200,14 @@ async def test_state_updated_refreshes_entities(
 async def test_config_snapshot_only_creates_diagnostics_after_poll(
     hass: HomeAssistant, fake_addon: _FakeAddOn
 ) -> None:
-    """Config-derived diagnostic entities appear only after first config_snapshot."""
+    """Config-derived diagnostic entities appear only after first config_snapshot.
+
+    Config sensors are disabled-by-default (15.14), so they don't show up in
+    `hass.states` unless explicitly enabled. We assert on the entity registry
+    instead — that's where "entity exists but disabled" shows up.
+    """
+    from homeassistant.helpers import entity_registry as er
+
     fake_addon.messages = [SNAPSHOT_PAYLOAD]  # no config_snapshot yet
     entry = MockConfigEntry(
         domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2
@@ -211,18 +218,23 @@ async def test_config_snapshot_only_creates_diagnostics_after_poll(
 
     await _wait_for_state(hass, f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power")
 
-    # Without a config_snapshot, the firmware diagnostic entity doesn't exist.
-    assert hass.states.get("sensor.mate3_system_mate3_firmware") is None
+    registry = er.async_get(hass)
+    firmware_eid = "sensor.mate3_system_mate3_firmware"
+    # Without a config_snapshot, the firmware diagnostic entity isn't registered.
+    assert registry.async_get(firmware_eid) is None
 
-    # Send one. After it lands, the firmware sensor should exist.
+    # Send one. After it lands, the entity should be registered (disabled,
+    # but present — the gating from 15.13 is what we're verifying).
     await fake_addon.broadcast(CONFIG_PAYLOAD)
     for _ in range(40):
-        st = hass.states.get("sensor.mate3_system_mate3_firmware")
-        if st is not None:
+        entry = registry.async_get(firmware_eid)
+        if entry is not None:
             break
         await asyncio.sleep(0.05)
-    assert st is not None
-    assert st.state == "001.004.007"
+    assert entry is not None, "firmware diagnostic entity never registered"
+    assert entry.disabled_by is er.RegistryEntryDisabler.INTEGRATION, (
+        f"expected disabled-by-default config sensor, got disabled_by={entry.disabled_by}"
+    )
 
 
 async def test_reconnects_after_addon_drops_ws(
