@@ -3,11 +3,20 @@
         "step": {
             "user": {
                 "title": "Outback MATE3 Setup",
-                "description": "Set up your Outback MATE3 integration",
+                "description": "Enter the WebSocket URL of the companion Outback MATE3 add-on. The default value works when the add-on is installed on the same Home Assistant instance.",
                 "data": {
-                    "port": "UDP Port (default: 57027)"
+                    "url": "Add-on WebSocket URL"
                 }
             }
+        },
+        "error": {
+            "cannot_connect": "Could not connect to the add-on.",
+            "timeout": "Connection to the add-on timed out.",
+            "bad_handshake": "Connected, but did not receive a valid snapshot message.",
+            "unknown": "Unexpected error connecting to the add-on."
+        },
+        "abort": {
+            "already_configured": "This add-on URL is already configured."
         }
     }
 }

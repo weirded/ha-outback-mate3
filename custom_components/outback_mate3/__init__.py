@@ -1,438 +1,219 @@
-"""The Outback MATE3 integration."""
+"""The Outback MATE3 integration.
+
+Connects to the companion ``outback_mate3`` add-on over WebSocket and mirrors
+its device state into HA entities. The add-on owns UDP I/O and MATE3 frame
+parsing; this integration is a thin reactive client that turns
+``snapshot`` / ``device_added`` / ``state_updated`` events into HA entity
+lifecycle and state updates.
+"""
+from __future__ import annotations
+
 import asyncio
 import logging
-import socket
-import re
-from datetime import datetime
-from typing import Dict, Set, List
+from typing import Any
 
-import voluptuous as vol
+import aiohttp
+from aiohttp import ClientWebSocketResponse, WSMsgType
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.const import (
-    CONF_PORT,
-    Platform,
-)
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.const import Platform
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "outback_mate3"
-DEFAULT_PORT = 57027
-
 PLATFORMS = [Platform.SENSOR]
 
-CONFIG_SCHEMA = vol.Schema(
-    {
-        DOMAIN: vol.Schema(
-            {
-                vol.Optional(CONF_PORT, default=DEFAULT_PORT): vol.All(
-                    vol.Coerce(int), vol.Range(min=1, max=65535)
-                ),
-            }
-        )
-    },
-    extra=vol.ALLOW_EXTRA,
-)
+CONF_URL = "url"
+DEFAULT_URL = "ws://a0d7b954-outback-mate3:8099/ws"
 
-MAC_PATTERN = re.compile(r'\[([0-9A-F]{6})-([0-9A-F]{6})\]')
+KIND_INVERTER = "inverter"
+KIND_CHARGE_CONTROLLER = "charge_controller"
+
+_INITIAL_BACKOFF_S = 1.0
+_MAX_BACKOFF_S = 30.0
+_WS_HEARTBEAT_S = 30.0
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Outback MATE3 from a config entry."""
-    _LOGGER.debug("Setting up Outback MATE3 integration")
     hass.data.setdefault(DOMAIN, {})
-    
-    mate3 = OutbackMate3(hass, entry.data[CONF_PORT])
+
+    url = entry.data.get(CONF_URL, DEFAULT_URL)
+    mate3 = OutbackMate3(hass, url)
     hass.data[DOMAIN][entry.entry_id] = mate3
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    
-    _LOGGER.debug("Starting UDP listener")
-    mate3.start_listening()
-    
+
+    mate3.start()
     return True
+
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         mate3 = hass.data[DOMAIN].pop(entry.entry_id)
-        mate3.stop_listening()
-
+        await mate3.stop()
     return unload_ok
 
 
-class OutbackMate3(DataUpdateCoordinator):
-    """Main class for Outback MATE3 integration."""
-
-    def __init__(self, hass: HomeAssistant, port: int):
-        """Initialize the MATE3 integration."""
-        super().__init__(
-            hass,
-            _LOGGER,
-            name=DOMAIN,
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate legacy UDP-port config entries to the new WebSocket URL form."""
+    if entry.version == 1:
+        # Old entries stored {"port": 57027}. The add-on listens for UDP locally now,
+        # so we can't preserve "listen directly" mode — set a sensible default URL
+        # and let the user edit it if the add-on hostname differs.
+        new_data = {CONF_URL: DEFAULT_URL}
+        hass.config_entries.async_update_entry(entry, data=new_data, version=2)
+        _LOGGER.info(
+            "Migrated Outback MATE3 entry from UDP-port config to WS URL %s",
+            DEFAULT_URL,
         )
+    return True
+
+
+class OutbackMate3(DataUpdateCoordinator):
+    """Reactive WebSocket client that mirrors the add-on's device state."""
+
+    def __init__(self, hass: HomeAssistant, url: str) -> None:
+        super().__init__(hass, _LOGGER, name=DOMAIN)
         self.hass = hass
-        self.port = port
-        self._socket = None
+        self.url = url
+
+        self._task: asyncio.Task | None = None
         self._running = False
-        self._add_entities_callback = None
-        self.device_counts: Dict[str, Dict[int, int]] = {}  # MAC -> {device_type -> count}
-        self.charge_controllers: Dict[str, Dict[int, dict]] = {}  # MAC -> {device_id -> data}
-        self.inverters: Dict[str, Dict[int, dict]] = {}  # MAC -> {device_id -> data}
-        self.discovered_devices: Set[str] = set()  # Set of "mac_type_id" strings
-        self.combined_metrics: Dict[str, dict] = {}  # MAC -> combined metrics
-        self._last_updates: Dict[str, datetime] = {}  # MAC -> last update time
-        _LOGGER.debug("Initialized OutbackMate3 with port %d", port)
+        self._add_entities_callback: AddEntitiesCallback | None = None
+
+        # Per-MAC state dicts that sensor.py reads from directly.
+        self.inverters: dict[str, dict[int, dict[str, Any]]] = {}
+        self.charge_controllers: dict[str, dict[int, dict[str, Any]]] = {}
+
+        # Device keys we've already announced to HA via the add-entities callback.
+        # Same format as the legacy code so user-facing unique IDs don't change.
+        self.discovered_devices: set[str] = set()
+
+        self._connected = False
 
     def set_add_entities_callback(self, callback: AddEntitiesCallback) -> None:
-        """Set the callback for adding entities."""
         self._add_entities_callback = callback
 
-    def start_listening(self):
-        """Start listening for UDP packets."""
-        if not self._running:
-            self._running = True
-            asyncio.create_task(self._listen())
-            _LOGGER.debug("Created UDP listener task")
+    def start(self) -> None:
+        if self._running:
+            return
+        self._running = True
+        self._task = self.hass.loop.create_task(self._ws_loop())
 
-    def stop_listening(self):
-        """Stop listening for UDP packets."""
+    async def stop(self) -> None:
         self._running = False
-        if self._socket:
-            self._socket.close()
-            _LOGGER.debug("Closed UDP socket")
+        if self._task is not None:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
+            self._task = None
 
-    async def _listen(self):
-        """Listen for UDP packets from MATE3."""
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._socket.bind(('0.0.0.0', self.port))
-        self._socket.setblocking(False)
-
-        _LOGGER.info('Listening for MATE3 streaming metrics on UDP port %d', self.port)
-
+    async def _ws_loop(self) -> None:
+        """Connect to the add-on and consume events; reconnect with backoff."""
+        backoff = _INITIAL_BACKOFF_S
         while self._running:
             try:
-                data, addr = await self.hass.loop.sock_recvfrom(self._socket, 4096)
-                if data:
-                    remote_ip = addr[0]
-                    _LOGGER.debug("Received UDP data from %s: %s", remote_ip, data.decode('utf-8'))
-                    self._process_data(data, remote_ip)
-            except Exception as e:
-                _LOGGER.error("Error receiving data: %s", str(e))
-                await asyncio.sleep(1)
+                async with aiohttp.ClientSession() as session:
+                    async with session.ws_connect(
+                        self.url, heartbeat=_WS_HEARTBEAT_S
+                    ) as ws:
+                        _LOGGER.info("Connected to MATE3 add-on at %s", self.url)
+                        self._connected = True
+                        backoff = _INITIAL_BACKOFF_S
+                        await self._consume(ws)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                _LOGGER.warning(
+                    "MATE3 add-on connection to %s failed: %s", self.url, exc
+                )
 
-    def _process_data(self, data, remote_ip):
-        """Process received data."""
-        try:
-            metrics = data.decode('utf-8')
-            
-            # Extract MAC address from the start of the data line
-            mac_match = MAC_PATTERN.match(metrics)
-            if not mac_match:
-                _LOGGER.debug("Could not find MAC address in data: %s", metrics)
+            self._connected = False
+            self._mark_entities_stale()
+            if not self._running:
+                break
+            _LOGGER.debug("Reconnecting to %s in %.1fs", self.url, backoff)
+            try:
+                await asyncio.sleep(backoff)
+            except asyncio.CancelledError:
+                break
+            backoff = min(backoff * 2, _MAX_BACKOFF_S)
+
+    async def _consume(self, ws: ClientWebSocketResponse) -> None:
+        async for msg in ws:
+            if msg.type == WSMsgType.TEXT:
+                try:
+                    payload = msg.json()
+                except ValueError:
+                    _LOGGER.warning("Non-JSON WS message: %r", msg.data[:80])
+                    continue
+                self._handle_message(payload)
+            elif msg.type == WSMsgType.ERROR:
+                _LOGGER.warning("WS error: %s", ws.exception())
                 return
-            
-            mac_address = mac_match.group(1) + mac_match.group(2)
-            
-            # Check if we should process this message based on time since last update
-            now = datetime.now()
-            last_update = self._last_updates.get(mac_address)
-            if last_update and (now - last_update).total_seconds() < 30:
-                return
-            
-            header, *devices = re.split(']<|><|>', metrics)
-            devices = list(filter(lambda x: x.startswith('0'), devices))
 
-            _LOGGER.debug("Processing %d devices from IP %s", len(devices), remote_ip)
-            if mac_address not in self.device_counts:
-                self.device_counts[mac_address] = {}
-            self.device_counts[mac_address].clear()
-            
-            # Initialize combined metrics for this MAC
-            if mac_address not in self.combined_metrics:
-                self.combined_metrics[mac_address] = {}
-            
-            combined = {
-                'total_grid_power': 0.0,
-                'total_grid_current': 0.0,
-                'total_charger_power': 0.0,
-                'total_charger_current': 0.0,
-                'total_inverter_power': 0.0,
-                'total_inverter_current': 0.0,
-                'total_cc_output_current': 0.0,
-                'total_cc_output_power': 0.0,
-                'avg_ac_input_voltage': 0.0,
-                'avg_ac_output_voltage': 0.0,
-                'avg_battery_voltage': 0.0,
-            }
-            
-            # Track counts for averaging
-            voltage_counts = {
-                'ac_input': 0,
-                'ac_output': 0,
-                'battery': 0,
-            }
-            
-            # Process each device and accumulate totals
-            for device in devices:
-                self._process_device(device, mac_address)
-            
-            # Calculate combined metrics for inverters
-            for inv_data in self.inverters.get(mac_address, {}).values():
-                combined['total_grid_power'] += inv_data.get('grid_power', 0)
-                combined['total_grid_current'] += inv_data.get('l1_grid_power', 0) + inv_data.get('l2_grid_power', 0)
-                combined['total_charger_power'] += inv_data.get('charger_power', 0)
-                combined['total_charger_current'] += inv_data.get('l1_charger_current', 0) + inv_data.get('l2_charger_current', 0)
-                combined['total_inverter_power'] += inv_data.get('inverter_power', 0)
-                combined['total_inverter_current'] += inv_data.get('l1_inverter_current', 0) + inv_data.get('l2_inverter_current', 0)
-                
-                # Add voltages for averaging
-                if 'l1_ac_input_voltage' in inv_data:
-                    combined['avg_ac_input_voltage'] += float(inv_data['l1_ac_input_voltage'])
-                    voltage_counts['ac_input'] += 1
-                if 'l2_ac_input_voltage' in inv_data:
-                    combined['avg_ac_input_voltage'] += float(inv_data['l2_ac_input_voltage'])
-                    voltage_counts['ac_input'] += 1
-                if 'l1_ac_output_voltage' in inv_data:
-                    combined['avg_ac_output_voltage'] += float(inv_data['l1_ac_output_voltage'])
-                    voltage_counts['ac_output'] += 1
-                if 'l2_ac_output_voltage' in inv_data:
-                    combined['avg_ac_output_voltage'] += float(inv_data['l2_ac_output_voltage'])
-                    voltage_counts['ac_output'] += 1
-            
-            # Calculate combined metrics for charge controllers
-            for cc_data in self.charge_controllers.get(mac_address, {}).values():
-                output_current = float(cc_data.get('output_current', 0))
-                battery_voltage = float(cc_data.get('battery_voltage', 0))
-                output_power = output_current * battery_voltage
-                
-                # Store the calculated output power
-                cc_data['output_power'] = output_power
-                
-                combined['total_cc_output_current'] += output_current
-                combined['total_cc_output_power'] += output_power
-                
-                # Add battery voltage for averaging
-                if 'battery_voltage' in cc_data:
-                    combined['avg_battery_voltage'] += battery_voltage
-                    voltage_counts['battery'] += 1
-            
-            # Calculate averages
-            if voltage_counts['ac_input'] > 0:
-                combined['avg_ac_input_voltage'] /= voltage_counts['ac_input']
-            else:
-                combined['avg_ac_input_voltage'] = None
-                
-            if voltage_counts['ac_output'] > 0:
-                combined['avg_ac_output_voltage'] /= voltage_counts['ac_output']
-            else:
-                combined['avg_ac_output_voltage'] = None
-                
-            if voltage_counts['battery'] > 0:
-                combined['avg_battery_voltage'] /= voltage_counts['battery']
-            else:
-                combined['avg_battery_voltage'] = None
-            
-            # Update the combined metrics and last update time
-            self.combined_metrics[mac_address] = combined
-            self._last_updates[mac_address] = now
-            self.async_set_updated_data(None)
-            
-            # Update energy tracking timestamp
-            now = datetime.now()
-            
-        except Exception as e:
-            _LOGGER.error("Error processing data: %s", str(e))
+    # ---- Message dispatch --------------------------------------------------
 
-    def _is_bit_set(self, byte, bit_position):
-        return (byte & (1 << bit_position)) != 0
-
-    def _process_device(self, device, mac_address):
-        """Process individual device data."""
-        values = list(device.split(","))
-        device_type = int(values[1])
-        no = self.device_counts[mac_address].get(device_type, 0) + 1
-        self.device_counts[mac_address][device_type] = no
-
-        device_key = f"{mac_address}_{device_type}_{no}"
-        is_new_device = device_key not in self.discovered_devices
-
-        _LOGGER.debug("Processing device type %d, number %d from MAC %s", device_type, no, mac_address)
-
-        if device_type == 6:  # Inverter
-            if mac_address not in self.inverters:
-                self.inverters[mac_address] = {}
-            self._process_inverter(no, values, mac_address)
-        elif device_type == 3:  # Charge Controller
-            if mac_address not in self.charge_controllers:
-                self.charge_controllers[mac_address] = {}
-            self._process_charge_controller(no, values, mac_address)
+    def _handle_message(self, msg: dict[str, Any]) -> None:
+        mtype = msg.get("type")
+        if mtype == "snapshot":
+            # Reset per-device state but keep discovered_devices so we don't
+            # re-announce entities HA already knows about.
+            self.inverters.clear()
+            self.charge_controllers.clear()
+            for device in msg.get("devices", []):
+                self._apply_device(device, emit_discovery=True)
+        elif mtype == "device_added":
+            self._apply_device(msg, emit_discovery=True)
+        elif mtype == "state_updated":
+            self._apply_device(msg, emit_discovery=False)
         else:
-            _LOGGER.warning("Unknown device type: %s", device_type)
+            _LOGGER.debug("Ignoring unknown WS message type %r", mtype)
+            return
+        self.async_set_updated_data(None)
+
+    def _apply_device(self, payload: dict[str, Any], *, emit_discovery: bool) -> None:
+        mac = payload["mac"]
+        kind = payload["kind"]
+        index = payload["index"]
+        state = payload["state"]
+
+        if kind == KIND_INVERTER:
+            self.inverters.setdefault(mac, {})[index] = state
+            type_code = 6
+        elif kind == KIND_CHARGE_CONTROLLER:
+            self.charge_controllers.setdefault(mac, {})[index] = state
+            type_code = 3
+        else:
+            _LOGGER.debug("Ignoring unknown device kind %r", kind)
             return
 
-        if is_new_device:
+        # Preserve legacy device_key format so existing entity unique IDs stay stable.
+        device_key = f"{mac}_{type_code}_{index}"
+        is_new = device_key not in self.discovered_devices
+        if emit_discovery and is_new:
             self.discovered_devices.add(device_key)
-            if self._add_entities_callback:
+            if self._add_entities_callback is not None:
                 from .sensor import create_device_entities
-                entities = create_device_entities(self, mac_address)
-                if entities and self._add_entities_callback is not None:
+
+                entities = create_device_entities(self, mac)
+                if entities:
                     self._add_entities_callback(entities)
 
-    def _process_inverter(self, no, values, mac_address):
-        """Process inverter data."""
-        if mac_address not in self.inverters:
-            self.inverters[mac_address] = {}
-        if no not in self.inverters[mac_address]:
-            self.inverters[mac_address][no] = {}
-        inv = self.inverters[mac_address][no]
+    def _mark_entities_stale(self) -> None:
+        """Trigger a coordinator refresh so CoordinatorEntity.available reflects the drop."""
+        self.async_set_updated_data(None)
 
-        # AC factor (120V = 1.0, 230V = 2.0)
-        ac_factor = 2.0 if float(values[6]) > 150.0 else 1.0
+    # ---- Status helpers ----------------------------------------------------
 
-        # L1 values
-        l1_inverter_current = float(values[2])
-        l1_charger_current = float(values[3])
-        l1_buy_current = float(values[4])
-        l1_sell_current = float(values[5])
-        l1_ac_input_voltage = float(values[6]) * ac_factor
-        l1_ac_output_voltage = float(values[8]) * ac_factor
-
-        # L2 values
-        l2_inverter_current = float(values[2 + 7])
-        l2_charger_current = float(values[3 + 7])
-        l2_buy_current = float(values[4 + 7])
-        l2_sell_current = float(values[5 + 7])
-        l2_ac_input_voltage = float(values[6 + 7]) * ac_factor
-        l2_ac_output_voltage = float(values[8 + 7]) * ac_factor
-
-        # Calculate per-leg powers
-        # For buy/sell: positive = buying (consuming), negative = selling (producing)
-        l1_buy_power = l1_buy_current * l1_ac_input_voltage
-        l1_sell_power = -l1_sell_current * l1_ac_output_voltage
-        l1_grid_power = l1_buy_power + l1_sell_power
-
-        l2_buy_power = l2_buy_current * l2_ac_input_voltage
-        l2_sell_power = -l2_sell_current * l2_ac_output_voltage
-        l2_grid_power = l2_buy_power + l2_sell_power
-
-        # Calculate per-leg inverter/charger powers
-        l1_inverter_power = l1_inverter_current * l1_ac_output_voltage
-        l1_charger_power = l1_charger_current * l1_ac_input_voltage
-
-        l2_inverter_power = l2_inverter_current * l2_ac_output_voltage
-        l2_charger_power = l2_charger_current * l2_ac_input_voltage
-
-        # Calculate total input and output voltages
-        total_ac_input_voltage = l1_ac_input_voltage + l2_ac_input_voltage
-        total_ac_output_voltage = l1_ac_output_voltage + l2_ac_output_voltage
-
-        # Store all values
-        inv.update({
-            'l1_inverter_current': l1_inverter_current,
-            'l1_charger_current': l1_charger_current,
-            'l1_buy_current': l1_buy_current,
-            'l1_sell_current': l1_sell_current,
-            'l1_ac_input_voltage': l1_ac_input_voltage,
-            'l1_ac_output_voltage': l1_ac_output_voltage,
-            'l1_grid_power': l1_grid_power,
-            'l1_inverter_power': l1_inverter_power,
-            'l1_charger_power': l1_charger_power,
-
-            'l2_inverter_current': l2_inverter_current,
-            'l2_charger_current': l2_charger_current,
-            'l2_buy_current': l2_buy_current,
-            'l2_sell_current': l2_sell_current,
-            'l2_ac_input_voltage': l2_ac_input_voltage,
-            'l2_ac_output_voltage': l2_ac_output_voltage,
-            'l2_grid_power': l2_grid_power,
-            'l2_inverter_power': l2_inverter_power,
-            'l2_charger_power': l2_charger_power,
-
-            # Combined values
-            'grid_power': l1_grid_power + l2_grid_power,
-            'inverter_power': l1_inverter_power + l2_inverter_power,
-            'charger_power': l1_charger_power + l2_charger_power,
-            'inverter_current': l1_inverter_current + l2_inverter_current,
-            'charger_current': l1_charger_current + l2_charger_current,
-            'total_ac_input_voltage': total_ac_input_voltage,
-            'total_ac_output_voltage': total_ac_output_voltage,
-            'battery_voltage': float(values[12]),  # Already in correct voltage, no need to divide by 10
-        })
-
-        # Process modes
-        inverter_mode = int(values[16])
-        inv['inverter_mode'] = {
-            3: 'charging',
-            0: 'off',
-            1: 'search',
-            2: 'inverting',
-            4: 'silent',
-            5: 'floating',
-            6: 'equalizing',
-            7: 'charger-off',
-            8: 'charger-off',
-            9: 'selling',
-            10: 'pass-through',
-            11: 'slave-on',
-            12: 'slave-off',
-            14: 'offsetting',
-            90: 'inverter-error',
-            91: 'ags-error',
-            92: 'comm-error',
-        }.get(inverter_mode, 'unknown')
-
-        ac_mode = int(values[18])
-        inv['ac_mode'] = {
-            0: 'no-ac',
-            1: 'ac-drop',
-            2: 'ac-use',
-        }.get(ac_mode, 'unknown')
-
-        inv['grid_mode'] = 'grid' if self._is_bit_set(int(values[20]), 6) else 'generator'
-
-        _LOGGER.debug("Updated inverter %d values for MAC %s", no, mac_address)
-
-    def _process_charge_controller(self, no, values, mac_address):
-        """Process charge controller data."""
-        if mac_address not in self.charge_controllers:
-            self.charge_controllers[mac_address] = {}
-        if no not in self.charge_controllers[mac_address]:
-            self.charge_controllers[mac_address][no] = {}
-        cc = self.charge_controllers[mac_address][no]
-
-        # Process values
-        pv_current = float(values[4])
-        pv_voltage = float(values[5])
-        output_current = float(values[3])
-        battery_voltage = float(values[11]) / 10.0  # Values come in as 10x actual voltage
-
-        # Calculate power values
-        pv_power = pv_current * pv_voltage
-        output_power = output_current * battery_voltage
-
-        # Store values
-        cc.update({
-            'pv_current': pv_current,
-            'pv_voltage': pv_voltage,
-            'output_current': output_current,
-            'output_power': output_power,
-            'pv_power': pv_power,
-            'battery_voltage': battery_voltage,
-            'kwh_today': float(values[13]),
-        })
-        
-        # Get charge mode
-        charge_mode = int(values[10])
-        cc['charge_mode'] = {
-            0: 'silent',
-            1: 'float',
-            2: 'bulk',
-            3: 'absorb',
-            4: 'eq',
-        }.get(charge_mode, 'unknown')
-
-        _LOGGER.debug("Updated charge controller %d values for MAC %s", no, mac_address)
+    @property
+    def is_connected(self) -> bool:
+        return self._connected
