@@ -95,9 +95,25 @@ _Goal: a pure Python module with no HA imports that both the add-on will use and
 - [ ] **11.5** Restart the add-on; confirm integration reconnects and entities recover.
 - [ ] **11.6** Restart HA Core; confirm integration reconnects and entities recover.
 
-## Phase 12 — Nice-to-haves (defer unless small and obvious)
+## Phase 12 — Hass.io discovery (auto-suggest the add-on to the integration)
 
-- [ ] **12.1** Add `/healthz` HTTP endpoint to the add-on for Supervisor healthchecks.
-- [ ] **12.2** Add zeroconf/hassio discovery so the integration can auto-suggest the add-on URL in the config flow.
-- [ ] **12.3** Add optional simple token auth between integration and add-on (shared secret in add-on options, echoed in integration config).
-- [ ] **12.4** Publish the add-on to a broader community add-on index.
+When the add-on is running, HA should automatically surface the integration under **Settings → Devices & Services → Discovered**, pre-filled with the add-on's WebSocket URL. No manual config flow needed.
+
+- [ ] **12.1** Add `hassio_api: true` and `discovery: [outback_mate3]` to `outback_mate3_addon/config.yaml`. The first grants the add-on permission to talk to Supervisor; the second declares which service names it may announce.
+- [ ] **12.2** Implement discovery announce in `outback_mate3_addon/src/main.py`. On startup, if `SUPERVISOR_TOKEN` is set, POST to `http://supervisor/discovery` with `{"service": "outback_mate3", "config": {"host": "<addon-hostname>", "port": <ws_port>}}`. Store the returned UUID. On graceful shutdown, DELETE `/discovery/{uuid}`. Failures log and continue — running outside HA (plain Docker) must still work.
+- [ ] **12.3** Set `"hassio": true` in `custom_components/outback_mate3/manifest.json` so HA routes Hass.io discovery events for our service name to this integration.
+- [ ] **12.4** Implement `async_step_hassio(discovery_info: HassioServiceInfo)` in `custom_components/outback_mate3/config_flow.py`. Build the WS URL from `discovery_info.config`, set a stable unique_id so repeated announces don't create duplicates (and update the URL if it changed), show a confirmation step.
+- [ ] **12.5** Add strings for the `hassio_confirm` step to `custom_components/outback_mate3/translations/en.json`.
+- [ ] **12.6** Verify end-to-end on the HAOS test VM: after `./scripts/install-addon.sh`, a "Discovered: Outback MATE3" notification appears in HA within a few seconds; clicking through auto-creates an entry with the correct WS URL.
+
+## Phase 13 — Nice-to-haves (defer unless small and obvious)
+
+- [ ] **13.1** Add `/healthz` HTTP endpoint to the add-on for Supervisor healthchecks.
+- [ ] **13.2** Add optional simple token auth between integration and add-on (shared secret in add-on options, echoed in integration config).
+- [ ] **13.3** Publish the add-on to a broader community add-on index.
+
+## Bugfixes/Tweaks
+
+- [ ] B1 - we don't need to describe the WebSocket protocol on docs.md.
+- [ ] B2 - we are missing a changelog; let's fix that. 
+- [ ] B3 - the add-on is missing the icon that we had for the integration before. Let's fix that also. 
