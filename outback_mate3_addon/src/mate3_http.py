@@ -44,6 +44,27 @@ def _int(el: ET.Element | None) -> int | None:
         return None
 
 
+def _volt_tenths(el: ET.Element | None) -> float | None:
+    """Battery / DC voltages in CONFIG.xml are stored as tenths of a volt.
+
+    Example: ``<Voltage>552</Voltage>`` for an absorb setpoint means 55.2 V.
+    AC voltages (120 V, 240 V line-side values) are stored directly and
+    should use :func:`_int` instead.
+    """
+    v = _int(el)
+    return v / 10.0 if v is not None else None
+
+
+def _amp_tenths(el: ET.Element | None) -> float | None:
+    """Most current values in CONFIG.xml are stored as tenths of an amp.
+
+    Example: ``<Output_Limit>800</Output_Limit>`` on a FLEXmax 80 means
+    80.0 A (the max the unit can push, not 800 A).
+    """
+    v = _int(el)
+    return v / 10.0 if v is not None else None
+
+
 def _parse_system(root: ET.Element) -> dict[str, Any]:
     out: dict[str, Any] = {}
     for child_tag, key in [
@@ -110,29 +131,29 @@ def _parse_inverter(dev: ET.Element) -> dict[str, Any]:
         out["ac_output_voltage"] = _int(inv.find("AC_Output_Voltage"))
         lb = inv.find("Low_battery")
         if lb is not None:
-            out["low_battery_cut_out_voltage"] = _int(lb.find("Cut_Out_Voltage"))
-            out["low_battery_cut_in_voltage"] = _int(lb.find("Cut_In_Voltage"))
+            out["low_battery_cut_out_voltage"] = _volt_tenths(lb.find("Cut_Out_Voltage"))
+            out["low_battery_cut_in_voltage"] = _volt_tenths(lb.find("Cut_In_Voltage"))
             out["low_battery_delay"] = _int(lb.find("Delay"))
         hb = inv.find("High_battery")
         if hb is not None:
-            out["high_battery_cut_out_voltage"] = _int(hb.find("Cut_Out_Voltage"))
-            out["high_battery_cut_in_voltage"] = _int(hb.find("Cut_In_Voltage"))
+            out["high_battery_cut_out_voltage"] = _volt_tenths(hb.find("Cut_Out_Voltage"))
+            out["high_battery_cut_in_voltage"] = _volt_tenths(hb.find("Cut_In_Voltage"))
             out["high_battery_delay"] = _int(hb.find("Delay"))
     ch = dev.find("Charger")
     if ch is not None:
         out["charger_mode"] = ch.get("Mode")
-        out["charger_absorb_voltage"] = _int(ch.find("Absorb/Voltage"))
+        out["charger_absorb_voltage"] = _volt_tenths(ch.find("Absorb/Voltage"))
         out["charger_absorb_time"] = _int(ch.find("Absorb/Time"))
-        out["charger_float_voltage"] = _int(ch.find("Float/Voltage"))
-        out["charger_eq_voltage"] = _int(ch.find("EQ/Voltage"))
+        out["charger_float_voltage"] = _volt_tenths(ch.find("Float/Voltage"))
+        out["charger_eq_voltage"] = _volt_tenths(ch.find("EQ/Voltage"))
         out["charger_eq_time"] = _int(ch.find("EQ/Time"))
-        out["charger_re_float_voltage"] = _int(ch.find("Re_Float/Voltage"))
-        out["charger_re_bulk_voltage"] = _int(ch.find("Re_Bulk/Voltage"))
-        out["charger_ac_input_limit"] = _int(ch.find("AC_Charger_Input_Limit"))
+        out["charger_re_float_voltage"] = _volt_tenths(ch.find("Re_Float/Voltage"))
+        out["charger_re_bulk_voltage"] = _volt_tenths(ch.find("Re_Bulk/Voltage"))
+        out["charger_ac_input_limit"] = _amp_tenths(ch.find("AC_Charger_Input_Limit"))
     gt = dev.find("Grid_tie")
     if gt is not None:
         out["grid_tie_mode"] = gt.get("Mode")
-        out["grid_tie_voltage"] = _int(gt.find("Voltage"))
+        out["grid_tie_voltage"] = _volt_tenths(gt.find("Voltage"))
         out["grid_tie_window"] = _text(gt.find("Window"))
     for ac_tag, prefix in [("AC1_input", "ac1"), ("AC2_input", "ac2")]:
         ac = dev.find(ac_tag)
@@ -159,14 +180,14 @@ def _parse_charge_controller(dev: ET.Element) -> dict[str, Any]:
     }
     ch = model.find("Charger")
     if ch is not None:
-        out["charger_absorb_voltage"] = _int(ch.find("Absorb/Voltage"))
+        out["charger_absorb_voltage"] = _volt_tenths(ch.find("Absorb/Voltage"))
         out["charger_absorb_time"] = _int(ch.find("Absorb/Time"))
-        out["charger_absorb_end_amps"] = _int(ch.find("Absorb/End_Amps"))
-        out["charger_float_voltage"] = _int(ch.find("Float_Voltage"))
-        out["charger_rebulk_voltage"] = _int(ch.find("Rebulk_Voltage"))
-        out["charger_eq_voltage"] = _int(ch.find("EQ/Voltage"))
+        out["charger_absorb_end_amps"] = _amp_tenths(ch.find("Absorb/End_Amps"))
+        out["charger_float_voltage"] = _volt_tenths(ch.find("Float_Voltage"))
+        out["charger_rebulk_voltage"] = _volt_tenths(ch.find("Rebulk_Voltage"))
+        out["charger_eq_voltage"] = _volt_tenths(ch.find("EQ/Voltage"))
         out["charger_eq_time"] = _int(ch.find("EQ/Time"))
-        out["charger_output_limit"] = _int(ch.find("Output_Limit"))
+        out["charger_output_limit"] = _amp_tenths(ch.find("Output_Limit"))
     mppt = model.find("MPPT")
     if mppt is not None:
         out["mppt_mode"] = mppt.get("Mode")

@@ -76,16 +76,17 @@ def test_inverter_firmware_and_type(config):
 
 def test_inverter_battery_cutoffs(config):
     inv = config["inverters"][0]
-    assert inv["low_battery_cut_out_voltage"] == 480
-    assert inv["low_battery_cut_in_voltage"] == 508
-    assert inv["high_battery_cut_out_voltage"] == 560
+    # Battery voltages are stored in CONFIG.xml as tenths; parser normalizes.
+    assert inv["low_battery_cut_out_voltage"] == 48.0
+    assert inv["low_battery_cut_in_voltage"] == 50.8
+    assert inv["high_battery_cut_out_voltage"] == 56.0
 
 
 def test_inverter_charger_setpoints(config):
     inv = config["inverters"][0]
     assert inv["charger_mode"] == "Auto"
-    assert inv["charger_absorb_voltage"] == 552
-    assert inv["charger_float_voltage"] == 532
+    assert inv["charger_absorb_voltage"] == 55.2
+    assert inv["charger_float_voltage"] == 53.2
 
 
 def test_inverter_grid_tie(config):
@@ -120,9 +121,11 @@ def test_cc_firmware_and_type(config):
 
 def test_cc_setpoints(config):
     cc = config["charge_controllers"][0]
-    assert cc["charger_absorb_voltage"] == 554
-    assert cc["charger_float_voltage"] == 535
-    assert cc["charger_output_limit"] == 800
+    # Voltages and currents are stored as tenths; parser normalizes.
+    assert cc["charger_absorb_voltage"] == 55.4
+    assert cc["charger_float_voltage"] == 53.5
+    assert cc["charger_output_limit"] == 80.0
+    assert cc["charger_absorb_end_amps"] == 10.0
 
 
 def test_cc_mppt(config):

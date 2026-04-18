@@ -409,6 +409,8 @@ class OutbackConfigDiagnosticSensor(CoordinatorEntity, SensorEntity):
         config_getter,             # callable(config_dict: dict) -> str | None
         *,
         is_firmware: bool = False, # if True, also populate device_info.sw_version
+        unit: str | None = None,
+        device_class: SensorDeviceClass | None = None,
     ) -> None:
         super().__init__(mate3)
         self._mate3 = mate3
@@ -421,6 +423,8 @@ class OutbackConfigDiagnosticSensor(CoordinatorEntity, SensorEntity):
 
         mac_id = mac_address.replace(".", "_")
         self._attr_name = name
+        self._attr_native_unit_of_measurement = unit
+        self._attr_device_class = device_class
 
         if device_kind == "system":
             self.entity_id = f"sensor.mate3_system_{key}"
@@ -464,60 +468,172 @@ class OutbackConfigDiagnosticSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self):
         v = self._read_value()
-        return None if v is None else str(v)
+        if v is None:
+            return None
+        # Numeric sensors (unit set) should keep their native numeric type so
+        # HA formats them correctly and units display. Anything else is
+        # rendered as a string.
+        if self._attr_native_unit_of_measurement is not None and isinstance(v, (int, float)):
+            return v
+        return str(v)
 
     @property
     def available(self) -> bool:
         return self._read_value() is not None
 
 
+def _sys(key):
+    """Getter for a top-level system-block value."""
+    return lambda c, k=key: c.get("system", {}).get(k)
+
+
+def _m3(key):
+    """Getter for a top-level mate3-block value."""
+    return lambda c, k=key: c.get("mate3", {}).get(k)
+
+
+def _inv(key):
+    """Per-inverter getter; closes over a 1-based index."""
+    def f(c, i, k=key):
+        inverters = c.get("inverters") or []
+        return inverters[i - 1].get(k) if len(inverters) >= i else None
+    return f
+
+
+def _cc(key):
+    """Per-charge-controller getter; closes over a 1-based index."""
+    def f(c, i, k=key):
+        ccs = c.get("charge_controllers") or []
+        return ccs[i - 1].get(k) if len(ccs) >= i else None
+    return f
+
+
+# System-level config sensors. Tuples: (key, name, getter, unit, device_class, is_firmware)
+_SYSTEM_CONFIG_SENSORS = [
+    ("mate3_firmware", "MATE3 Firmware", _m3("firmware"), None, None, True),
+    ("data_stream_target", "Data Stream Target",
+     lambda c: (
+         f"{c['mate3']['data_stream_ip']}:{c['mate3']['data_stream_port']}"
+         if c.get("mate3", {}).get("data_stream_ip")
+         and c.get("mate3", {}).get("data_stream_port")
+         else None
+     ), None, None, False),
+    ("data_stream_mode", "Data Stream Mode", _m3("data_stream_mode"), None, None, False),
+    ("sd_card_log_mode", "SD Card Log Mode", _m3("sd_card_log_mode"), None, None, False),
+    ("mate3_ip_address", "MATE3 IP Address", _m3("ip_address"), None, None, False),
+    ("mate3_dhcp", "MATE3 DHCP", _m3("dhcp"), None, None, False),
+    ("mate3_gateway", "MATE3 Gateway", _m3("gateway"), None, None, False),
+    ("system_type", "System Type", _sys("system_type"), None, None, False),
+    ("nominal_voltage", "Nominal Voltage", _sys("nominal_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("battery_ah_capacity", "Battery Ah Capacity", _sys("battery_ah_capacity"),
+     "Ah", None, False),
+    ("pv_size_watts", "PV Size", _sys("pv_size_watts"),
+     UnitOfPower.WATT, SensorDeviceClass.POWER, False),
+    ("generator_kw", "Generator Rating", _sys("generator_kw"), "kW", None, False),
+    ("max_inverter_output_kw", "Max Inverter Output", _sys("max_inverter_output_kw"), "kW", None, False),
+    ("max_charger_output_kw", "Max Charger Output", _sys("max_charger_output_kw"), "kW", None, False),
+]
+
+# Per-inverter config sensors. Getter is called with (config, index).
+_INVERTER_CONFIG_SENSORS = [
+    ("firmware", "Firmware", _inv("firmware"), None, None, True),
+    ("configured_type", "Configured Type", _inv("type"), None, None, False),
+    ("configured_inverter_mode", "Configured Inverter Mode", _inv("inverter_mode"), None, None, False),
+    ("ac_output_voltage", "AC Output Voltage Setpoint", _inv("ac_output_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("low_battery_cut_out_voltage", "Low Battery Cut-Out", _inv("low_battery_cut_out_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("low_battery_cut_in_voltage", "Low Battery Cut-In", _inv("low_battery_cut_in_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("high_battery_cut_out_voltage", "High Battery Cut-Out", _inv("high_battery_cut_out_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("high_battery_cut_in_voltage", "High Battery Cut-In", _inv("high_battery_cut_in_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("charger_mode", "Charger Mode", _inv("charger_mode"), None, None, False),
+    ("charger_absorb_voltage", "Charger Absorb Voltage", _inv("charger_absorb_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("charger_absorb_time", "Charger Absorb Time", _inv("charger_absorb_time"), "min", None, False),
+    ("charger_float_voltage", "Charger Float Voltage", _inv("charger_float_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("charger_eq_voltage", "Charger EQ Voltage", _inv("charger_eq_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("charger_re_float_voltage", "Charger Re-Float Voltage", _inv("charger_re_float_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("charger_re_bulk_voltage", "Charger Re-Bulk Voltage", _inv("charger_re_bulk_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("grid_tie_mode", "Grid Tie Mode", _inv("grid_tie_mode"), None, None, False),
+    ("grid_tie_voltage", "Grid Tie Voltage", _inv("grid_tie_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("grid_tie_window", "Grid Tie Window", _inv("grid_tie_window"), None, None, False),
+    ("ac_input_priority", "AC Input Priority", _inv("ac_input_priority"), None, None, False),
+    ("ac1_input_type", "AC1 Input Type", _inv("ac1_input_type"), None, None, False),
+    ("ac1_min_voltage", "AC1 Min Voltage", _inv("ac1_min_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("ac1_max_voltage", "AC1 Max Voltage", _inv("ac1_max_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("ac2_input_type", "AC2 Input Type", _inv("ac2_input_type"), None, None, False),
+    ("ac2_min_voltage", "AC2 Min Voltage", _inv("ac2_min_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("ac2_max_voltage", "AC2 Max Voltage", _inv("ac2_max_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("stack_mode", "Stack Mode", _inv("stack_mode"), None, None, False),
+]
+
+# Per-charge-controller config sensors.
+_CC_CONFIG_SENSORS = [
+    ("firmware", "Firmware", _cc("firmware"), None, None, True),
+    ("model_type", "Model", _cc("model_type"), None, None, False),
+    ("gt_mode", "Grid Tie Mode", _cc("gt_mode"), None, None, False),
+    ("charger_absorb_voltage", "Absorb Voltage", _cc("charger_absorb_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("charger_absorb_time", "Absorb Time", _cc("charger_absorb_time"), "min", None, False),
+    ("charger_absorb_end_amps", "Absorb End Amps", _cc("charger_absorb_end_amps"),
+     UnitOfElectricCurrent.AMPERE, SensorDeviceClass.CURRENT, False),
+    ("charger_float_voltage", "Float Voltage", _cc("charger_float_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("charger_rebulk_voltage", "Re-Bulk Voltage", _cc("charger_rebulk_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("charger_eq_voltage", "EQ Voltage", _cc("charger_eq_voltage"),
+     UnitOfElectricPotential.VOLT, SensorDeviceClass.VOLTAGE, False),
+    ("charger_eq_time", "EQ Time", _cc("charger_eq_time"), "min", None, False),
+    ("charger_output_limit", "Output Current Limit", _cc("charger_output_limit"),
+     UnitOfElectricCurrent.AMPERE, SensorDeviceClass.CURRENT, False),
+    ("mppt_mode", "MPPT Mode", _cc("mppt_mode"), None, None, False),
+    ("mppt_sweep_mode", "MPPT Sweep Mode", _cc("mppt_sweep_mode"), None, None, False),
+    ("mppt_max_sweep", "MPPT Max Sweep", _cc("mppt_max_sweep"), None, None, False),
+]
+
+
 def _config_system_sensors(mate3: "OutbackMate3", mac: str) -> List[SensorEntity]:
-    """Three system-level diagnostic sensors derived from the config poll."""
-    return [
-        OutbackConfigDiagnosticSensor(
-            mate3, mac, "system", 0, "mate3_firmware", "MATE3 Firmware",
-            lambda c: c.get("mate3", {}).get("firmware"),
-            is_firmware=True,
-        ),
-        OutbackConfigDiagnosticSensor(
-            mate3, mac, "system", 0, "data_stream_target", "Data Stream Target",
-            lambda c: (
-                f"{c['mate3']['data_stream_ip']}:{c['mate3']['data_stream_port']}"
-                if c.get("mate3", {}).get("data_stream_ip")
-                and c.get("mate3", {}).get("data_stream_port")
-                else None
-            ),
-        ),
-        OutbackConfigDiagnosticSensor(
-            mate3, mac, "system", 0, "sd_card_log_mode", "SD Card Log Mode",
-            lambda c: c.get("mate3", {}).get("sd_card_log_mode"),
-        ),
-    ]
+    out: List[SensorEntity] = []
+    for key, name, getter, unit, dev_class, is_fw in _SYSTEM_CONFIG_SENSORS:
+        out.append(OutbackConfigDiagnosticSensor(
+            mate3, mac, "system", 0, key, name,
+            getter,
+            unit=unit, device_class=dev_class, is_firmware=is_fw,
+        ))
+    return out
 
 
-def _config_inverter_sensors(
-    mate3: "OutbackMate3", mac: str, index: int
-) -> List[SensorEntity]:
-    """Per-inverter firmware sensor."""
-    return [
-        OutbackConfigDiagnosticSensor(
-            mate3, mac, "inverter", index, "firmware", "Firmware",
-            lambda c, i=index: (c.get("inverters") or [{}] * i)[i - 1].get("firmware")
-            if len(c.get("inverters") or []) >= i else None,
-            is_firmware=True,
-        ),
-    ]
+def _config_inverter_sensors(mate3: "OutbackMate3", mac: str, index: int) -> List[SensorEntity]:
+    out: List[SensorEntity] = []
+    for key, name, getter, unit, dev_class, is_fw in _INVERTER_CONFIG_SENSORS:
+        # getter takes (config, index)
+        out.append(OutbackConfigDiagnosticSensor(
+            mate3, mac, "inverter", index, key, name,
+            lambda c, g=getter, i=index: g(c, i),
+            unit=unit, device_class=dev_class, is_firmware=is_fw,
+        ))
+    return out
 
 
-def _config_charge_controller_sensors(
-    mate3: "OutbackMate3", mac: str, index: int
-) -> List[SensorEntity]:
-    """Per-charge-controller firmware sensor."""
-    return [
-        OutbackConfigDiagnosticSensor(
-            mate3, mac, "charge_controller", index, "firmware", "Firmware",
-            lambda c, i=index: (c.get("charge_controllers") or [{}] * i)[i - 1].get("firmware")
-            if len(c.get("charge_controllers") or []) >= i else None,
-            is_firmware=True,
-        ),
-    ]
+def _config_charge_controller_sensors(mate3: "OutbackMate3", mac: str, index: int) -> List[SensorEntity]:
+    out: List[SensorEntity] = []
+    for key, name, getter, unit, dev_class, is_fw in _CC_CONFIG_SENSORS:
+        out.append(OutbackConfigDiagnosticSensor(
+            mate3, mac, "charge_controller", index, key, name,
+            lambda c, g=getter, i=index: g(c, i),
+            unit=unit, device_class=dev_class, is_firmware=is_fw,
+        ))
+    return out
