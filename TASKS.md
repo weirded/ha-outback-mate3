@@ -159,10 +159,29 @@ Architecture: the **add-on** polls (it already knows the MATE3 IP from every UDP
 
 ### Deliberately skipped
 
-- AUX output and relay setpoints (20+ per device, rarely changed, not useful without the physical context).
-- Grid mode schedules 1/2/3, High/Low battery transfer, Advanced Generator Start — complex multi-setting blocks that only matter if you're using those features. Defer until asked.
-- Display backlight, button beep, etc.
-- The empty `Mini_Grid`, `Grid_Zero` sub-blocks that only populate when those modes are active.
+- Display backlight, button beep, wheel click, serial baud, DNS 1/2, FTP / Telnet ports, OPTICS cloud toggles, MATE3 `Time_Stamp`, free-form `Installer_Notes`.
+- The empty `Mini_Grid`, `Grid_Zero`, `AC_Coupled_Mode` sub-blocks only populate when those modes are active. Parser already handles populated-vs-empty.
+
+### Audit & followups
+
+See [`docs/config-xml-coverage.md`](docs/config-xml-coverage.md) for the full CONFIG.xml → sensor audit. As of 2.0.0-dev8 we capture every useful per-port leaf; ~35 system-level leaves remain unexposed, tracked as B10.
+
+## Phase 15 — Surface remaining CONFIG.xml system-level fields (B10 breakdown)
+
+See `docs/config-xml-coverage.md` for the full field list. Grouped by sub-block:
+
+- [ ] **15.1** **Low SOC thresholds**: `Low_SOC_Warning_Percentage`, `Low_SOC_Error_Percentage` — numeric, battery device attributes.
+- [ ] **15.2** **Coordination modes**: `CC_Float_Coordination@Mode`, `Multi_Phase_Coordination@Mode` — enum strings, system device.
+- [ ] **15.3** **AC coupling**: `AC_Coupled_Control@Mode`, `AC_Coupled_Control/AUX_Output` — enum + int, system device.
+- [ ] **15.4** **Global CC output cap**: `Global_Charge_Controller_Output_Control@Mode` + `/Max_Charge_Rate` — enum + `_amp_tenths` (300 → 30.0 A).
+- [ ] **15.5** **SunSpec / Modbus**: `Network_Options/SunSpec` + `SunSpec_Port` + `Time_Zone` — useful for users running HA's own Modbus integration alongside this add-on.
+- [ ] **15.6** **FNDC integration**: `FNDC_Charge_Term_Control@Mode`, `FNDC_Sell_Control@Mode` — FlexNet DC features; capture as plain enum sensors.
+- [ ] **15.7** **Grid Mode Schedules 1/2/3**: 3 × (`@Mode`, `Enable_Hour`, `Enable_Min`) = 9 sensors. Users who run time-of-use grid modes will want these.
+- [ ] **15.8** **High Battery Transfer (HVT/LVC)**: `@Mode` + 6 setpoints (V, delays, SOC connect/disconnect %) = 7 sensors. `_volt_tenths` for the two Voltage fields.
+- [ ] **15.9** **Load Grid Transfer (load shedding)**: `@Mode` + 5 setpoints (kW threshold, 2 delays, 2 battery voltages tenths) = 6 sensors.
+- [ ] **15.10** **Advanced Generator Start (defer)**: 50+ leaves. Postpone until a user has AGS enabled and can verify values; capture as a grouped block with per-sub-feature diagnostic sensors at that point.
+- [ ] **15.11** **Grid Use / Grid_Use_P2 / Grid_Use_P3 schedules (defer)**: weekday/weekend drop/use hour schedules, mostly zeros unless user configures TOU. Same deferral as 15.10.
+- [ ] **15.12** Refresh `docs/config-xml-coverage.md` after shipping 15.1-15.9 so the "not captured" count reflects reality.
 
 ## Phase 12 — Hass.io discovery (auto-suggest the add-on to the integration)
 
