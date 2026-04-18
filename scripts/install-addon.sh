@@ -155,22 +155,25 @@ ha_cli "store reload --no-progress" >/dev/null 2>&1 \
 
 # Check if already installed: `ha apps info <slug>` exits 0 if installed
 INFO_JSON=$(ha_cli "apps info $FULL_SLUG --raw-json" 2>/dev/null || echo '{"data":{}}')
-# 'installed' field is null when installed-but-errored, and False when not installed.
-# 'version' is populated iff installed (may equal version_latest). Use version presence
-# as the ground truth.
-INSTALLED_VERSION=$(python3 -c "
+# - `version` is non-empty iff installed (may equal `version_latest`).
+# - `version_latest` is what's in the store (our current config.yaml version).
+read -r INSTALLED_VERSION LATEST_VERSION < <(python3 -c "
 import sys, json
 d = json.loads(sys.stdin.read()).get('data', {})
-v = d.get('version')
-print(v if v else '')
+print((d.get('version') or ''), (d.get('version_latest') or ''))
 " <<<"$INFO_JSON")
 
-if [[ -n "$INSTALLED_VERSION" ]]; then
-  log "Rebuilding $FULL_SLUG (was at $INSTALLED_VERSION)"
-  HA_CLI_TIMEOUT=900 ha_cli "apps rebuild $FULL_SLUG" >/dev/null
-else
+if [[ -z "$INSTALLED_VERSION" ]]; then
   log "Installing $FULL_SLUG (first build can take several minutes)"
   HA_CLI_TIMEOUT=900 ha_cli "apps install $FULL_SLUG" >/dev/null
+elif [[ "$INSTALLED_VERSION" != "$LATEST_VERSION" ]]; then
+  # Supervisor refuses `apps rebuild` when the version changed in config.yaml;
+  # use `apps update` to pick up the new version + build.
+  log "Updating $FULL_SLUG ($INSTALLED_VERSION → $LATEST_VERSION)"
+  HA_CLI_TIMEOUT=900 ha_cli "apps update $FULL_SLUG" >/dev/null
+else
+  log "Rebuilding $FULL_SLUG (was at $INSTALLED_VERSION, same version — code-only change)"
+  HA_CLI_TIMEOUT=900 ha_cli "apps rebuild $FULL_SLUG" >/dev/null
 fi
 
 log "Ensuring $FULL_SLUG is running"

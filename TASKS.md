@@ -114,6 +114,11 @@ When the add-on is running, HA should automatically surface the integration unde
 
 ## Bugfixes/Tweaks
 
-- [x] B1 - we don't need to describe the WebSocket protocol on docs.md.
-- [x] B2 - we are missing a changelog; let's fix that. 
-- [x] B3 - the add-on is missing the icon that we had for the integration before. Let's fix that also. 
+_Each completed item is annotated with `(vX.Y.Z-devN)` — the add-on / integration version running on VM 106 when the fix was deployed. Used to derive the changelog._
+
+- [x] B1 - we don't need to describe the WebSocket protocol on docs.md. _(2.0.0-dev1)_
+- [x] B2 - we are missing a changelog; let's fix that.  _(2.0.0-dev1)_
+- [x] B3 - the add-on is missing the icon that we had for the integration before. Let's fix that also. _(2.0.0-dev1)_
+- [x] B4 - let's make the version of the add-on and integration match always. _(2.0.0-dev1)_
+- [x] B5 - while we develop, let's append a .devN suffix to the version and increment N on each turn, so that I can see when we are running a newer version. _(2.0.0-dev1)_
+- [x] B6 - after each turn, update TASKS.md, noting the specific version that fixed the task. We are going to use tasks.md to derive a changelog. _(2.0.0-dev1)_

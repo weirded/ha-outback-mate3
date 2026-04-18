@@ -28,13 +28,30 @@ Scripts:
   via qemu-guest-agent and installs/rebuilds via `ha` CLI
 - `scripts/install-integration.sh` — pushes local `custom_components/outback_mate3/`
   into the VM and restarts HA core
+- `scripts/bump-dev-version.sh` — increments `-devN` suffix in the add-on's
+  `config.yaml` and the integration's `manifest.json` in lockstep
 - `scripts/teardown-haos-vm.sh` — destroys the VM
 
-## Standing rule — always push + commit after each turn
+## Versioning
+
+Add-on and integration share a single version (B4). Format while developing
+is `<semver>-dev<N>`, e.g. `2.0.0-dev7`. `./scripts/bump-dev-version.sh`
+increments N and writes the new string into both
+`outback_mate3_addon/config.yaml` and
+`custom_components/outback_mate3/manifest.json`.
+
+## Standing rule — always bump, push, and commit after each turn
 
 After every turn that changes files in the repo:
 
-1. **Deploy** to the test VM so changes are immediately visible:
+1. **Bump the dev version**:
+
+    ```sh
+    ./scripts/bump-dev-version.sh
+    ```
+
+2. **Deploy** to the test VM so the bump + code changes are immediately
+   visible (the bumped version shows on the add-on card and integration entry):
 
     ```sh
     ./scripts/install-addon.sh          # if outback_mate3_addon/ changed
@@ -43,8 +60,12 @@ After every turn that changes files in the repo:
                                         # if either of those two scripts changed
     ```
 
-2. **Commit** the changes to the current branch (`weirded/ha-addon-plan`) with
-   a clear message.
+3. **Update TASKS.md**: for any tasks completed this turn, annotate with the
+   current version — e.g. `- [x] B4 - ... _(2.0.0-dev3)_`. This is how we
+   derive the changelog.
 
-Do all three unless the user explicitly says not to. Changes the user can't
+4. **Commit** everything (the bump, the code changes, the TASKS.md annotation)
+   to the current branch (`weirded/ha-addon-plan`) with a clear message.
+
+Do all four unless the user explicitly says not to. Changes the user can't
 see sitting on my disk don't count as delivered.
