@@ -83,7 +83,7 @@ _Goal: a pure Python module with no HA imports that both the add-on will use and
 
 - [x] **10.1** Update `README.md`: remove the "does not work on HA OS" warning, add sections explaining the two-part install (add-on from repo URL, integration from HACS), and add a breaking-change note for existing users.
 - [x] **10.2** Add `outback_mate3_addon/README.md` explaining options, what to point MATE3 at (host IP:57027), and troubleshooting.
-- [ ] **10.3** Check `hacs.json` — it tracks the integration, not the add-on; likely no change needed.
+- [x] **10.3** ~~Check `hacs.json`~~ → Dropped HACS entirely (`hacs.json` removed, README badges and install instructions updated, CHANGELOG notes the removal). _(2.0.0-dev4)_
 - [x] **10.4** Write release notes / CHANGELOG for the 2.0 cut.
 
 ## Phase 11 — End-to-end validation on real HA OS
@@ -193,4 +193,5 @@ _Each completed item is annotated with `(vX.Y.Z-devN)` — the add-on / integrat
 - [x] B6 - after each turn, update TASKS.md, noting the specific version that fixed the task. We are going to use tasks.md to derive a changelog. _(2.0.0-dev1)_
 - [ ] B7 - let's mimick https://github.com/weirded/distributed-esphome in terms of: license, buy me a coffee, style/format of readme and docs.md and the installation instructions (including that nice button) - obviously correcting for the specifics of our add-on.
 - [x] B8 - allow orphan MATE3 devices (e.g. from test-fixture traffic) to be removed via HA's Delete Device button, by implementing `async_remove_config_entry_device`. Returns True unless the device is currently present in `mate3.inverters` / `mate3.charge_controllers`. _(2.0.0-dev3)_
+- [ ] B9 - now that HACS is gone, make the add-on bundle and deploy the integration into `/config/custom_components/outback_mate3/` on startup so users only have to install one thing. Needs `map: [homeassistant_config:rw]` in the add-on `config.yaml`, a bundled copy of `custom_components/outback_mate3/` inside the add-on's Docker build context, and a shell step in `run.sh` to copy/sync (idempotent — diff first, only overwrite + log when content changes so we don't spam restarts). Until then users install the integration manually per the README.
 - [ ]  

@@ -1,6 +1,5 @@
 # Home Assistant Outback MATE3 Integration
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=for-the-badge)](https://github.com/hacs/integration)
 [![GitHub Release][releases-shield]][releases]
 [![License][license-shield]](LICENSE)
 
@@ -11,9 +10,7 @@
 This project integrates the Outback MATE3 system controller with Home Assistant, providing real-time monitoring of Outback power system components including inverters and charge controllers. It ships as two pieces that work together:
 
 - **Add-on** (`outback_mate3`): listens for MATE3 UDP streaming telemetry on the LAN, parses it, and exposes a WebSocket stream of parsed device state. Runs on Home Assistant OS / Supervised.
-- **Integration** (`custom_components/outback_mate3`): connects to the add-on's WebSocket and creates / updates HA sensor entities. Installed via HACS.
-
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=weirded&repository=ha-outback-mate3&category=integration)
+- **Integration** (`custom_components/outback_mate3`): connects to the add-on's WebSocket and creates / updates HA sensor entities.
 
 ## Features
 
@@ -35,17 +32,18 @@ You need both the add-on and the integration.
 3. Find the **Outback MATE3** add-on in the store and install it
 4. Start the add-on (the default options — UDP port 57027, WS port 8099 — work out of the box)
 
-### 2. Install the integration (HACS)
+### 2. Install the integration
 
-1. Open HACS → **Integrations**
-2. **⋮ menu → Custom repositories**, add this repo URL with category **Integration**
-3. Install **Outback MATE3** and restart Home Assistant
-4. Add the integration: **Settings → Devices & Services → Add Integration → Outback MATE3**
-5. The default WebSocket URL assumes the add-on is running on the same instance; edit only if you've changed the add-on's WS port
+> Automatic install bundled with the add-on is planned — see the project's
+> `TASKS.md` (B9). For now, install manually: copy
+> `custom_components/outback_mate3/` from this repository into your Home
+> Assistant `/config/custom_components/` directory (e.g. via the **Samba share**
+> or **SSH & Web Terminal** add-ons), then restart Home Assistant.
 
-### Manual installation (integration only)
-
-Copy `custom_components/outback_mate3/` into your Home Assistant config directory. You still need the add-on installed separately.
+Once the integration code is in place and Home Assistant has restarted, the
+running add-on will announce itself via Hass.io discovery. You'll see a
+**Discovered: Outback MATE3** card under **Settings → Devices & Services**
+— click **Submit** and the integration is configured.
 
 ## Configuration
 
@@ -71,7 +69,7 @@ You should now see your system and components in Home Assistant.
 The 1.x integration bound a UDP socket inside the Home Assistant core container, which does not work on HA OS. Version 2.0 moves UDP listening into a separate add-on and reduces the integration to a WebSocket client. To upgrade:
 
 1. Install the add-on as above.
-2. Update the integration via HACS to 2.0 or later.
+2. Replace `custom_components/outback_mate3/` in your HA config with the 2.x version from this repo and restart HA. (If you previously installed 1.x via HACS, remove it from HACS first so it doesn't fight with the new version.)
 3. The integration will migrate your existing config entry automatically. If the default add-on URL doesn't resolve on your setup, edit the integration's configuration to set the correct WebSocket URL.
 4. Entity unique IDs are preserved, so your existing dashboards, automations, and Energy Dashboard configuration continue to work.
 

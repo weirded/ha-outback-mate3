@@ -43,3 +43,8 @@ core-container networking constraints.
 ### Removed
 
 - HA-OS-incompatibility warning from the README.
+- **HACS support.** `hacs.json` and HACS badges / install instructions are
+  gone. The integration is no longer distributed through HACS. Users install
+  the add-on from this repo (Supervisor → Add-on Store → Repositories), and
+  for now copy `custom_components/outback_mate3/` into HA config manually;
+  bundling the integration with the add-on is tracked as a follow-up.
