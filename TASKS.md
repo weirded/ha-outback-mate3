@@ -88,12 +88,81 @@ _Goal: a pure Python module with no HA imports that both the add-on will use and
 
 ## Phase 11 — End-to-end validation on real HA OS
 
-- [ ] **11.1** Install the add-on on an HA OS instance by adding this repo's URL to Supervisor.
-- [ ] **11.2** Install the integration via HACS on the same instance.
-- [ ] **11.3** Configure MATE3 to stream to the HA host IP on port 57027.
-- [ ] **11.4** Verify entities appear with correct values; cross-check against the MATE3 display (and, if available, a Supervised install running the old version).
-- [ ] **11.5** Restart the add-on; confirm integration reconnects and entities recover.
-- [ ] **11.6** Restart HA Core; confirm integration reconnects and entities recover.
+- [ ] **11.1** Install the add-on on an HA OS instance by adding this repo's URL to Supervisor. _(still pending — we've only validated sideload via `install-addon.sh`; the repo-URL store path is untested)_
+- [ ] **11.2** Install the integration via HACS on the same instance. _(still pending — we've only validated sideload via `install-integration.sh`)_
+- [x] **11.3** Configure MATE3 to stream to the HA host IP on port 57027. _(2.0.0-dev2, verified via tcpdump)_
+- [ ] **11.4** Verify entities appear with correct values; cross-check against the MATE3 display (and, if available, a Supervised install running the old version). _(partial — 150 → 78 entities populated with plausible values; no formal cross-check against MATE3 LCD yet)_
+- [x] **11.5** Restart the add-on; confirm integration reconnects and entities recover. _(2.0.0-dev3 — add-on restart this turn, integration reconnected, new snapshot applied)_
+- [x] **11.6** Restart HA Core; confirm integration reconnects and entities recover. _(2.0.0-dev1 — every `install-integration.sh` run issues `ha core restart` and the integration re-binds the add-on WS cleanly)_
+
+## Phase 14 — MATE3 HTTP config poll (nameplate, firmware, setpoints)
+
+The UDP stream gives live readings. The MATE3's web server at `http://<mate3>/CONFIG.xml` gives everything *else* — firmware versions, nameplate values, configured setpoints, MATE3's own network and data-stream config. Poll at ~5 min intervals and surface the useful bits into HA.
+
+Architecture: the **add-on** polls (it already knows the MATE3 IP from every UDP packet's source), then pushes a new `config_snapshot` event (full curated state on WS connect + every poll) and, if we want, a `config_updated` diff event. The integration stays a reactive WS client.
+
+- [ ] **14.1** Add-on: track `last_seen_remote_ip` per MAC in `DeviceRegistry`; this becomes the candidate MATE3 HTTP host. Expose as a method the poller uses.
+- [ ] **14.2** Add-on: new `src/mate3_http.py` with `async fetch_config(host)` → parsed dict of curated values (see below). Uses aiohttp; 8 s timeout; logs + returns None on unreachable.
+- [ ] **14.3** Add-on: poller task on a 5-min interval (configurable via `config_poll_interval_s` in add-on options, default `300`, `0` disables). Runs after first UDP packet arrives so the host is known.
+- [ ] **14.4** Add-on: extend the WS protocol with `config_snapshot` (sent on client connect immediately after `snapshot`, and on every successful poll) and `config_updated` (fires only when parsed dict diverges from the previous). Event shape: `{"type":"config_snapshot", "mac":"...", "config": { ... }}`.
+- [ ] **14.5** Integration: handle `config_snapshot` / `config_updated`. Store on `OutbackMate3.config_by_mac[mac]`. Trigger refresh so entity attributes re-read.
+- [ ] **14.6** Integration: new `OutbackConfigSensor` class (or extension of existing) for the handful of values that deserve standalone entities — firmware versions, data-stream config, SD card log mode. Everything else becomes attributes on existing `Outback System` / `Outback Inverter N` / `Outback Charge Controller N` devices.
+- [ ] **14.7** Tests: unit test the XML parser against a captured `CONFIG.xml` (obfuscated), and against malformed / partial / empty responses. Add a fixture.
+
+### Curated value list (what to pull, where it lands)
+
+**Standalone sensors** (one per instance):
+- `sensor.mate3_firmware` ← `New_Remote/Firmware`
+- `sensor.mate3_<mac>_inverter_<n>_firmware` ← `Port/Device/Firmware` (per inverter)
+- `sensor.mate3_<mac>_charge_controller_<n>_firmware` ← `Port/Device/Model/Firmware` (per CC)
+- `sensor.mate3_data_stream_target` ← `New_Remote/Network/Data_Stream_IP:Port` (diagnostic — catches "saved but not applied")
+- `sensor.mate3_sd_card_log_mode` ← `New_Remote/SD_CARD_Log_Mode` (Disabled / Compact / Excel)
+
+**Outback System device — attributes**:
+- `system_type` ← `System@Type`
+- `nominal_voltage` ← `Nominal_Voltage`
+- `battery_ah_capacity` ← `Battery_AH_Capacity`
+- `pv_size_watts` ← `PV_Size_Watts`
+- `generator_kw` ← `Generator_KW`
+- `max_inverter_output_kw` ← `Max_Inverter_Output_KW`
+- `max_charger_output_kw` ← `Max_Charger_Output_KW`
+- `data_stream_mode` ← `New_Remote/Data_Stream_Mode`
+- `mate3_ip_address` / `mate3_dhcp` / `mate3_gateway` ← `New_Remote/Network/{IP_address,DHCP,Gateway}`
+- `system_name` / `installer_name` / `installer_phone` — only populate when non-empty
+
+**Outback Inverter N device — attributes** (from the matching `Port/Device`):
+- `type` (e.g. "Split Phase 240V 50/60Hz")
+- `inverter_mode` (SEARCH/ON/OFF — configured mode; different from UDP's live `inverter_mode`)
+- `low_battery_cut_out_voltage`, `low_battery_cut_in_voltage`, `low_battery_delay`
+- `high_battery_cut_out_voltage`, `high_battery_cut_in_voltage`, `high_battery_delay`
+- `ac_output_voltage` (120 or 240)
+- `charger_mode` (Auto/Off/On)
+- `charger_absorb_voltage`, `charger_absorb_time`
+- `charger_float_voltage`
+- `charger_eq_voltage`, `charger_eq_time`
+- `charger_re_float_voltage`, `charger_re_bulk_voltage`
+- `grid_tie_mode`, `grid_tie_voltage`, `grid_tie_window` (IEEE/UL)
+- `ac_input_priority` (Grid/Generator)
+- `ac1_input_type`, `ac1_input_size`, `ac1_min_voltage`, `ac1_max_voltage`
+- `ac2_input_type`, `ac2_input_size`, `ac2_min_voltage`, `ac2_max_voltage`
+- `stack_mode` (Master/Slave)
+
+**Outback Charge Controller N device — attributes**:
+- `model_type` (FM / FM80 / FMX / FlexMax Extreme)
+- `charger_absorb_voltage`, `charger_absorb_time`, `charger_absorb_end_amps`
+- `charger_float_voltage`
+- `charger_rebulk_voltage`
+- `charger_eq_voltage`, `charger_eq_time`
+- `charger_output_limit` (max A)
+- `mppt_mode`, `mppt_sweep_mode`, `mppt_max_sweep`
+- `gt_mode` (Grid Tie Enabled/Disabled)
+
+### Deliberately skipped
+
+- AUX output and relay setpoints (20+ per device, rarely changed, not useful without the physical context).
+- Grid mode schedules 1/2/3, High/Low battery transfer, Advanced Generator Start — complex multi-setting blocks that only matter if you're using those features. Defer until asked.
+- Display backlight, button beep, etc.
+- The empty `Mini_Grid`, `Grid_Zero` sub-blocks that only populate when those modes are active.
 
 ## Phase 12 — Hass.io discovery (auto-suggest the add-on to the integration)
 
