@@ -99,7 +99,7 @@ def test_inverter_grid_tie(config):
 def test_inverter_ac_inputs(config):
     inv = config["inverters"][0]
     assert inv["ac1_input_type"] == "Grid Tied"
-    assert inv["ac1_input_size"] == 2000
+    assert inv["ac1_input_size_amps"] == 200.0
     assert inv["ac2_input_type"] == "Generator"
 
 
@@ -132,6 +132,72 @@ def test_cc_mppt(config):
     cc = config["charge_controllers"][0]
     assert cc["mppt_mode"] == "Auto"
     assert cc["mppt_sweep_mode"] == "Half"
+
+
+# --- expanded CC coverage (AUX, Wakeup, RTS, MPPT extras) ------------------
+
+def test_cc_wakeup_and_snooze(config):
+    cc = config["charge_controllers"][0]
+    assert cc["wakeup_interval"] == 5
+    assert cc["wakeup_voc_change"] == 6.0
+    assert cc["snooze_amps"] == 0.6
+
+
+def test_cc_rts(config):
+    cc = config["charge_controllers"][0]
+    assert cc["rts_mode"] == "Wide"
+    assert cc["rts_maximum_voltage"] == 55.6
+    assert cc["rts_minimum_voltage"] == 48.4
+
+
+def test_cc_aux_pv_trigger_and_nite_light(config):
+    cc = config["charge_controllers"][0]
+    assert cc["aux_mode"] == "Vent Fan"
+    assert cc["aux_pv_trigger_voltage"] == 140.0
+    assert cc["aux_nite_light_threshold_voltage"] == 10.0
+    assert cc["aux_nite_light_on_hours"] == 4
+
+
+# --- expanded inverter coverage (Search, Stack, Mini-Grid, AUX, Relay) -----
+
+def test_inverter_search(config):
+    inv = config["inverters"][0]
+    assert inv["search_pulse_length"] == 8
+    assert inv["search_ac_load_threshold_amps"] == 1.0
+    assert inv["search_pulse_spacing"] == 60
+
+
+def test_inverter_mini_grid_and_grid_zero(config):
+    inv = config["inverters"][0]
+    assert inv["mini_grid_lbx_voltage"] == 51.2
+    assert inv["grid_zero_voltage"] == 51.2
+    assert inv["grid_zero_max_amps"] == 120.0
+
+
+def test_inverter_stack_levels(config):
+    inv = config["inverters"][0]
+    assert inv["stack_mode"] == "Master"
+    assert inv["stack_master_power_save_level"] == 3
+    assert inv["stack_slave_power_save_level"] == 1
+
+
+def test_inverter_aux_output(config):
+    inv = config["inverters"][0]
+    assert inv["aux_output_mode"] == "Vent Fan"
+    assert inv["aux_output_high_setpoint_voltage"] == 56.0
+    assert inv["aux_output_high_setpoint_ac_amps"] == 3.0
+
+
+def test_inverter_relay(config):
+    inv = config["inverters"][0]
+    assert inv["relay_mode"] == "Gen Alert"
+    assert inv["relay_high_setpoint_voltage"] == 56.0
+
+
+def test_inverter_ac_input_sizes(config):
+    inv = config["inverters"][0]
+    assert inv["ac1_input_size_amps"] == 200.0
+    assert inv["ac2_input_size_amps"] == 25.0
 
 
 # --- robustness ------------------------------------------------------------

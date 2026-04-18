@@ -129,6 +129,12 @@ def _parse_inverter(dev: ET.Element) -> dict[str, Any]:
     if inv is not None:
         out["inverter_mode"] = inv.get("Mode")
         out["ac_output_voltage"] = _int(inv.find("AC_Output_Voltage"))
+        out["ac_coupled_mode"] = _text(inv.find("AC_Coupled_Mode"))
+        search = inv.find("Search")
+        if search is not None:
+            out["search_pulse_length"] = _int(search.find("Pulse_Length"))
+            out["search_ac_load_threshold_amps"] = _amp_tenths(search.find("Amps"))
+            out["search_pulse_spacing"] = _int(search.find("Spacing"))
         lb = inv.find("Low_battery")
         if lb is not None:
             out["low_battery_cut_out_voltage"] = _volt_tenths(lb.find("Cut_Out_Voltage"))
@@ -145,6 +151,7 @@ def _parse_inverter(dev: ET.Element) -> dict[str, Any]:
         out["charger_absorb_voltage"] = _volt_tenths(ch.find("Absorb/Voltage"))
         out["charger_absorb_time"] = _int(ch.find("Absorb/Time"))
         out["charger_float_voltage"] = _volt_tenths(ch.find("Float/Voltage"))
+        out["charger_float_time"] = _int(ch.find("Float/Time"))
         out["charger_eq_voltage"] = _volt_tenths(ch.find("EQ/Voltage"))
         out["charger_eq_time"] = _int(ch.find("EQ/Time"))
         out["charger_re_float_voltage"] = _volt_tenths(ch.find("Re_Float/Voltage"))
@@ -155,17 +162,42 @@ def _parse_inverter(dev: ET.Element) -> dict[str, Any]:
         out["grid_tie_mode"] = gt.get("Mode")
         out["grid_tie_voltage"] = _volt_tenths(gt.find("Voltage"))
         out["grid_tie_window"] = _text(gt.find("Window"))
+    mg = dev.find("Mini_Grid")
+    if mg is not None:
+        out["mini_grid_lbx_voltage"] = _volt_tenths(mg.find("LBX_Voltage"))
+        out["mini_grid_lbx_delay"] = _int(mg.find("LBX_Delay"))
+    gz = dev.find("Grid_Zero")
+    if gz is not None:
+        out["grid_zero_voltage"] = _volt_tenths(gz.find("Voltage"))
+        out["grid_zero_max_amps"] = _amp_tenths(gz.find("Max_Amps"))
     for ac_tag, prefix in [("AC1_input", "ac1"), ("AC2_input", "ac2")]:
         ac = dev.find(ac_tag)
         if ac is None:
             continue
         out[f"{prefix}_input_type"] = _text(ac.find("Input_type"))
-        out[f"{prefix}_input_size"] = _int(ac.find("Input_size"))
+        out[f"{prefix}_input_size_amps"] = _amp_tenths(ac.find("Input_size"))
+        out[f"{prefix}_transfer_delay"] = _int(ac.find("Transfer_Delay"))
+        out[f"{prefix}_connect_delay"] = _int(ac.find("Connect_Delay"))
         out[f"{prefix}_min_voltage"] = _int(ac.find("Minimum_Input_Voltage"))
         out[f"{prefix}_max_voltage"] = _int(ac.find("Maximum_Input_Voltage"))
     stack = dev.find("Stack")
     if stack is not None:
         out["stack_mode"] = stack.get("Mode")
+        out["stack_master_power_save_level"] = _int(stack.find("Master_Power_Save_Level"))
+        out["stack_slave_power_save_level"] = _int(stack.find("Slave_Power_Save_Level"))
+    # AUX 12V output + Relay share identical sub-structure on the Radian/GS.
+    for xml_tag, prefix in [("AUX_Output", "aux_output"), ("Relay", "relay")]:
+        el = dev.find(xml_tag)
+        if el is None:
+            continue
+        out[f"{prefix}_mode"] = el.get("Mode")
+        out[f"{prefix}_operation_mode"] = _text(el.find("Operation_Mode"))
+        out[f"{prefix}_on_delay"] = _int(el.find("On_Delay"))
+        out[f"{prefix}_off_delay"] = _int(el.find("Off_Delay"))
+        out[f"{prefix}_high_setpoint_voltage"] = _volt_tenths(el.find("High_Setpoint_Voltage"))
+        out[f"{prefix}_low_setpoint_voltage"] = _volt_tenths(el.find("Low_Setpoint_Voltage"))
+        out[f"{prefix}_high_setpoint_ac_amps"] = _amp_tenths(el.find("High_Setpoint_AC_Amps"))
+        out[f"{prefix}_low_setpoint_ac_amps"] = _amp_tenths(el.find("Low_Setpoint_AC_Amps"))
     return {k: v for k, v in out.items() if v is not None}
 
 
@@ -187,12 +219,53 @@ def _parse_charge_controller(dev: ET.Element) -> dict[str, Any]:
         out["charger_rebulk_voltage"] = _volt_tenths(ch.find("Rebulk_Voltage"))
         out["charger_eq_voltage"] = _volt_tenths(ch.find("EQ/Voltage"))
         out["charger_eq_time"] = _int(ch.find("EQ/Time"))
+        out["charger_eq_auto_interval_days"] = _int(ch.find("EQ/Auto_Interval"))
         out["charger_output_limit"] = _amp_tenths(ch.find("Output_Limit"))
+    wake = model.find("Wakeup")
+    if wake is not None:
+        out["wakeup_interval"] = _int(wake.find("Interval"))
+        out["wakeup_voc_change"] = _volt_tenths(wake.find("VOC_Change"))
+    out["snooze_amps"] = _amp_tenths(model.find("Snooze_Amps"))
     mppt = model.find("MPPT")
     if mppt is not None:
         out["mppt_mode"] = mppt.get("Mode")
         out["mppt_sweep_mode"] = _text(mppt.find("Sweep_Mode"))
         out["mppt_max_sweep"] = _int(mppt.find("Max_Sweep"))
+        out["mppt_upick_percentage"] = _int(mppt.find("Upick_Percentage"))
+        out["mppt_restart_mode"] = _int(mppt.find("Restart_Mode"))
+    rts = model.find("Remote_Temp_Sensor_Comp")
+    if rts is not None:
+        out["rts_mode"] = rts.get("Mode")
+        out["rts_maximum_voltage"] = _volt_tenths(rts.find("Maximum_RTS_Voltage"))
+        out["rts_minimum_voltage"] = _volt_tenths(rts.find("Minimum_RTS_Voltage"))
+    aux = model.find("AUX_Output")
+    if aux is not None:
+        out["aux_mode"] = aux.get("Mode")
+        out["aux_operation_mode"] = _text(aux.find("Operation_Mode"))
+        out["aux_polarity"] = _text(aux.find("Polarity"))
+        out["aux_error_low_batt_voltage"] = _volt_tenths(aux.find("AUX_Error_Low_Batt_Voltage"))
+        disc = aux.find("AUX_Low_Batt_Disconnect")
+        if disc is not None:
+            out["aux_low_batt_disconnect_voltage"] = _volt_tenths(disc.find("Disconnect_Voltage"))
+            out["aux_low_batt_disconnect_delay"] = _int(disc.find("Disconnect_Delay"))
+            out["aux_low_batt_reconnect_voltage"] = _volt_tenths(disc.find("Reconnect_Voltage"))
+        out["aux_vent_fan_voltage"] = _volt_tenths(aux.find("AUX_Vent_Fan_Voltage"))
+        div = aux.find("AUX_Diversion")
+        if div is not None:
+            out["aux_diversion_hold_time"] = _int(div.find("Hold_Time"))
+            out["aux_diversion_delay"] = _int(div.find("Delay"))
+            out["aux_diversion_relative_voltage"] = _volt_tenths(div.find("Relative_Voltage"))
+            out["aux_diversion_hysteresis_voltage"] = _volt_tenths(div.find("Hysteresis_Voltage"))
+        pvt = aux.find("AUX_PV_Trigger")
+        if pvt is not None:
+            out["aux_pv_trigger_voltage"] = _volt_tenths(pvt.find("Trigger_Voltage"))
+            out["aux_pv_trigger_hold_time"] = _int(pvt.find("Hold_Time"))
+        nite = aux.find("AUX_Nite_Light")
+        if nite is not None:
+            out["aux_nite_light_threshold_voltage"] = _volt_tenths(nite.find("Threshold_Voltage"))
+            out["aux_nite_light_on_hyst_time"] = _int(nite.find("On_Hyst_Time"))
+            out["aux_nite_light_off_hyst_time"] = _int(nite.find("Off_Hyst_Time"))
+            out["aux_nite_light_on_hours"] = _int(nite.find("On_Hours"))
     return {k: v for k, v in out.items() if v is not None}
 
 
