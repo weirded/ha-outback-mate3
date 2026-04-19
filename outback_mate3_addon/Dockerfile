@@ -1,6 +1,9 @@
 ARG BUILD_FROM
 FROM $BUILD_FROM
 
+ARG BUILD_ARCH
+ARG BUILD_VERSION
+
 RUN apk add --no-cache python3 py3-pip
 
 WORKDIR /app
@@ -21,3 +24,18 @@ COPY bundled_integration/outback_mate3/ /opt/integration/outback_mate3/
 # default init run.
 COPY run.sh /etc/services.d/outback_mate3/run
 RUN chmod a+x /etc/services.d/outback_mate3/run
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD python3 -c "import socket, sys; s=socket.socket(); s.settimeout(3); s.connect(('127.0.0.1', 28099)); s.close()" || exit 1
+
+LABEL \
+  io.hass.name="Outback MATE3" \
+  io.hass.description="Relays Outback MATE3 UDP telemetry to Home Assistant over a structured WebSocket." \
+  io.hass.arch="${BUILD_ARCH}" \
+  io.hass.type="addon" \
+  io.hass.version="${BUILD_VERSION}" \
+  maintainer="Stefan Zier <stefan@zier.com>" \
+  org.opencontainers.image.title="Outback MATE3" \
+  org.opencontainers.image.source="https://github.com/weirded/ha-outback-mate3" \
+  org.opencontainers.image.licenses="MIT" \
+  org.opencontainers.image.vendor="weirded"

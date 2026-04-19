@@ -1,0 +1,30 @@
+name: Lint
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - "weirded/**"
+  pull_request:
+
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff==0.6.9
+
+      - name: Ruff lint
+        run: ruff check .
+
+      # `ruff format --check` is intentionally not enforced yet — 19 files
+      # want whitespace-only reformats as of 2.0.0. Turning this on will be
+      # a single sweep commit as part of Phase 17 (17.11 pre-commit setup).

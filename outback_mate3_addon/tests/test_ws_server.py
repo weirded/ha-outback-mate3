@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 from aiohttp.test_utils import TestClient, TestServer
-
 from src.parser import KIND_INVERTER, parse_frame
 from src.state import DeviceAdded, DeviceRegistry, StateUpdated
 from src.ws_server import WSServer, event_to_message

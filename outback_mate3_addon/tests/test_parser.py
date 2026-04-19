@@ -10,7 +10,6 @@ import math
 from pathlib import Path
 
 import pytest
-
 from src.parser import (
     KIND_CHARGE_CONTROLLER,
     KIND_INVERTER,

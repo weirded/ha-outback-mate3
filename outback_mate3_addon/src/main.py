@@ -8,6 +8,7 @@ listener and the HTTP/WebSocket server until SIGTERM/SIGINT.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
 import signal
@@ -93,10 +94,8 @@ async def run() -> None:
     await runner.cleanup()
     for task in (poller, broadcaster):
         task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            pass
 
 
 if __name__ == "__main__":

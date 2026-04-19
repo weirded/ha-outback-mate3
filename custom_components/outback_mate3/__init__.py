@@ -9,13 +9,13 @@ lifecycle and state updates.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import time
 from typing import Any
 
 import aiohttp
 from aiohttp import ClientWebSocketResponse, WSMsgType
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -168,10 +168,8 @@ class OutbackMate3(DataUpdateCoordinator):
         self._running = False
         if self._task is not None:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
             self._task = None
 
     async def _ws_loop(self) -> None:
@@ -183,18 +181,17 @@ class OutbackMate3(DataUpdateCoordinator):
         warned_while_disconnected = False
         while self._running:
             try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.ws_connect(
-                        self.url, heartbeat=_WS_HEARTBEAT_S
-                    ) as ws:
-                        _LOGGER.info("Connected to MATE3 add-on at %s", self.url)
-                        self._connected = True
-                        backoff = _INITIAL_BACKOFF_S
-                        warned_while_disconnected = False
-                        await self._consume(ws)
+                async with aiohttp.ClientSession() as session, session.ws_connect(
+                    self.url, heartbeat=_WS_HEARTBEAT_S
+                ) as ws:
+                    _LOGGER.info("Connected to MATE3 add-on at %s", self.url)
+                    self._connected = True
+                    backoff = _INITIAL_BACKOFF_S
+                    warned_while_disconnected = False
+                    await self._consume(ws)
             except asyncio.CancelledError:
                 raise
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 if not warned_while_disconnected:
                     _LOGGER.warning(
                         "MATE3 add-on connection to %s failed: %s (retrying)",

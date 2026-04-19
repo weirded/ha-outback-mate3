@@ -1,0 +1,72 @@
+name: Bug report
+description: Something isn't working as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. The more detail you give,
+        the faster this gets fixed. If you're reporting a security issue,
+        please use a private security advisory instead — see `SECURITY.md`.
+
+  - type: input
+    id: version
+    attributes:
+      label: Add-on / integration version
+      description: The version shown on the add-on card (both ship the same version).
+      placeholder: e.g. 2.0.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ha_install
+    attributes:
+      label: Home Assistant install type
+      options:
+        - HAOS (Home Assistant OS)
+        - Supervised
+        - HA Container
+        - HA Core
+    validations:
+      required: true
+
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      placeholder: e.g. 2026.4.2
+    validations:
+      required: true
+
+  - type: input
+    id: hardware
+    attributes:
+      label: Outback hardware
+      description: Which MATE3 firmware + inverter / charge controller mix.
+      placeholder: e.g. MATE3 fw 3.0.12, 2× Radian GS8048, 2× FM80
+    validations:
+      required: true
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened
+      description: What did you see, and what did you expect to see instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste add-on logs and/or HA core logs. Wrap in triple backticks.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: false

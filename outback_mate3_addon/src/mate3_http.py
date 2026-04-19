@@ -492,11 +492,13 @@ async def fetch_config(host: str, timeout: aiohttp.ClientTimeout | None = None) 
     """Fetch + parse CONFIG.xml from ``host``. Returns ``None`` on failure."""
     url = f"http://{host}/CONFIG.xml"
     try:
-        async with aiohttp.ClientSession(timeout=timeout or _HTTP_TIMEOUT) as session:
-            async with session.get(url) as resp:
-                resp.raise_for_status()
-                body = await resp.read()
-    except Exception as exc:  # noqa: BLE001
+        async with (
+            aiohttp.ClientSession(timeout=timeout or _HTTP_TIMEOUT) as session,
+            session.get(url) as resp,
+        ):
+            resp.raise_for_status()
+            body = await resp.read()
+    except Exception as exc:
         _LOGGER.debug("Failed to fetch %s: %s", url, exc)
         return None
     try:

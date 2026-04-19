@@ -2,20 +2,19 @@
 from __future__ import annotations
 
 import logging
-from typing import List
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
-    RestoreSensor,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     EntityCategory,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
-    UnitOfPower,
     UnitOfEnergy,
+    UnitOfPower,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
@@ -34,18 +33,18 @@ async def async_setup_entry(
     """Set up the Outback MATE3 sensors."""
     mate3: OutbackMate3 = hass.data[DOMAIN][config_entry.entry_id]
     _LOGGER.debug("Setting up sensors for Outback MATE3")
-    
+
     # Store the callback for adding entities later when devices are discovered
     mate3.set_add_entities_callback(async_add_entities)
 
 
-def create_device_entities(mate3: OutbackMate3, mac_address: str) -> List[SensorEntity]:
+def create_device_entities(mate3: OutbackMate3, mac_address: str) -> list[SensorEntity]:
     """Create entities for all devices."""
     entities = []
 
     # Create system sensors first
     _LOGGER.debug("Creating system sensors for MAC %s", mac_address)
-    
+
     # Add power sensors for energy monitoring (as system sensors)
     power_sensors = [
         ("From Grid", "from_grid"),  # Positive for consumption, negative for production
@@ -53,7 +52,7 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> List[Sensor
         ("From Battery", "from_battery"),  # Positive for discharge, negative for charge
         ("To Loads", "to_loads"),  # Sum of From Grid and From Battery
     ]
-    
+
     for name, key in power_sensors:
         entities.append(
             OutbackSystemSensor(
@@ -96,7 +95,7 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> List[Sensor
     mate3.discovered_devices.add(f"combined_{mac_address}")
 
     # Add inverter sensors
-    for device_id, inverter in mate3.inverters[mac_address].items():
+    for device_id, _inverter in mate3.inverters[mac_address].items():
         _LOGGER.debug("Creating sensors for inverter %d from MAC %s", device_id, mac_address)
         entities.extend([
             # Current sensors
@@ -123,7 +122,7 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> List[Sensor
                                 SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
             OutbackInverterSensor(mate3, mac_address, device_id, "charger_current", "Total Charger Current",
                                 SensorDeviceClass.CURRENT, UnitOfElectricCurrent.AMPERE),
-            
+
             # Voltage sensors
             # L1 voltage sensors
             OutbackInverterSensor(mate3, mac_address, device_id, "l1_ac_input_voltage", "L1 AC Input Voltage",
@@ -140,7 +139,7 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> List[Sensor
                                 SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
             OutbackInverterSensor(mate3, mac_address, device_id, "total_ac_output_voltage", "Total AC Output Voltage",
                                 SensorDeviceClass.VOLTAGE, UnitOfElectricPotential.VOLT),
-            
+
             # Power sensors
             # L1 power sensors
             OutbackInverterSensor(mate3, mac_address, device_id, "l1_grid_power", "L1 Grid Power",
@@ -174,7 +173,7 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> List[Sensor
         ])
 
     # Add charge controller sensors
-    for device_id, charge_controller in mate3.charge_controllers[mac_address].items():
+    for device_id, _charge_controller in mate3.charge_controllers[mac_address].items():
         _LOGGER.debug("Creating sensors for charge controller %d from MAC %s", device_id, mac_address)
         entities.extend([
             OutbackChargeControllerSensor(mate3, mac_address, device_id, "pv_current", "PV Current",
@@ -197,7 +196,7 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> List[Sensor
     return entities
 
 
-def create_config_entities(mate3: "OutbackMate3", mac_address: str) -> List[SensorEntity]:
+def create_config_entities(mate3: OutbackMate3, mac_address: str) -> list[SensorEntity]:
     """Diagnostic entities derived from the HTTP CONFIG.xml poll.
 
     Only called after the first ``config_snapshot`` arrives for a MAC, so the
@@ -207,7 +206,7 @@ def create_config_entities(mate3: "OutbackMate3", mac_address: str) -> List[Sens
     config = mate3.config_by_mac.get(mac_address)
     if config is None:
         return []
-    entities: List[SensorEntity] = []
+    entities: list[SensorEntity] = []
     entities.extend(_config_system_sensors(mate3, mac_address))
     # Iterate the config's own port-order lists — this doesn't depend on
     # whether we've seen a UDP frame for each device yet.
@@ -238,14 +237,14 @@ class OutbackBaseSensor(CoordinatorEntity, SensorEntity):
         self._mac_address = mac_address
         self._device_id = device_id
         self._sensor_type = sensor_type
-        
+
         # Create entity_id friendly MAC (replace dots with underscores)
         mac_id = mac_address.replace('.', '_')
-        
+
         # Set entity name and ID
         self._attr_has_entity_name = True
         self._attr_name = name
-        
+
         device_type = self._get_device_type()
         if device_type == "system":
             device_name = "Outback System"
@@ -257,13 +256,13 @@ class OutbackBaseSensor(CoordinatorEntity, SensorEntity):
         self._attr_device_class = device_class
         self._attr_native_unit_of_measurement = unit
         self._attr_state_class = SensorStateClass.MEASUREMENT
-        
+
         # Set unique ID based on device type
         if device_type == "system":
             self._attr_unique_id = f"{DOMAIN}_system_{sensor_type}"
         else:
             self._attr_unique_id = f"{DOMAIN}_{mac_address}_{device_type}_{device_id}_{sensor_type}"
-        
+
         # Set up device info
         if device_type == "system":
             self._attr_device_info = DeviceInfo(
@@ -356,10 +355,10 @@ class OutbackInverterSensor(OutbackBaseSensor):
     @property
     def native_value(self):
         """Return the state of the sensor."""
-        if (self._mac_address in self._mate3.inverters and 
+        if (self._mac_address in self._mate3.inverters and
             self._device_id in self._mate3.inverters[self._mac_address]):
             value = self._mate3.inverters[self._mac_address][self._device_id].get(self._sensor_type)
-            _LOGGER.debug("Inverter sensor %s for device %d from MAC %s value: %s", 
+            _LOGGER.debug("Inverter sensor %s for device %d from MAC %s value: %s",
                          self._sensor_type, self._device_id, self._mac_address, value)
             return value
         return None
@@ -367,7 +366,7 @@ class OutbackInverterSensor(OutbackBaseSensor):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return (self._mac_address in self._mate3.inverters and 
+        return (self._mac_address in self._mate3.inverters and
                 self._device_id in self._mate3.inverters[self._mac_address] and
                 self._sensor_type in self._mate3.inverters[self._mac_address][self._device_id])
 
@@ -382,10 +381,10 @@ class OutbackChargeControllerSensor(OutbackBaseSensor):
     @property
     def native_value(self):
         """Return the state of the sensor."""
-        if (self._mac_address in self._mate3.charge_controllers and 
+        if (self._mac_address in self._mate3.charge_controllers and
             self._device_id in self._mate3.charge_controllers[self._mac_address]):
             value = self._mate3.charge_controllers[self._mac_address][self._device_id].get(self._sensor_type)
-            _LOGGER.debug("Charge controller sensor %s for device %d from MAC %s value: %s", 
+            _LOGGER.debug("Charge controller sensor %s for device %d from MAC %s value: %s",
                          self._sensor_type, self._device_id, self._mac_address, value)
             return value
         return None
@@ -422,7 +421,7 @@ class OutbackConfigDiagnosticSensor(CoordinatorEntity, SensorEntity):
 
     def __init__(
         self,
-        mate3: "OutbackMate3",
+        mate3: OutbackMate3,
         mac_address: str,
         device_kind: str,          # "system" | "inverter" | "charge_controller"
         device_id: int,            # 0 for system; 1-based for inverter/cc
@@ -495,7 +494,7 @@ class OutbackConfigDiagnosticSensor(CoordinatorEntity, SensorEntity):
         # Numeric sensors (unit set) should keep their native numeric type so
         # HA formats them correctly and units display. Anything else is
         # rendered as a string.
-        if self._attr_native_unit_of_measurement is not None and isinstance(v, (int, float)):
+        if self._attr_native_unit_of_measurement is not None and isinstance(v, int | float):
             return v
         return str(v)
 
@@ -947,8 +946,8 @@ _CC_CONFIG_SENSORS = [
 ]
 
 
-def _config_system_sensors(mate3: "OutbackMate3", mac: str) -> List[SensorEntity]:
-    out: List[SensorEntity] = []
+def _config_system_sensors(mate3: OutbackMate3, mac: str) -> list[SensorEntity]:
+    out: list[SensorEntity] = []
     for key, name, getter, unit, dev_class, is_fw in _SYSTEM_CONFIG_SENSORS:
         out.append(OutbackConfigDiagnosticSensor(
             mate3, mac, "system", 0, key, name,
@@ -958,8 +957,8 @@ def _config_system_sensors(mate3: "OutbackMate3", mac: str) -> List[SensorEntity
     return out
 
 
-def _config_inverter_sensors(mate3: "OutbackMate3", mac: str, index: int) -> List[SensorEntity]:
-    out: List[SensorEntity] = []
+def _config_inverter_sensors(mate3: OutbackMate3, mac: str, index: int) -> list[SensorEntity]:
+    out: list[SensorEntity] = []
     for key, name, getter, unit, dev_class, is_fw in _INVERTER_CONFIG_SENSORS:
         # getter takes (config, index)
         out.append(OutbackConfigDiagnosticSensor(
@@ -970,8 +969,8 @@ def _config_inverter_sensors(mate3: "OutbackMate3", mac: str, index: int) -> Lis
     return out
 
 
-def _config_charge_controller_sensors(mate3: "OutbackMate3", mac: str, index: int) -> List[SensorEntity]:
-    out: List[SensorEntity] = []
+def _config_charge_controller_sensors(mate3: OutbackMate3, mac: str, index: int) -> list[SensorEntity]:
+    out: list[SensorEntity] = []
     for key, name, getter, unit, dev_class, is_fw in _CC_CONFIG_SENSORS:
         out.append(OutbackConfigDiagnosticSensor(
             mate3, mac, "charge_controller", index, key, name,

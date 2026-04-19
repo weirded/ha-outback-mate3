@@ -147,11 +147,11 @@ class WSServer:
         while not stop.is_set():
             try:
                 events = await asyncio.wait_for(self._queue.get(), timeout=1.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             try:
                 await self.broadcast(events)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 _LOGGER.exception("WS broadcast failed")
 
     async def broadcast(self, events: list[Event]) -> None:
@@ -167,7 +167,7 @@ class WSServer:
             *(self._send_to(ws, messages) for ws in clients),
             return_exceptions=True,
         )
-        for ws, result in zip(clients, results):
+        for ws, result in zip(clients, results, strict=False):
             if isinstance(result, BaseException):
                 _LOGGER.debug("Dropping unresponsive WS client: %r", result)
                 self._clients.discard(ws)

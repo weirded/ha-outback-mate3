@@ -42,7 +42,7 @@ async def announce(ws_port: int) -> str | None:
             ) as resp:
                 resp.raise_for_status()
                 info = await resp.json()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             _LOGGER.warning("Couldn't fetch add-on info: %s", exc)
             return None
         hostname = info.get("data", {}).get("hostname")
@@ -60,7 +60,7 @@ async def announce(ws_port: int) -> str | None:
             ) as resp:
                 resp.raise_for_status()
                 body = await resp.json()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             _LOGGER.warning("Failed to announce discovery: %s", exc)
             return None
 
@@ -87,5 +87,5 @@ async def withdraw(uuid: str | None) -> None:
                 headers={"Authorization": f"Bearer {token}"},
             )
             _LOGGER.info("Withdrew discovery uuid=%s", uuid)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             _LOGGER.warning("Failed to withdraw discovery uuid=%s: %s", uuid, exc)

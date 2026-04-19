@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 from aiohttp.test_utils import TestClient, TestServer
-
 from src.state import DeviceRegistry
 from src.udp_listener import start_listener
 from src.ws_server import WSServer

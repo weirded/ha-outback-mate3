@@ -11,11 +11,9 @@ import asyncio
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestServer
-
+from custom_components.outback_mate3 import CONF_URL, DOMAIN
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
-
-from custom_components.outback_mate3 import CONF_URL, DOMAIN
 
 # PHACC disables sockets by default so accidental internet hits fail loudly.
 # These tests rely on a locally-bound aiohttp server, so reenable.

@@ -6,7 +6,6 @@ from typing import Any
 
 import aiohttp
 import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.service_info.hassio import HassioServiceInfo
@@ -30,11 +29,11 @@ async def _probe_ws_url(url: str, timeout_s: float = 5.0) -> str | None:
                     if payload.get("type") != "snapshot":
                         return "bad_handshake"
                     return None
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return "timeout"
     except aiohttp.ClientError:
         return "cannot_connect"
-    except Exception:  # noqa: BLE001
+    except Exception:
         return "unknown"
 
 

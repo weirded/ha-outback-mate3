@@ -12,6 +12,7 @@ source on each tick.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 
 from src.mate3_http import fetch_config
@@ -37,10 +38,8 @@ async def run(
 
     # Wait for the first UDP datagram so we know at least one MATE3 IP.
     while not registry.known_sources() and not stop.is_set():
-        try:
+        with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(stop.wait(), timeout=5)
-        except asyncio.TimeoutError:
-            pass
     if stop.is_set():
         return
 
@@ -58,7 +57,6 @@ async def run(
             else:
                 _LOGGER.debug("Config for %s (%s) unchanged", mac, host)
 
-        try:
+        with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(stop.wait(), timeout=interval_s)
-        except asyncio.TimeoutError:
-            pass  # interval elapsed, loop for another poll
+            # interval elapsed, loop for another poll

@@ -219,6 +219,62 @@ _Each completed item is annotated with `(vX.Y.Z-devN)` — the add-on / integrat
 - [x] B19 - `binary_sensor.mate3_system_receiving_data` ("Receiving Data from MATE3"). _(2.0.0-dev14; new `custom_components/outback_mate3/binary_sensor.py` platform — `BinarySensorDeviceClass.CONNECTIVITY`, on the Outback System device. `OutbackMate3.last_udp_at` monotonic timestamp set in `_apply_device` for snapshot/device_added/state_updated (NOT config_snapshot — those come from HTTP, not UDP). Sensor's `is_on` returns True iff `last_udp_at` is not None and less than 300 s old. Two refresh paths: the coordinator listener catches off→on instantly, and a 30-second `async_track_time_interval` catches on→off when the stream goes silent. Two new tests in `tests/test_integration.py` cover both the flip-on-snapshot and the stays-off-when-only-config-snapshot cases.)_
 - [ ] B20 Add MyPy to the entire codebase and make sure it passes.
 
+## Phase 16 — Gold readiness, Wave 1 (foundation)
+
+_Low-risk additive changes that unblock later gold work. Target: Bronze on the HA Integration Quality Scale + community-file hygiene._
+
+### Integration
+
+- [x] **16.1** Declare `quality_scale: "bronze"` in `custom_components/outback_mate3/manifest.json`. _(2.0.0-dev1)_
+- [x] **16.2** Add empty `custom_components/outback_mate3/py.typed` marker so downstream type-checkers honor our annotations. _(2.0.0-dev1)_
+- [ ] **16.3** Create `custom_components/outback_mate3/const.py` and move scattered literals (domain, default WS URL, backoff, heartbeat, entity-timeout constants) into it. No behavior change.
+- [ ] **16.4** Switch the `solar_production_energy` sensor (and any other energy totalizers) from `SensorStateClass.MEASUREMENT` to `SensorStateClass.TOTAL_INCREASING` so the Energy Dashboard treats them as totalizers.
+- [ ] **16.5** Set `entity_category = EntityCategory.DIAGNOSTIC` on every config-derived 400+ sensor. (The `entity_registry_enabled_default=False` flip landed in 15.14 — this is the category flag on top.)
+
+### Add-on
+
+- [x] **16.6** Add `outback_mate3_addon/apparmor.txt` — minimal permissive profile (network in/out, `/app` rx, `/homeassistant` rw, deny everything else outside the container rootfs). _(2.0.0-dev1)_
+- [x] **16.7** Add `HEALTHCHECK` to `outback_mate3_addon/Dockerfile` that probes TCP `28099` (the WS port). _(2.0.0-dev1)_
+- [x] **16.8** Add `io.hass.*` OCI labels to `outback_mate3_addon/Dockerfile` (`io.hass.version`, `io.hass.type=addon`, `io.hass.arch`, `maintainer`). _(2.0.0-dev1)_
+- [x] **16.9** Pin `aiohttp` to an exact version in `outback_mate3_addon/requirements.txt` — `aiohttp==3.11.11`. _(2.0.0-dev1)_
+
+### Repo infrastructure
+
+- [x] **16.10** Add `CODEOWNERS` at repo root (single entry for `@weirded`). _(2.0.0-dev1)_
+- [x] **16.11** Add `SECURITY.md` — reporting instructions + supported versions. _(2.0.0-dev1)_
+- [x] **16.12** Add `.github/FUNDING.yml` — Buy Me a Coffee as first-class GitHub funding link. _(2.0.0-dev1)_
+- [x] **16.13** Add `.github/ISSUE_TEMPLATE/bug.yaml` and `.github/ISSUE_TEMPLATE/feature.yaml` (+ `config.yml` to direct questions to the HA forum). _(2.0.0-dev1)_
+- [x] **16.14** Add `.github/PULL_REQUEST_TEMPLATE.md`. _(2.0.0-dev1)_
+- [x] **16.15** Add `pyproject.toml` at repo root with `[tool.ruff]` + `[tool.pytest.ini_options]` config (migrated from `pytest.ini`, which was deleted). _(2.0.0-dev1)_
+- [x] **16.16** Add `.github/workflows/lint.yaml` — runs `ruff check` on push / PR. Rule-set selects E/W/F/I/UP/B/SIM/ASYNC/RUF with pragmatic ignores; the ruff auto-fixes landed across 19 files as part of enabling this. Format-check is intentionally off for now (Phase 17). _(2.0.0-dev1)_
+- [x] **16.17** Add `.github/workflows/test.yaml` — runs pytest for `tests/` (integration) and `outback_mate3_addon/tests/` (add-on). Uses new `requirements_test.txt`. _(2.0.0-dev1)_
+
+## Phase 17 — Gold readiness, Wave 2 (gold criteria)
+
+_Bigger-surface changes that move the integration from Bronze toward Gold._
+
+- [ ] **17.1** Create `custom_components/outback_mate3/diagnostics.py` — `async_get_config_entry_diagnostics` returning entry data + coordinator snapshot with sensitive-field redaction.
+- [ ] **17.2** Create `custom_components/outback_mate3/strings.json` with translatable names for entity classes + exceptions; regenerate `translations/en.json` from it.
+- [ ] **17.3** Add `async_step_reconfigure(self, user_input)` to `custom_components/outback_mate3/config_flow.py` so users can change the WS URL post-setup without deleting/recreating the entry.
+- [ ] **17.4** Split `custom_components/outback_mate3/sensor.py` into `sensor.py` (live UDP sensors) + `sensor_config.py` (400+ config-derived diagnostic sensors) — or drive config-derived entities from a declarative table.
+- [ ] **17.5** Parameterize `DataUpdateCoordinator[None]` and migrate from `hass.data[DOMAIN][entry_id]` to `ConfigEntry.runtime_data`.
+- [ ] **17.6** Replace broad `except Exception` with `ConfigEntryNotReady` + specific exceptions for transient WS failures in `__init__.py`.
+- [ ] **17.7** Expand `tests/test_integration.py`: config-flow paths (user, hassio, reconfigure, error handling), malformed payload, backoff sequence, stale-device cleanup. Target ≥ 80 % line coverage.
+- [ ] **17.8** Add `outback_mate3_addon/logo.png` (512×512 PNG).
+- [ ] **17.9** Add `.github/workflows/builder.yaml` — multi-arch add-on build via `home-assistant/builder` action (all 5 archs).
+- [ ] **17.10** Add `.github/dependabot.yml` — GitHub Actions + pip ecosystems.
+- [ ] **17.11** Add `.pre-commit-config.yaml` + `.editorconfig`.
+- [ ] **17.12** Flip `quality_scale` from `"bronze"` to `"silver"` once 17.1–17.7 land; revisit `"gold"` after running through the HA checklist entry-by-entry.
+
+## Phase 18 — Platinum-adjacent polish (Wave 3)
+
+- [ ] **18.1** Create `custom_components/outback_mate3/repairs.py` — repairs flow for add-on offline / version drift.
+- [ ] **18.2** Add snapshot tests via `syrupy` for entity state.
+- [ ] **18.3** Add `async_step_reauth(self, entry_data)` to config_flow (no-op until auth is added, but wired for forward compat).
+- [ ] **18.4** Finish B20 — MyPy strict across both components, wire into `.github/workflows/lint.yaml`.
+- [ ] **18.5** Build user-facing `docs/` (architecture, troubleshooting, FAQ) beyond the README.
+- [ ] **18.6** Add `.github/workflows/release.yaml` — tag-triggered release that validates version bump across add-on + integration.
+
 ## Post-2.0 follow-ups (from PR #6 review)
 
 Copilot reviewed the 2.0 PR and flagged 10 items. All ten were addressed as part of cutting 2.0.0 — two user-facing doc bugs inline with the version bump, the eight robustness / cleanup items in a focused follow-up pass.

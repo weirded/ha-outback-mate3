@@ -4,7 +4,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from src.mate3_http import parse_config
 
 FIXTURE = Path(__file__).parent / "fixtures" / "config.xml"
