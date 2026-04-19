@@ -19,8 +19,9 @@ from homeassistant.const import (
     UnitOfPower,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import MateConfigEntry, OutbackMate3
@@ -43,7 +44,7 @@ async def async_setup_entry(
 
 def create_device_entities(mate3: OutbackMate3, mac_address: str) -> list[SensorEntity]:
     """Create entities for all devices."""
-    entities = []
+    entities: list[SensorEntity] = []
 
     # Create system sensors first
     _LOGGER.debug("Creating system sensors for MAC %s", mac_address)
@@ -202,7 +203,7 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> list[Sensor
     return entities
 
 
-class OutbackBaseSensor(CoordinatorEntity, SensorEntity):
+class OutbackBaseSensor(CoordinatorEntity[OutbackMate3], SensorEntity):
     """Base class for Outback sensors."""
 
     def __init__(
@@ -330,7 +331,7 @@ class OutbackSystemSensor(OutbackBaseSensor):
                 if 'battery_voltage' in cc:
                     voltages.append(cc['battery_voltage'])
             if voltages:
-                return sum(voltages) / len(voltages)
+                return float(sum(voltages) / len(voltages))
         return None
 
     def _get_device_type(self) -> str:
@@ -346,7 +347,7 @@ class OutbackInverterSensor(OutbackBaseSensor):
         return "inverter"
 
     @property
-    def native_value(self):
+    def native_value(self) -> StateType:
         """Return the state of the sensor."""
         if (self._mac_address in self._mate3.inverters and
             self._device_id in self._mate3.inverters[self._mac_address]):
@@ -372,7 +373,7 @@ class OutbackChargeControllerSensor(OutbackBaseSensor):
         return "charge_controller"
 
     @property
-    def native_value(self):
+    def native_value(self) -> StateType:
         """Return the state of the sensor."""
         if (self._mac_address in self._mate3.charge_controllers and
             self._device_id in self._mate3.charge_controllers[self._mac_address]):

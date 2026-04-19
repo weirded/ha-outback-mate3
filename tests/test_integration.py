@@ -9,6 +9,7 @@ migrations, malformed payloads, and diagnostics.
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -29,7 +30,7 @@ pytestmark = pytest.mark.enable_socket
 
 MAC = "TESTMAC00001"
 
-SNAPSHOT_PAYLOAD = {
+SNAPSHOT_PAYLOAD: dict[str, Any] = {
     "type": "snapshot",
     "devices": [
         {
@@ -68,7 +69,7 @@ SNAPSHOT_PAYLOAD = {
     ],
 }
 
-CONFIG_PAYLOAD = {
+CONFIG_PAYLOAD: dict[str, Any] = {
     "type": "config_snapshot",
     "mac": MAC,
     "config": {
@@ -90,6 +91,7 @@ class _FakeAddOn:
         self.messages: list[dict] = []
         self.hello_version: str | None = None
         self.connected: list[web.WebSocketResponse] = []
+        self.url: str = ""  # set by the `fake_addon` fixture after the server binds
         self.app = web.Application()
         self.app.router.add_get("/ws", self._handle)
 
@@ -638,7 +640,7 @@ async def test_remove_stale_device_allowed(
     # Construct a synthetic DeviceEntry identifier for a MAC we've never seen.
     stale_device = dr.DeviceEntry(
         id="stale_id",
-        identifiers={(DOMAIN, "inverter_GHOSTMAC99999_7")},
+        identifiers={(DOMAIN, "inverter_GHOSTMAC99999_7")},  # type: ignore[arg-type]
         config_entries={entry.entry_id},
     )
     assert await async_remove_config_entry_device(hass, entry, stale_device) is True
@@ -660,7 +662,7 @@ async def test_remove_live_device_blocked(
 
     live_device = dr.DeviceEntry(
         id="live_id",
-        identifiers={(DOMAIN, f"inverter_{MAC}_1")},
+        identifiers={(DOMAIN, f"inverter_{MAC}_1")},  # type: ignore[arg-type]
         config_entries={entry.entry_id},
     )
     assert await async_remove_config_entry_device(hass, entry, live_device) is False

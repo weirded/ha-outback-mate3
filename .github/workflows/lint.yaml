@@ -28,3 +28,30 @@ jobs:
       # `ruff format --check` is intentionally not enforced yet — 19 files
       # want whitespace-only reformats as of 2.0.0. Turning this on will be
       # a single sweep commit as part of Phase 17 (17.11 pre-commit setup).
+
+  mypy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install mypy + runtime deps needed for type-checking
+        # homeassistant pulls in the stubs mypy needs to resolve the
+        # integration's HA imports; aiohttp is the add-on's only runtime dep
+        # (pin matches outback_mate3_addon/requirements.txt).
+        run: |
+          pip install mypy==1.19.1
+          pip install homeassistant aiohttp==3.11.11 voluptuous
+
+      # Two invocations because `tests/` and `outback_mate3_addon/tests/`
+      # both expose a module named `tests.conftest`, which trips mypy's
+      # single-pass module resolver. Two passes keep each tree isolated.
+      - name: MyPy — integration + its tests
+        run: mypy custom_components/outback_mate3 tests
+
+      - name: MyPy — add-on + its tests
+        run: mypy outback_mate3_addon/src outback_mate3_addon/tests

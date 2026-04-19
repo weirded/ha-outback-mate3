@@ -19,7 +19,7 @@ from homeassistant.const import (
     UnitOfElectricPotential,
     UnitOfPower,
 )
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import OutbackMate3
@@ -50,7 +50,7 @@ def create_config_entities(mate3: OutbackMate3, mac_address: str) -> list[Sensor
     return entities
 
 
-class OutbackConfigDiagnosticSensor(CoordinatorEntity, SensorEntity):
+class OutbackConfigDiagnosticSensor(CoordinatorEntity[OutbackMate3], SensorEntity):
     """A diagnostic sensor read from OutbackMate3.config_by_mac.
 
     Covers firmware versions, nameplate, setpoints, AGS / Grid_Use /

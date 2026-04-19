@@ -7,7 +7,7 @@ from typing import Any
 import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.data_entry_flow import FlowResult
+from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 
 from .const import CONF_URL, DEFAULT_URL, DOMAIN
@@ -48,7 +48,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle the initial step."""
         errors: dict[str, str] = {}
 
@@ -76,7 +76,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_hassio(
         self, discovery_info: HassioServiceInfo
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle auto-discovery from the Outback MATE3 Supervisor add-on."""
         host = discovery_info.config["host"]
         port = discovery_info.config["port"]
@@ -96,7 +96,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_hassio_confirm(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Ask the user to confirm the discovered add-on before adding it."""
         assert self._discovered_url is not None
         if user_input is not None:
@@ -114,7 +114,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Let users update the WS URL post-setup without deleting the entry.
 
         Reaches here when the user clicks "Reconfigure" on the entry card —
