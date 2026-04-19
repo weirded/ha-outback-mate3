@@ -91,7 +91,11 @@ class OutbackConfigDiagnosticSensor(CoordinatorEntity[OutbackMate3], SensorEntit
         self._is_firmware = is_firmware
 
         mac_id = mac_address.replace(".", "_")
-        self._attr_name = name
+        # Gold-tier entity-translations: name comes from
+        # `entity.sensor.<key>.name` in strings.json. `name` is kept in the
+        # table literal as the readable English source for those entries,
+        # but isn't consulted at runtime.
+        self._attr_translation_key = key
         self._attr_native_unit_of_measurement = unit
         self._attr_device_class = device_class
 

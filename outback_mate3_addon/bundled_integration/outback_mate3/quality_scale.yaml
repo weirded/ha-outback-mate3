@@ -1,0 +1,72 @@
+# Home Assistant integration quality-scale checklist.
+#
+# Scale: https://developers.home-assistant.io/docs/core/integration-quality-scale/
+#
+# Current declared level in manifest.json: "gold".
+# Every bronze / silver / gold rule is either done or (rarely) exempt.
+#
+# Platinum rules are deferred; `strict-typing` especially would trade the
+# pragmatic mypy config for a heavier "strict = true" burden with limited
+# payoff for a custom integration.
+
+rules:
+  # --- Bronze --------------------------------------------------------------
+  action-setup: exempt              # no domain-level actions
+  appropriate-polling: done         # 30s coordinator interval + push via WS
+  brands: exempt                    # not in home-assistant/brands (custom)
+  common-modules: done              # const.py, shared helpers
+  config-flow: done
+  config-flow-test-coverage: done   # user, hassio, reconfigure, migration covered
+  dependency-transparency: done     # no `requirements` block, aiohttp is core
+  docs-actions: exempt              # no actions
+  docs-high-level-description: done # README "What it gives you"
+  docs-installation-instructions: done
+  docs-removal-instructions: done   # README 1.x upgrade note
+  entity-event-setup: done          # CoordinatorEntity handles listeners
+  entity-unique-id: done
+  has-entity-name: done             # `_attr_has_entity_name = True`
+  runtime-data: done                # ConfigEntry[OutbackMate3]
+  test-before-configure: done       # config_flow `_probe_ws`
+  test-before-setup: done           # `ConfigEntryNotReady` on transient fail
+  unique-config-entry: done         # URL-based duplicate guard
+
+  # --- Silver --------------------------------------------------------------
+  action-exceptions: exempt         # no actions
+  config-entry-unloading: done      # async_unload_entry closes WS
+  docs-configuration-parameters: done  # README + add-on translations
+  docs-installation-parameters: done
+  entity-unavailable: done          # coordinator `last_update_success`
+  integration-owner: done           # codeowners = ["@weirded"]
+  log-when-unavailable: done        # WS connect/disconnect at INFO
+  parallel-updates: done            # `PARALLEL_UPDATES = 0` (push model)
+  reauthentication-flow: exempt     # no authentication; see TASKS.md #18.3
+  test-coverage: done               # 27 tests; config-flow paths + edges covered
+
+  # --- Gold ----------------------------------------------------------------
+  devices: done                     # system / inverter / charge_controller
+  diagnostics: done                 # diagnostics.py with MAC/IP redaction
+  discovery: done                   # hassio discovery
+  discovery-update-info: done       # hassio rediscovery updates URL in place
+  docs-data-update: done            # README + docs/architecture.md
+  docs-examples: done               # README Energy Dashboard section
+  docs-known-limitations: done      # docs/faq.md (multi-MATE3, FNDC, container)
+  docs-supported-devices: done      # README device list
+  docs-supported-functions: done    # README sensor catalogue
+  docs-troubleshooting: done        # docs/troubleshooting.md (symptom-driven)
+  docs-use-cases: done              # README Energy Dashboard; docs/faq.md
+  dynamic-devices: done             # async_setup_devices on UDP discovery
+  entity-category: done             # EntityCategory.DIAGNOSTIC on 400+ config sensors
+  entity-device-class: done         # Power/Voltage/Current/Energy classes set
+  entity-disabled-by-default: done  # config sensors disabled by default
+  entity-translations: done         # 262 keys in strings.json entity.sensor.*
+                                    # (live UDP + CONFIG.xml-derived diagnostics)
+  exception-translations: done      # `strings.json -> exceptions.addon_unreachable`
+  icon-translations: exempt         # no non-default icons in use
+  reconfiguration-flow: done        # async_step_reconfigure
+  repair-issues: done               # addon_offline + version_drift
+  stale-devices: done               # async_remove_config_entry_device + auto-prune
+
+  # --- Platinum ------------------------------------------------------------
+  async-dependency: done            # aiohttp (core) is async-native
+  inject-websession: todo           # add-on WS client opens its own session
+  strict-typing: todo               # mypy is pragmatic, not `strict = true`

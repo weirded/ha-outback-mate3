@@ -226,9 +226,13 @@ class OutbackBaseSensor(CoordinatorEntity[OutbackMate3], SensorEntity):
         # Create entity_id friendly MAC (replace dots with underscores)
         mac_id = mac_address.replace('.', '_')
 
-        # Set entity name and ID
+        # Gold-tier entity-translations: display name resolves from
+        # `entity.sensor.<sensor_type>.name` in strings.json, not a hardcoded
+        # English string. `name` is no longer read at runtime; it lives on at
+        # call sites as a readable label next to each sensor_type and is the
+        # canonical source for strings.json + translations/en.json.
         self._attr_has_entity_name = True
-        self._attr_name = name
+        self._attr_translation_key = sensor_type
 
         device_type = self._get_device_type()
         if device_type == "system":

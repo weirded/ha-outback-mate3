@@ -1,57 +1,845 @@
 {
-    "config": {
-        "flow_title": "{name}",
-        "step": {
-            "user": {
-                "title": "Outback MATE3 Setup",
-                "description": "Enter the WebSocket URL of the companion Outback MATE3 add-on. The default value works when the add-on is installed on the same Home Assistant instance.",
-                "data": {
-                    "url": "Add-on WebSocket URL"
-                }
-            },
-            "hassio_confirm": {
-                "title": "Outback MATE3 discovered",
-                "description": "The Outback MATE3 add-on is running. Add it to Home Assistant so it can stream telemetry to this integration via {url}?"
-            },
-            "reconfigure": {
-                "title": "Outback MATE3 — reconfigure",
-                "description": "Point this entry at a different add-on WebSocket endpoint. Useful if the add-on slug, hostname, or port has changed.",
-                "data": {
-                    "url": "Add-on WebSocket URL"
-                }
-            }
-        },
-        "error": {
-            "cannot_connect": "Could not connect to the add-on.",
-            "timeout": "Connection to the add-on timed out.",
-            "bad_handshake": "Connected, but did not receive a valid snapshot message.",
-            "unknown": "Unexpected error connecting to the add-on."
-        },
-        "abort": {
-            "already_configured": "This add-on URL is already configured.",
-            "reconfigure_successful": "Re-pointed this entry at the new add-on URL."
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Outback MATE3 Setup",
+        "description": "Enter the WebSocket URL of the companion Outback MATE3 add-on. The default value works when the add-on is installed on the same Home Assistant instance.",
+        "data": {
+          "url": "Add-on WebSocket URL"
         }
+      },
+      "hassio_confirm": {
+        "title": "Outback MATE3 discovered",
+        "description": "The Outback MATE3 add-on is running. Add it to Home Assistant so it can stream telemetry to this integration via {url}?"
+      },
+      "reconfigure": {
+        "title": "Outback MATE3 — reconfigure",
+        "description": "Point this entry at a different add-on WebSocket endpoint. Useful if the add-on slug, hostname, or port has changed.",
+        "data": {
+          "url": "Add-on WebSocket URL"
+        }
+      }
     },
-    "exceptions": {
-        "addon_unreachable": {
-            "message": "Could not connect to the Outback MATE3 add-on at {url}. Is the add-on running?"
-        }
+    "error": {
+      "cannot_connect": "Could not connect to the add-on.",
+      "timeout": "Connection to the add-on timed out.",
+      "bad_handshake": "Connected, but did not receive a valid snapshot message.",
+      "unknown": "Unexpected error connecting to the add-on."
     },
-    "entity": {
-        "binary_sensor": {
-            "mate3_connected": {
-                "name": "MATE3 Connected"
-            }
-        }
-    },
-    "issues": {
-        "addon_offline": {
-            "title": "Outback MATE3 add-on is not running",
-            "description": "The integration can't reach the companion add-on at {url}. Start or restart the 'Outback MATE3' add-on in Settings \u2192 Add-ons \u2192 Outback MATE3."
-        },
-        "version_drift": {
-            "title": "Integration and add-on versions don't match",
-            "description": "The Outback MATE3 integration is at version {integration_version} but the add-on is at {addon_version}. They ship together and should be kept on the same version; update whichever is behind."
-        }
+    "abort": {
+      "already_configured": "This add-on URL is already configured.",
+      "reconfigure_successful": "Re-pointed this entry at the new add-on URL."
     }
+  },
+  "exceptions": {
+    "addon_unreachable": {
+      "message": "Could not connect to the Outback MATE3 add-on at {url}. Is the add-on running?"
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "mate3_connected": {
+        "name": "MATE3 Connected"
+      }
+    },
+    "sensor": {
+      "ac1_connect_delay": {
+        "name": "AC1 Connect Delay"
+      },
+      "ac1_input_size_amps": {
+        "name": "AC1 Input Size"
+      },
+      "ac1_input_type": {
+        "name": "AC1 Input Type"
+      },
+      "ac1_max_voltage": {
+        "name": "AC1 Max Voltage"
+      },
+      "ac1_min_voltage": {
+        "name": "AC1 Min Voltage"
+      },
+      "ac1_transfer_delay": {
+        "name": "AC1 Transfer Delay"
+      },
+      "ac2_connect_delay": {
+        "name": "AC2 Connect Delay"
+      },
+      "ac2_input_size_amps": {
+        "name": "AC2 Input Size"
+      },
+      "ac2_input_type": {
+        "name": "AC2 Input Type"
+      },
+      "ac2_max_voltage": {
+        "name": "AC2 Max Voltage"
+      },
+      "ac2_min_voltage": {
+        "name": "AC2 Min Voltage"
+      },
+      "ac2_transfer_delay": {
+        "name": "AC2 Transfer Delay"
+      },
+      "ac_coupled_control_aux_output": {
+        "name": "AC Coupled AUX Output"
+      },
+      "ac_coupled_control_mode": {
+        "name": "AC Coupled Control"
+      },
+      "ac_coupled_mode": {
+        "name": "AC Coupled Mode"
+      },
+      "ac_input_priority": {
+        "name": "AC Input Priority"
+      },
+      "ac_mode": {
+        "name": "AC Mode"
+      },
+      "ac_output_voltage": {
+        "name": "AC Output Voltage Setpoint"
+      },
+      "ags_ac_input_reconnect_delay": {
+        "name": "AGS AC Input Reconnect Delay"
+      },
+      "ags_control": {
+        "name": "AGS Control"
+      },
+      "ags_cooldown_time": {
+        "name": "AGS Cooldown Time"
+      },
+      "ags_dc_generator_absorb_time": {
+        "name": "AGS DC Generator Absorb Time"
+      },
+      "ags_dc_generator_absorb_voltage": {
+        "name": "AGS DC Generator Absorb Voltage"
+      },
+      "ags_fault_time": {
+        "name": "AGS Fault Time"
+      },
+      "ags_fndc_full_charge_interval": {
+        "name": "AGS FNDC Full Charge Interval"
+      },
+      "ags_fndc_full_charge_mode": {
+        "name": "AGS FNDC Full Charge"
+      },
+      "ags_generator_exercise_day": {
+        "name": "AGS Generator Exercise Day"
+      },
+      "ags_generator_exercise_interval": {
+        "name": "AGS Generator Exercise Interval"
+      },
+      "ags_generator_exercise_mode": {
+        "name": "AGS Generator Exercise"
+      },
+      "ags_generator_exercise_period": {
+        "name": "AGS Generator Exercise Period"
+      },
+      "ags_generator_exercise_sell_during": {
+        "name": "AGS Sell During Exercise"
+      },
+      "ags_generator_exercise_start_hour": {
+        "name": "AGS Generator Exercise Start Hour"
+      },
+      "ags_generator_exercise_start_min": {
+        "name": "AGS Generator Exercise Start Min"
+      },
+      "ags_generator_type": {
+        "name": "AGS Generator Type"
+      },
+      "ags_load_start_mode": {
+        "name": "AGS Load Start"
+      },
+      "ags_load_start_start_delay": {
+        "name": "AGS Load Start Start Delay"
+      },
+      "ags_load_start_start_load_kw": {
+        "name": "AGS Load Start Start Load"
+      },
+      "ags_load_start_stop_delay": {
+        "name": "AGS Load Start Stop Delay"
+      },
+      "ags_load_start_stop_load_kw": {
+        "name": "AGS Load Start Stop Load"
+      },
+      "ags_mode": {
+        "name": "AGS"
+      },
+      "ags_must_run_mode": {
+        "name": "AGS Must Run"
+      },
+      "ags_must_run_weekday_start_hour": {
+        "name": "AGS Must Run Weekday Start Hour"
+      },
+      "ags_must_run_weekday_start_min": {
+        "name": "AGS Must Run Weekday Start Min"
+      },
+      "ags_must_run_weekday_stop_hour": {
+        "name": "AGS Must Run Weekday Stop Hour"
+      },
+      "ags_must_run_weekday_stop_min": {
+        "name": "AGS Must Run Weekday Stop Min"
+      },
+      "ags_must_run_weekend_start_hour": {
+        "name": "AGS Must Run Weekend Start Hour"
+      },
+      "ags_must_run_weekend_start_min": {
+        "name": "AGS Must Run Weekend Start Min"
+      },
+      "ags_must_run_weekend_stop_hour": {
+        "name": "AGS Must Run Weekend Stop Hour"
+      },
+      "ags_must_run_weekend_stop_min": {
+        "name": "AGS Must Run Weekend Stop Min"
+      },
+      "ags_port": {
+        "name": "AGS Port"
+      },
+      "ags_quiet_time_mode": {
+        "name": "AGS Quiet Time"
+      },
+      "ags_quiet_time_weekday_start_hour": {
+        "name": "AGS Quiet Time Weekday Start Hour"
+      },
+      "ags_quiet_time_weekday_start_min": {
+        "name": "AGS Quiet Time Weekday Start Min"
+      },
+      "ags_quiet_time_weekday_stop_hour": {
+        "name": "AGS Quiet Time Weekday Stop Hour"
+      },
+      "ags_quiet_time_weekday_stop_min": {
+        "name": "AGS Quiet Time Weekday Stop Min"
+      },
+      "ags_quiet_time_weekend_start_hour": {
+        "name": "AGS Quiet Time Weekend Start Hour"
+      },
+      "ags_quiet_time_weekend_start_min": {
+        "name": "AGS Quiet Time Weekend Start Min"
+      },
+      "ags_quiet_time_weekend_stop_hour": {
+        "name": "AGS Quiet Time Weekend Stop Hour"
+      },
+      "ags_quiet_time_weekend_stop_min": {
+        "name": "AGS Quiet Time Weekend Stop Min"
+      },
+      "ags_soc_start_mode": {
+        "name": "AGS SOC Start"
+      },
+      "ags_soc_start_start_percentage": {
+        "name": "AGS SOC Start %"
+      },
+      "ags_soc_start_stop_percentage": {
+        "name": "AGS SOC Stop %"
+      },
+      "ags_twenty_four_hour_voltage_start_mode": {
+        "name": "AGS 24-Hour Voltage Start"
+      },
+      "ags_twenty_four_hour_voltage_start_voltage": {
+        "name": "AGS 24-Hour Voltage"
+      },
+      "ags_two_hour_voltage_start_mode": {
+        "name": "AGS 2-Hour Voltage Start"
+      },
+      "ags_two_hour_voltage_start_voltage": {
+        "name": "AGS 2-Hour Voltage"
+      },
+      "ags_two_min_voltage_start_mode": {
+        "name": "AGS 2-Min Voltage Start"
+      },
+      "ags_two_min_voltage_start_voltage": {
+        "name": "AGS 2-Min Voltage"
+      },
+      "ags_warmup_time": {
+        "name": "AGS Warmup Time"
+      },
+      "aux_diversion_delay": {
+        "name": "AUX Diversion Delay"
+      },
+      "aux_diversion_hold_time": {
+        "name": "AUX Diversion Hold Time"
+      },
+      "aux_diversion_hysteresis_voltage": {
+        "name": "AUX Diversion Hysteresis Voltage"
+      },
+      "aux_diversion_relative_voltage": {
+        "name": "AUX Diversion Relative Voltage"
+      },
+      "aux_error_low_batt_voltage": {
+        "name": "AUX Error Low Battery Voltage"
+      },
+      "aux_low_batt_disconnect_delay": {
+        "name": "AUX Low-Batt Disconnect Delay"
+      },
+      "aux_low_batt_disconnect_voltage": {
+        "name": "AUX Low-Batt Disconnect Voltage"
+      },
+      "aux_low_batt_reconnect_voltage": {
+        "name": "AUX Low-Batt Reconnect Voltage"
+      },
+      "aux_mode": {
+        "name": "AUX Mode"
+      },
+      "aux_nite_light_off_hyst_time": {
+        "name": "AUX Nite Light Off Hyst Time"
+      },
+      "aux_nite_light_on_hours": {
+        "name": "AUX Nite Light On Hours"
+      },
+      "aux_nite_light_on_hyst_time": {
+        "name": "AUX Nite Light On Hyst Time"
+      },
+      "aux_nite_light_threshold_voltage": {
+        "name": "AUX Nite Light Threshold Voltage"
+      },
+      "aux_operation_mode": {
+        "name": "AUX Operation Mode"
+      },
+      "aux_output_high_setpoint_ac_amps": {
+        "name": "AUX High Setpoint AC Amps"
+      },
+      "aux_output_high_setpoint_voltage": {
+        "name": "AUX High Setpoint Voltage"
+      },
+      "aux_output_low_setpoint_ac_amps": {
+        "name": "AUX Low Setpoint AC Amps"
+      },
+      "aux_output_low_setpoint_voltage": {
+        "name": "AUX Low Setpoint Voltage"
+      },
+      "aux_output_mode": {
+        "name": "AUX Output Mode"
+      },
+      "aux_output_off_delay": {
+        "name": "AUX Off Delay"
+      },
+      "aux_output_on_delay": {
+        "name": "AUX On Delay"
+      },
+      "aux_output_operation_mode": {
+        "name": "AUX Operation Mode"
+      },
+      "aux_polarity": {
+        "name": "AUX Polarity"
+      },
+      "aux_pv_trigger_hold_time": {
+        "name": "AUX PV Trigger Hold Time"
+      },
+      "aux_pv_trigger_voltage": {
+        "name": "AUX PV Trigger Voltage"
+      },
+      "aux_vent_fan_voltage": {
+        "name": "AUX Vent Fan Voltage"
+      },
+      "battery_ah_capacity": {
+        "name": "Battery Ah Capacity"
+      },
+      "battery_voltage": {
+        "name": "Battery Voltage"
+      },
+      "cc_float_coordination_mode": {
+        "name": "CC Float Coordination"
+      },
+      "charge_mode": {
+        "name": "Charge Mode"
+      },
+      "charger_absorb_end_amps": {
+        "name": "Absorb End Amps"
+      },
+      "charger_absorb_time": {
+        "name": "Absorb Time"
+      },
+      "charger_absorb_voltage": {
+        "name": "Absorb Voltage"
+      },
+      "charger_current": {
+        "name": "Total Charger Current"
+      },
+      "charger_eq_auto_interval_days": {
+        "name": "EQ Auto Interval"
+      },
+      "charger_eq_time": {
+        "name": "EQ Time"
+      },
+      "charger_eq_voltage": {
+        "name": "EQ Voltage"
+      },
+      "charger_float_time": {
+        "name": "Charger Float Time"
+      },
+      "charger_float_voltage": {
+        "name": "Float Voltage"
+      },
+      "charger_mode": {
+        "name": "Charger Mode"
+      },
+      "charger_output_limit": {
+        "name": "Output Current Limit"
+      },
+      "charger_power": {
+        "name": "Total Charger Power"
+      },
+      "charger_re_bulk_voltage": {
+        "name": "Charger Re-Bulk Voltage"
+      },
+      "charger_re_float_voltage": {
+        "name": "Charger Re-Float Voltage"
+      },
+      "charger_rebulk_voltage": {
+        "name": "Re-Bulk Voltage"
+      },
+      "configured_inverter_mode": {
+        "name": "Configured Inverter Mode"
+      },
+      "configured_type": {
+        "name": "Configured Type"
+      },
+      "data_stream_mode": {
+        "name": "Data Stream Mode"
+      },
+      "data_stream_target": {
+        "name": "Data Stream Target"
+      },
+      "firmware": {
+        "name": "Firmware"
+      },
+      "fndc_charge_term_mode": {
+        "name": "FNDC Charge Term Control"
+      },
+      "fndc_sell_mode": {
+        "name": "FNDC Sell Control"
+      },
+      "from_battery": {
+        "name": "From Battery"
+      },
+      "from_grid": {
+        "name": "From Grid"
+      },
+      "generator_kw": {
+        "name": "Generator Rating"
+      },
+      "global_cc_control_mode": {
+        "name": "Global CC Output Control"
+      },
+      "global_cc_max_charge_rate": {
+        "name": "Global CC Max Charge Rate"
+      },
+      "grid_mode": {
+        "name": "Grid Mode"
+      },
+      "grid_mode_schedule_1_enable_hour": {
+        "name": "Grid Mode Schedule 1 Hour"
+      },
+      "grid_mode_schedule_1_enable_min": {
+        "name": "Grid Mode Schedule 1 Minute"
+      },
+      "grid_mode_schedule_1_mode": {
+        "name": "Grid Mode Schedule 1"
+      },
+      "grid_mode_schedule_2_enable_hour": {
+        "name": "Grid Mode Schedule 2 Hour"
+      },
+      "grid_mode_schedule_2_enable_min": {
+        "name": "Grid Mode Schedule 2 Minute"
+      },
+      "grid_mode_schedule_2_mode": {
+        "name": "Grid Mode Schedule 2"
+      },
+      "grid_mode_schedule_3_enable_hour": {
+        "name": "Grid Mode Schedule 3 Hour"
+      },
+      "grid_mode_schedule_3_enable_min": {
+        "name": "Grid Mode Schedule 3 Minute"
+      },
+      "grid_mode_schedule_3_mode": {
+        "name": "Grid Mode Schedule 3"
+      },
+      "grid_power": {
+        "name": "Total Grid Power"
+      },
+      "grid_tie_mode": {
+        "name": "Grid Tie Mode"
+      },
+      "grid_tie_voltage": {
+        "name": "Grid Tie Voltage"
+      },
+      "grid_tie_window": {
+        "name": "Grid Tie Window"
+      },
+      "grid_use_mode": {
+        "name": "Grid Use Mode"
+      },
+      "grid_use_p2_mode": {
+        "name": "Grid Use P2 Mode"
+      },
+      "grid_use_p2_weekday_drop_hour": {
+        "name": "Grid Use P2 Weekday Drop Hour"
+      },
+      "grid_use_p2_weekday_drop_min": {
+        "name": "Grid Use P2 Weekday Drop Min"
+      },
+      "grid_use_p2_weekday_use_hour": {
+        "name": "Grid Use P2 Weekday Use Hour"
+      },
+      "grid_use_p2_weekday_use_min": {
+        "name": "Grid Use P2 Weekday Use Min"
+      },
+      "grid_use_p2_weekend_drop_hour": {
+        "name": "Grid Use P2 Weekend Drop Hour"
+      },
+      "grid_use_p2_weekend_drop_min": {
+        "name": "Grid Use P2 Weekend Drop Min"
+      },
+      "grid_use_p2_weekend_use_hour": {
+        "name": "Grid Use P2 Weekend Use Hour"
+      },
+      "grid_use_p2_weekend_use_min": {
+        "name": "Grid Use P2 Weekend Use Min"
+      },
+      "grid_use_p3_mode": {
+        "name": "Grid Use P3 Mode"
+      },
+      "grid_use_p3_weekday_drop_hour": {
+        "name": "Grid Use P3 Weekday Drop Hour"
+      },
+      "grid_use_p3_weekday_drop_min": {
+        "name": "Grid Use P3 Weekday Drop Min"
+      },
+      "grid_use_p3_weekday_use_hour": {
+        "name": "Grid Use P3 Weekday Use Hour"
+      },
+      "grid_use_p3_weekday_use_min": {
+        "name": "Grid Use P3 Weekday Use Min"
+      },
+      "grid_use_p3_weekend_drop_hour": {
+        "name": "Grid Use P3 Weekend Drop Hour"
+      },
+      "grid_use_p3_weekend_drop_min": {
+        "name": "Grid Use P3 Weekend Drop Min"
+      },
+      "grid_use_p3_weekend_use_hour": {
+        "name": "Grid Use P3 Weekend Use Hour"
+      },
+      "grid_use_p3_weekend_use_min": {
+        "name": "Grid Use P3 Weekend Use Min"
+      },
+      "grid_use_weekday_drop_hour": {
+        "name": "Grid Use Weekday Drop Hour"
+      },
+      "grid_use_weekday_drop_min": {
+        "name": "Grid Use Weekday Drop Min"
+      },
+      "grid_use_weekday_use_hour": {
+        "name": "Grid Use Weekday Use Hour"
+      },
+      "grid_use_weekday_use_min": {
+        "name": "Grid Use Weekday Use Min"
+      },
+      "grid_use_weekend_drop_hour": {
+        "name": "Grid Use Weekend Drop Hour"
+      },
+      "grid_use_weekend_drop_min": {
+        "name": "Grid Use Weekend Drop Min"
+      },
+      "grid_use_weekend_use_hour": {
+        "name": "Grid Use Weekend Use Hour"
+      },
+      "grid_use_weekend_use_min": {
+        "name": "Grid Use Weekend Use Min"
+      },
+      "grid_zero_max_amps": {
+        "name": "Grid Zero Max Amps"
+      },
+      "grid_zero_voltage": {
+        "name": "Grid Zero Min Voltage"
+      },
+      "gt_mode": {
+        "name": "Grid Tie Mode"
+      },
+      "high_battery_cut_in_voltage": {
+        "name": "High Battery Cut-In"
+      },
+      "high_battery_cut_out_voltage": {
+        "name": "High Battery Cut-Out"
+      },
+      "hvt_disconnect_delay": {
+        "name": "HVT Disconnect Delay"
+      },
+      "hvt_disconnect_voltage": {
+        "name": "HVT Disconnect Voltage"
+      },
+      "hvt_mode": {
+        "name": "HVT Mode"
+      },
+      "hvt_reconnect_delay": {
+        "name": "HVT Reconnect Delay"
+      },
+      "hvt_reconnect_voltage": {
+        "name": "HVT Reconnect Voltage"
+      },
+      "hvt_soc_connect_pct": {
+        "name": "HVT Reconnect SOC"
+      },
+      "hvt_soc_disconnect_pct": {
+        "name": "HVT Disconnect SOC"
+      },
+      "inverter_current": {
+        "name": "Total Inverter Current"
+      },
+      "inverter_mode": {
+        "name": "Inverter Mode"
+      },
+      "inverter_power": {
+        "name": "Total Inverter Power"
+      },
+      "l1_ac_input_voltage": {
+        "name": "L1 AC Input Voltage"
+      },
+      "l1_ac_output_voltage": {
+        "name": "L1 AC Output Voltage"
+      },
+      "l1_buy_current": {
+        "name": "L1 Buy Current"
+      },
+      "l1_charger_current": {
+        "name": "L1 Charger Current"
+      },
+      "l1_charger_power": {
+        "name": "L1 Charger Power"
+      },
+      "l1_grid_power": {
+        "name": "L1 Grid Power"
+      },
+      "l1_inverter_current": {
+        "name": "L1 Inverter Current"
+      },
+      "l1_inverter_power": {
+        "name": "L1 Inverter Power"
+      },
+      "l1_sell_current": {
+        "name": "L1 Sell Current"
+      },
+      "l2_ac_input_voltage": {
+        "name": "L2 AC Input Voltage"
+      },
+      "l2_ac_output_voltage": {
+        "name": "L2 AC Output Voltage"
+      },
+      "l2_buy_current": {
+        "name": "L2 Buy Current"
+      },
+      "l2_charger_current": {
+        "name": "L2 Charger Current"
+      },
+      "l2_charger_power": {
+        "name": "L2 Charger Power"
+      },
+      "l2_grid_power": {
+        "name": "L2 Grid Power"
+      },
+      "l2_inverter_current": {
+        "name": "L2 Inverter Current"
+      },
+      "l2_inverter_power": {
+        "name": "L2 Inverter Power"
+      },
+      "l2_sell_current": {
+        "name": "L2 Sell Current"
+      },
+      "lgt_connect_delay": {
+        "name": "Load-Grid Connect Delay"
+      },
+      "lgt_disconnect_delay": {
+        "name": "Load-Grid Disconnect Delay"
+      },
+      "lgt_high_battery_disconnect_voltage": {
+        "name": "Load-Grid High Battery Disconnect"
+      },
+      "lgt_load_threshold_kw": {
+        "name": "Load-Grid Threshold"
+      },
+      "lgt_low_battery_connect_voltage": {
+        "name": "Load-Grid Low Battery Connect"
+      },
+      "lgt_mode": {
+        "name": "Load-Grid Transfer"
+      },
+      "low_battery_cut_in_voltage": {
+        "name": "Low Battery Cut-In"
+      },
+      "low_battery_cut_out_voltage": {
+        "name": "Low Battery Cut-Out"
+      },
+      "low_soc_error_percentage": {
+        "name": "Low SOC Error"
+      },
+      "low_soc_warning_percentage": {
+        "name": "Low SOC Warning"
+      },
+      "mate3_dhcp": {
+        "name": "MATE3 DHCP"
+      },
+      "mate3_firmware": {
+        "name": "MATE3 Firmware"
+      },
+      "mate3_gateway": {
+        "name": "MATE3 Gateway"
+      },
+      "mate3_ip_address": {
+        "name": "MATE3 IP Address"
+      },
+      "max_charger_output_kw": {
+        "name": "Max Charger Output"
+      },
+      "max_inverter_output_kw": {
+        "name": "Max Inverter Output"
+      },
+      "mini_grid_lbx_delay": {
+        "name": "Mini-Grid LBX Delay"
+      },
+      "mini_grid_lbx_voltage": {
+        "name": "Mini-Grid LBX Voltage"
+      },
+      "model_type": {
+        "name": "Model"
+      },
+      "mppt_max_sweep": {
+        "name": "MPPT Max Sweep"
+      },
+      "mppt_mode": {
+        "name": "MPPT Mode"
+      },
+      "mppt_restart_mode": {
+        "name": "MPPT Restart Mode"
+      },
+      "mppt_sweep_mode": {
+        "name": "MPPT Sweep Mode"
+      },
+      "mppt_upick_percentage": {
+        "name": "MPPT Upick %"
+      },
+      "multi_phase_coordination_mode": {
+        "name": "Multi-Phase Coordination"
+      },
+      "nominal_voltage": {
+        "name": "Nominal Voltage"
+      },
+      "output_current": {
+        "name": "Output Current"
+      },
+      "output_power": {
+        "name": "Output Power"
+      },
+      "pv_current": {
+        "name": "PV Current"
+      },
+      "pv_power": {
+        "name": "PV Power"
+      },
+      "pv_size_watts": {
+        "name": "PV Size"
+      },
+      "pv_voltage": {
+        "name": "PV Voltage"
+      },
+      "relay_high_setpoint_ac_amps": {
+        "name": "Relay High Setpoint AC Amps"
+      },
+      "relay_high_setpoint_voltage": {
+        "name": "Relay High Setpoint Voltage"
+      },
+      "relay_low_setpoint_ac_amps": {
+        "name": "Relay Low Setpoint AC Amps"
+      },
+      "relay_low_setpoint_voltage": {
+        "name": "Relay Low Setpoint Voltage"
+      },
+      "relay_mode": {
+        "name": "Relay Mode"
+      },
+      "relay_off_delay": {
+        "name": "Relay Off Delay"
+      },
+      "relay_on_delay": {
+        "name": "Relay On Delay"
+      },
+      "relay_operation_mode": {
+        "name": "Relay Operation Mode"
+      },
+      "rts_maximum_voltage": {
+        "name": "RTS Max Voltage"
+      },
+      "rts_minimum_voltage": {
+        "name": "RTS Min Voltage"
+      },
+      "rts_mode": {
+        "name": "RTS Mode"
+      },
+      "sd_card_log_mode": {
+        "name": "SD Card Log Mode"
+      },
+      "search_ac_load_threshold_amps": {
+        "name": "Search AC Load Threshold"
+      },
+      "search_pulse_length": {
+        "name": "Search Pulse Length"
+      },
+      "search_pulse_spacing": {
+        "name": "Search Pulse Spacing"
+      },
+      "snooze_amps": {
+        "name": "Snooze Amps"
+      },
+      "solar_production": {
+        "name": "Solar Production"
+      },
+      "solar_production_energy": {
+        "name": "Solar Production Energy"
+      },
+      "stack_master_power_save_level": {
+        "name": "Stack Master Power-Save Level"
+      },
+      "stack_mode": {
+        "name": "Stack Mode"
+      },
+      "stack_slave_power_save_level": {
+        "name": "Stack Slave Power-Save Level"
+      },
+      "sunspec_mode": {
+        "name": "SunSpec Server"
+      },
+      "sunspec_port": {
+        "name": "SunSpec Port"
+      },
+      "system_type": {
+        "name": "System Type"
+      },
+      "time_zone_raw": {
+        "name": "MATE3 Time Zone (raw)"
+      },
+      "to_loads": {
+        "name": "To Loads"
+      },
+      "total_ac_input_voltage": {
+        "name": "Total AC Input Voltage"
+      },
+      "total_ac_output_voltage": {
+        "name": "Total AC Output Voltage"
+      },
+      "wakeup_interval": {
+        "name": "Wakeup Interval"
+      },
+      "wakeup_voc_change": {
+        "name": "Wakeup VOC Change"
+      }
+    }
+  },
+  "issues": {
+    "addon_offline": {
+      "title": "Outback MATE3 add-on is not running",
+      "description": "The integration can't reach the companion add-on at {url}. Start or restart the 'Outback MATE3' add-on in Settings → Add-ons → Outback MATE3."
+    },
+    "version_drift": {
+      "title": "Integration and add-on versions don't match",
+      "description": "The Outback MATE3 integration is at version {integration_version} but the add-on is at {addon_version}. They ship together and should be kept on the same version; update whichever is behind."
+    }
+  }
 }
