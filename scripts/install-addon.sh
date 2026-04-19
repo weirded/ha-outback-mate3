@@ -158,15 +158,13 @@ ha_cli "store reload --no-progress" >/dev/null 2>&1 \
 
 # Check if already installed: `ha apps info <slug>` exits 0 if installed
 INFO_JSON=$(ha_cli "apps info $FULL_SLUG --raw-json" 2>/dev/null || echo '{"data":{}}')
-# - `version` is non-empty iff installed (may equal `version_latest`).
-# - `version_latest` is what's in the store (our current config.yaml version).
-read -r INSTALLED_VERSION LATEST_VERSION < <(python3 -c "
-import sys, json
-d = json.loads(sys.stdin.read()).get('data', {})
-print((d.get('version') or ''), (d.get('version_latest') or ''))
-" <<<"$INFO_JSON")
+# `installed` is the authoritative flag; `version` is null on a not-yet-
+# installed store app (which `read` with a default IFS would mis-split).
+INSTALLED=$(python3 -c "import sys,json; print('1' if json.loads(sys.stdin.read()).get('data',{}).get('installed') else '0')" <<<"$INFO_JSON")
+INSTALLED_VERSION=$(python3 -c "import sys,json; print(json.loads(sys.stdin.read()).get('data',{}).get('version') or '')" <<<"$INFO_JSON")
+LATEST_VERSION=$(python3 -c "import sys,json; print(json.loads(sys.stdin.read()).get('data',{}).get('version_latest') or '')" <<<"$INFO_JSON")
 
-if [[ -z "$INSTALLED_VERSION" ]]; then
+if [[ "$INSTALLED" != "1" ]]; then
   log "Installing $FULL_SLUG (first build can take several minutes)"
   HA_CLI_TIMEOUT=900 ha_cli "apps install $FULL_SLUG" >/dev/null
 elif [[ "$INSTALLED_VERSION" != "$LATEST_VERSION" ]]; then
