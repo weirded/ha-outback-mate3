@@ -1,0 +1,79 @@
+[project]
+name = "ha-outback-mate3"
+version = "2.0.0"
+description = "Home Assistant add-on + integration for the Outback Power MATE3 system controller."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.12"
+
+[tool.ruff]
+# Both source trees use the same rules; the add-on ships its own `src/` layout.
+target-version = "py312"
+line-length = 100
+src = [
+    "custom_components",
+    "outback_mate3_addon/src",
+    "tests",
+    "outback_mate3_addon/tests",
+]
+# Generated synced copy of the integration — lint it at the source tree only.
+extend-exclude = [
+    "outback_mate3_addon/bundled_integration",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "ASYNC",  # flake8-async
+    "RUF",  # ruff-specific
+]
+ignore = [
+    "E501",     # line-too-long handled by formatter
+    "B008",     # function-call-in-default-argument — common in HA schema defaults
+    "SIM108",   # ternary-vs-if — not always more readable
+    "ASYNC109", # async-function-with-timeout — explicit timeout params are fine
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B011", "B017"]
+"outback_mate3_addon/tests/**" = ["B011", "B017"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.12"
+# Without this, passing both `custom_components/outback_mate3` and `tests` in
+# a single invocation confuses mypy's module resolver — `tests/` imports
+# `custom_components.outback_mate3` which would otherwise get treated as a
+# duplicate of the top-level `outback_mate3` package.
+explicit_package_bases = true
+# The add-on's code and tests import `src.parser`, `src.ws_server`, etc.,
+# relying on `outback_mate3_addon/` as the sys.path root (mirrored by
+# `outback_mate3_addon/tests/conftest.py`). Tell mypy the same.
+mypy_path = "outback_mate3_addon"
+# Generated copy of the integration lives inside the add-on; only type-check
+# the canonical trees so errors surface once.
+exclude = [
+    "^outback_mate3_addon/bundled_integration/",
+]
+
+[[tool.mypy.overrides]]
+# Third-party test helpers ship no py.typed marker. The test files import
+# them at module load time — silence the resulting import-untyped errors.
+module = [
+    "pytest_homeassistant_custom_component.*",
+    "pytest_socket",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

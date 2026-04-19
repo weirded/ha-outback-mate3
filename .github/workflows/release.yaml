@@ -1,0 +1,103 @@
+name: Release
+
+# Tag-triggered release. Creates a GitHub Release with the tag name and a
+# body derived from CHANGELOG.md. Pre-validates that the tag matches the
+# version declared in both halves of the project (add-on + integration) —
+# a mismatch aborts the release before it publishes anything.
+#
+# Tag format: `v<semver>`, e.g. `v2.0.0`. Dev tags (`v2.0.0-dev21`) are
+# accepted too and published as pre-releases.
+#
+# Multi-arch add-on images are built by the separate `builder.yaml`
+# workflow on the main-branch push that a release commit creates.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+      - "v*.*.*-*"
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    name: Validate version coherence
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.derive.outputs.version }}
+      is_prerelease: ${{ steps.derive.outputs.is_prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive tag version
+        id: derive
+        run: |
+          # Strip the leading `v`; everything after is the canonical version.
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # Anything with a `-` after the semver core is a pre-release
+          # (matches our `-devN` convention).
+          if [[ "$version" == *-* ]]; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify add-on + integration versions match the tag
+        run: |
+          set -euo pipefail
+          version="${{ steps.derive.outputs.version }}"
+          addon_version=$(grep -E '^version:' outback_mate3_addon/config.yaml \
+            | awk '{print $2}' | tr -d '"')
+          integration_version=$(python3 -c \
+            "import json; print(json.load(open('custom_components/outback_mate3/manifest.json'))['version'])")
+          echo "Tag:         $version"
+          echo "Add-on:      $addon_version"
+          echo "Integration: $integration_version"
+          if [[ "$addon_version" != "$version" ]]; then
+            echo "::error::Add-on version ($addon_version) != tag ($version)"
+            exit 1
+          fi
+          if [[ "$integration_version" != "$version" ]]; then
+            echo "::error::Integration version ($integration_version) != tag ($version)"
+            exit 1
+          fi
+
+  release:
+    name: Publish GitHub Release
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Extract the section of CHANGELOG.md that matches this version.
+      # CHANGELOG entries look like: `## 2.0.0 — 2026-04-18` — we grab
+      # from the matching header to the next `## ` line.
+      - name: Extract release notes
+        id: notes
+        run: |
+          version="${{ needs.validate.outputs.version }}"
+          if [[ -f CHANGELOG.md ]]; then
+            awk -v v="$version" '
+              $0 ~ "^## "v"( |$|—)" { inside=1; print; next }
+              inside && /^## / { exit }
+              inside { print }
+            ' CHANGELOG.md > /tmp/notes.md
+          fi
+          if [[ ! -s /tmp/notes.md ]]; then
+            echo "No CHANGELOG section for $version; using tag name as body."
+            echo "Release $version" > /tmp/notes.md
+          fi
+          {
+            echo "path=/tmp/notes.md"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: ${{ steps.notes.outputs.path }}
+          prerelease: ${{ needs.validate.outputs.is_prerelease }}
+          generate_release_notes: false

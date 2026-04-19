@@ -1,0 +1,51 @@
+name: Builder
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - outback_mate3_addon/**
+      - .github/workflows/builder.yaml
+  pull_request:
+    paths:
+      - outback_mate3_addon/**
+      - .github/workflows/builder.yaml
+  workflow_dispatch:
+
+concurrency:
+  group: builder-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [aarch64, amd64, armhf, armv7, i386]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync bundled integration into add-on dir
+        run: ./scripts/sync-bundled-integration.sh
+
+      - name: Build add-on (${{ matrix.arch }})
+        uses: home-assistant/builder@2025.03.0
+        with:
+          # --docker-hub + --image together produce the tag
+          # `ghcr.io/weirded/<arch>-addon-outback-mate3:<version>`. Without
+          # these flags the builder assembles `/:<version>` from empty
+          # repository+image parts and aborts. We split the tag across both
+          # flags (instead of setting `image:` in config.yaml) so local
+          # Supervisor installs keep building from source instead of trying
+          # to pull from this registry.
+          args: |
+            --test \
+            --${{ matrix.arch }} \
+            --target outback_mate3_addon \
+            --docker-hub ghcr.io/weirded \
+            --image {arch}-addon-outback-mate3 \
+            --addon

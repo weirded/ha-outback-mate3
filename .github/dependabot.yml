@@ -1,0 +1,40 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    labels:
+      - dependencies
+      - ci
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps
+    labels:
+      - dependencies
+
+  - package-ecosystem: pip
+    directory: /outback_mate3_addon
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps(addon)
+    labels:
+      - dependencies
+      - addon
+
+  - package-ecosystem: docker
+    directory: /outback_mate3_addon
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps(addon)
+    labels:
+      - dependencies
+      - addon

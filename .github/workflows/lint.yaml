@@ -1,0 +1,58 @@
+name: Lint
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - "weirded/**"
+  pull_request:
+
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff==0.6.9
+
+      - name: Ruff lint
+        run: ruff check .
+
+      - name: Ruff format
+        run: ruff format --check .
+
+  mypy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install mypy + runtime deps needed for type-checking
+        # homeassistant pulls in the stubs mypy needs to resolve the
+        # integration's HA imports; aiohttp is the add-on's only runtime dep
+        # (pin matches outback_mate3_addon/requirements.txt); pytest,
+        # pytest-asyncio, and syrupy are needed so mypy can resolve
+        # test-only imports.
+        run: |
+          pip install mypy==1.19.1
+          pip install homeassistant aiohttp==3.11.11 voluptuous pytest pytest-asyncio syrupy
+
+      # Two invocations because `tests/` and `outback_mate3_addon/tests/`
+      # both expose a module named `tests.conftest`, which trips mypy's
+      # single-pass module resolver. Two passes keep each tree isolated.
+      - name: MyPy — integration + its tests
+        run: mypy custom_components/outback_mate3 tests
+
+      - name: MyPy — add-on + its tests
+        run: mypy outback_mate3_addon/src outback_mate3_addon/tests

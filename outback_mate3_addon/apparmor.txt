@@ -1,0 +1,41 @@
+#include <tunables/global>
+
+profile outback_mate3 flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  # Capabilities
+  file,
+  signal (send) set=(kill, term, int, hup, cont),
+
+  # Network (UDP listen + aiohttp WS + HTTP to MATE3 + Supervisor API)
+  network,
+
+  # s6-overlay init + services
+  /init ix,
+  /bin/** ix,
+  /usr/bin/** ix,
+  /usr/sbin/** ix,
+  /run/{s6,s6-rc*,service}/** ix,
+  /package/** ix,
+  /command/** ix,
+  /etc/services.d/** rwix,
+  /etc/cont-init.d/** rwix,
+  /etc/cont-finish.d/** rwix,
+  /etc/s6/** rwix,
+  /run/{,**} rwk,
+  /dev/tty rw,
+
+  # bashio
+  /usr/lib/bashio/** ix,
+  /tmp/** rwk,
+
+  # Add-on runtime
+  /app/** r,
+
+  # Supervisor-provided options + API token
+  /data/** rw,
+
+  # Bundled integration auto-deploy target (B9)
+  /homeassistant/ r,
+  /homeassistant/** rw,
+}

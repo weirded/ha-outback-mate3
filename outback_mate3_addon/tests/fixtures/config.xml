@@ -1,0 +1,531 @@
+<System_Config>
+<Sys_Name>OutBack Power Technologies</Sys_Name>
+<Sys_Title>OutBack Power</Sys_Title>
+<Installed_By></Installed_By>
+<Installer_Name></Installer_Name>
+<Installer_Phone></Installer_Phone>
+<Installer_Notes></Installer_Notes>
+<Time_Stamp> 1/1/26 00:00</Time_Stamp>
+<System Type="Grid Tied"/>
+<Nominal_Voltage>48</Nominal_Voltage>
+<PV_Size_Watts>1000</PV_Size_Watts>
+<Battery_AH_Capacity>100</Battery_AH_Capacity>
+<Generator_KW>50</Generator_KW>
+<Max_Inverter_Output_KW>12</Max_Inverter_Output_KW>
+<Max_Charger_Output_KW>10</Max_Charger_Output_KW>
+<New_Remote>
+<Firmware>001.004.007</Firmware>
+<Display>
+<Backlight>
+<Red>19</Red>
+<Blue>19</Blue>
+<Green>19</Green>
+<Brightness>10</Brightness>
+<Contrast>45</Contrast>
+<Mode>Auto</Mode>
+<Timeout>120</Timeout>
+</Backlight>
+<Contrast>45</Contrast>
+</Display>
+<Button_Beep>Enabled</Button_Beep>
+<Wheel_Click>Enabled</Wheel_Click>
+<Data_Stream_Mode>Ethernet</Data_Stream_Mode>
+<Serial_Baud>19200</Serial_Baud>
+<SD_CARD_Log_Mode>Disabled</SD_CARD_Log_Mode>
+<SD_CARD_Log_Interval>5</SD_CARD_Log_Interval>
+<Internal_Data_Log_Interval>300</Internal_Data_Log_Interval>
+<Network>
+<DHCP>Enabled</DHCP>
+<IP_address>192.168.000.064</IP_address>
+<Netmask>255.255.255.000</Netmask>
+<Gateway>192.168.000.001</Gateway>
+<DNS_1>192.168.000.002</DNS_1>
+<DNS_2>192.168.000.003</DNS_2>
+<HTTP_Port>80</HTTP_Port>
+<FTP_Port>21</FTP_Port>
+<Telnet_Port>23</Telnet_Port>
+<Data_Stream_IP>192.168.226.135</Data_Stream_IP>
+<Data_Stream_Port>57027</Data_Stream_Port>
+</Network>
+<Network_Options>
+<OPTICSre>Enabled</OPTICSre>
+<OPTICS_Auto_Reboot_Interval>4 Hours</OPTICS_Auto_Reboot_Interval>
+<SunSpec>Disabled</SunSpec>
+<SunSpec_Port>502</SunSpec_Port>
+<Internet_Time>Enabled</Internet_Time>
+<Time_Zone>64736</Time_Zone>
+</Network_Options>
+<Global_Charge_Controller_Output_Control Mode="Disabled">
+<Max_Charge_Rate>300</Max_Charge_Rate>
+</Global_Charge_Controller_Output_Control>
+<CC_Float_Coordination Mode="Enabled"/>
+<FNDC_Charge_Term_Control Mode="Disabled"/>
+<FNDC_Sell_Control Mode="Disabled"/>
+<Multi_Phase_Coordination Mode="Disabled"/>
+<Low_SOC_Warning_Percentage>60</Low_SOC_Warning_Percentage>
+<Low_SOC_Error_Percentage>50</Low_SOC_Error_Percentage>
+<AC_Coupled_Control Mode="Disabled">
+<AUX_Output>1</AUX_Output>
+</AC_Coupled_Control>
+<Advance_Generator_Start Mode="Disabled">
+<Port>1</Port>
+<Control>AUX Relay</Control>
+<Generator_Type>None</Generator_Type>
+<DC_Generator_Absorb_Time>10</DC_Generator_Absorb_Time>
+<DC_Generator_Absorb_Voltage>760</DC_Generator_Absorb_Voltage>
+<Fault_Time>17</Fault_Time>
+<Cooldown_Time>0</Cooldown_Time>
+<Warmup_Time>0</Warmup_Time>
+<AC_Input_Reconnect_Delay>3</AC_Input_Reconnect_Delay>
+<Two_Min_Voltage_Start Mode="Disabled">
+<Voltage>440</Voltage>
+</Two_Min_Voltage_Start>
+<Two_Hour_Voltage_Start Mode="Disabled">
+<Voltage>472</Voltage>
+</Two_Hour_Voltage_Start>
+<Twenty_Four_Hour_Voltage_Start Mode="Disabled">
+<Voltage>488</Voltage>
+</Twenty_Four_Hour_Voltage_Start>
+<Quiet_Time Mode="Disabled">
+<Weekday>
+<Start_Hour>0</Start_Hour>
+<Start_Min>0</Start_Min>
+<Stop_Hour>0</Stop_Hour>
+<Stop_Min>0</Stop_Min>
+</Weekday>
+<Weekend>
+<Start_Hour>0</Start_Hour>
+<Start_Min>0</Start_Min>
+<Stop_Hour>0</Stop_Hour>
+<Stop_Min>0</Stop_Min>
+</Weekend>
+</Quiet_Time>
+<Must_Run Mode="Disabled">
+<Weekday>
+<Start_Hour>0</Start_Hour>
+<Start_Min>0</Start_Min>
+<Stop_Hour>0</Stop_Hour>
+<Stop_Min>0</Stop_Min>
+</Weekday>
+<Weekend>
+<Start_Hour>0</Start_Hour>
+<Start_Min>0</Start_Min>
+<Stop_Hour>0</Stop_Hour>
+<Stop_Min>0</Stop_Min>
+</Weekend>
+</Must_Run>
+<Load_Start Mode="Disabled">
+<Start>
+<Load_KW>0</Load_KW>
+<Delay>1</Delay>
+</Start>
+<Stop>
+<Load_KW>0</Load_KW>
+<Delay>1</Delay>
+</Stop>
+</Load_Start>
+<SOC_Start Mode="Disabled">
+<Start_Percentage>60</Start_Percentage>
+<Stop_Percentage>90</Stop_Percentage>
+</SOC_Start>
+<FNDC_Full_Charge Mode="Disabled">
+<Interval>14</Interval>
+</FNDC_Full_Charge>
+<Generator_Exercise Mode="Disabled">
+<Start_Hour>0</Start_Hour>
+<Start_Min>0</Start_Min>
+<Day>Sun</Day>
+<Period>15</Period>
+<Interval>2</Interval>
+<Sell_During_Exercise>Enabled</Sell_During_Exercise>
+</Generator_Exercise>
+</Advance_Generator_Start>
+<Grid_Use Mode="Disabled">
+<Weekday>
+<Use_Hour>0</Use_Hour>
+<Use_Min>0</Use_Min>
+<Drop_Hour>0</Drop_Hour>
+<Drop_Min>0</Drop_Min>
+</Weekday>
+<Weekend>
+<Use_Hour>0</Use_Hour>
+<Use_Min>0</Use_Min>
+<Drop_Hour>0</Drop_Hour>
+<Drop_Min>0</Drop_Min>
+</Weekend>
+</Grid_Use>
+<Grid_Use_P2 Mode="Disabled">
+<Weekday>
+<Use_Hour>0</Use_Hour>
+<Use_Min>0</Use_Min>
+<Drop_Hour>0</Drop_Hour>
+<Drop_Min>0</Drop_Min>
+</Weekday>
+</Grid_Use_P2>
+<Grid_Use_P3 Mode="Disabled">
+<Weekday>
+<Use_Hour>0</Use_Hour>
+<Use_Min>0</Use_Min>
+<Drop_Hour>0</Drop_Hour>
+<Drop_Min>0</Drop_Min>
+</Weekday>
+</Grid_Use_P3>
+<High_Battery_Transfer Mode="Disabled">
+<Low_Voltage_Connect>
+<Voltage>480</Voltage>
+<Delay>60</Delay>
+</Low_Voltage_Connect>
+<High_Voltage_Disconnect>
+<Voltage>520</Voltage>
+<Delay>60</Delay>
+</High_Voltage_Disconnect>
+<SOC_Connect_Percentage>60</SOC_Connect_Percentage>
+<SOC_Disconnect_Percentage>90</SOC_Disconnect_Percentage>
+</High_Battery_Transfer>
+<Load_Grid_Transfer Mode="Disabled">
+<Load_Threshold_KW>1</Load_Threshold_KW>
+<Load_Connect_Delay>5</Load_Connect_Delay>
+<Load_Disconnect_Delay>10</Load_Disconnect_Delay>
+<Low_Battery_Connect>484</Low_Battery_Connect>
+<High_Battery_Disconnect>560</High_Battery_Disconnect>
+</Load_Grid_Transfer>
+<Grid_Mode_Schedule_1 Mode="Grid Tied">
+<Enable_Hour>7</Enable_Hour>
+<Enable_Min>0</Enable_Min>
+</Grid_Mode_Schedule_1>
+<Grid_Mode_Schedule_2 Mode="GridZero">
+<Enable_Hour>19</Enable_Hour>
+<Enable_Min>0</Enable_Min>
+</Grid_Mode_Schedule_2>
+<Grid_Mode_Schedule_3 Mode="---------">
+<Enable_Hour>0</Enable_Hour>
+<Enable_Min>0</Enable_Min>
+</Grid_Mode_Schedule_3>
+</New_Remote>
+<Port Num="1">
+<Device Type="GS">
+<Firmware>001.006.070</Firmware>
+<Voltage>48</Voltage>
+<Type>Split Phase 240V 50/60Hz</Type>
+<Inverter Mode="SEARCH">
+<Search>
+<Pulse_Length>8</Pulse_Length>
+<Amps>10</Amps>
+<Spacing>60</Spacing>
+</Search>
+<Low_battery>
+<Cut_Out_Voltage>480</Cut_Out_Voltage>
+<Cut_In_Voltage>508</Cut_In_Voltage>
+<Delay>24</Delay>
+</Low_battery>
+<High_battery>
+<Cut_Out_Voltage>560</Cut_Out_Voltage>
+<Cut_In_Voltage>552</Cut_In_Voltage>
+<Delay>4</Delay>
+</High_battery>
+<AC_Output_Voltage>120</AC_Output_Voltage>
+<AC_Coupled_Mode>Disabled</AC_Coupled_Mode>
+</Inverter>
+<Charger Mode="Auto">
+<Absorb>
+<Voltage>552</Voltage>
+<Time>50</Time>
+</Absorb>
+<Float>
+<Voltage>532</Voltage>
+<Time>0</Time>
+</Float>
+<EQ>
+<Voltage>552</Voltage>
+<Time>0</Time>
+</EQ>
+<Re_Float>
+<Voltage>520</Voltage>
+</Re_Float>
+<Re_Bulk>
+<Voltage>484</Voltage>
+</Re_Bulk>
+<AC_Charger_Input_Limit>600</AC_Charger_Input_Limit>
+</Charger>
+<Grid_tie Mode="Enabled">
+<Voltage>532</Voltage>
+<Window>IEEE</Window>
+</Grid_tie>
+<AC_Input_Priority>Grid</AC_Input_Priority>
+<Mini_Grid>
+<LBX_Voltage>512</LBX_Voltage>
+<LBX_Delay>2</LBX_Delay>
+</Mini_Grid>
+<Grid_Zero>
+<Voltage>512</Voltage>
+<Max_Amps>1200</Max_Amps>
+</Grid_Zero>
+<AC1_input>
+<Input_type>Grid Tied</Input_type>
+<Input_size>2000</Input_size>
+<Transfer_Delay>50</Transfer_Delay>
+<Maximum_Input_Voltage>130</Maximum_Input_Voltage>
+<Minimum_Input_Voltage>105</Minimum_Input_Voltage>
+<Connect_Delay>2</Connect_Delay>
+</AC1_input>
+<AC2_input>
+<Input_type>Generator</Input_type>
+<Input_size>250</Input_size>
+<Transfer_Delay>50</Transfer_Delay>
+<Maximum_Input_Voltage>130</Maximum_Input_Voltage>
+<Minimum_Input_Voltage>105</Minimum_Input_Voltage>
+<Connect_Delay>2</Connect_Delay>
+</AC2_input>
+<Stack Mode="Master">
+<Master_Power_Save_Level>3</Master_Power_Save_Level>
+<Slave_Power_Save_Level>1</Slave_Power_Save_Level>
+</Stack>
+<AUX_Output Mode="Vent Fan">
+<Operation_Mode>Auto</Operation_Mode>
+<On_Delay>5</On_Delay>
+<Off_Delay>5</Off_Delay>
+<High_Setpoint_Voltage>560</High_Setpoint_Voltage>
+<Low_Setpoint_Voltage>440</Low_Setpoint_Voltage>
+<High_Setpoint_AC_Amps>30</High_Setpoint_AC_Amps>
+<Low_Setpoint_AC_Amps>15</Low_Setpoint_AC_Amps>
+</AUX_Output>
+<Relay Mode="Gen Alert">
+<Operation_Mode>Auto</Operation_Mode>
+<On_Delay>5</On_Delay>
+<Off_Delay>5</Off_Delay>
+<High_Setpoint_Voltage>560</High_Setpoint_Voltage>
+<Low_Setpoint_Voltage>440</Low_Setpoint_Voltage>
+<High_Setpoint_AC_Amps>30</High_Setpoint_AC_Amps>
+<Low_Setpoint_AC_Amps>15</Low_Setpoint_AC_Amps>
+</Relay>
+</Device>
+</Port>
+<Port Num="2">
+<Device Type="GS">
+<Firmware>001.006.070</Firmware>
+<Voltage>48</Voltage>
+<Type>Split Phase 240V 50/60Hz</Type>
+<Inverter Mode="SEARCH">
+<Search>
+<Pulse_Length>8</Pulse_Length>
+<Amps>10</Amps>
+<Spacing>60</Spacing>
+</Search>
+<Low_battery>
+<Cut_Out_Voltage>480</Cut_Out_Voltage>
+<Cut_In_Voltage>508</Cut_In_Voltage>
+<Delay>24</Delay>
+</Low_battery>
+<High_battery>
+<Cut_Out_Voltage>560</Cut_Out_Voltage>
+<Cut_In_Voltage>552</Cut_In_Voltage>
+<Delay>4</Delay>
+</High_battery>
+<AC_Output_Voltage>120</AC_Output_Voltage>
+<AC_Coupled_Mode>Disabled</AC_Coupled_Mode>
+</Inverter>
+<Charger Mode="Auto">
+<Absorb>
+<Voltage>552</Voltage>
+<Time>50</Time>
+</Absorb>
+<Float>
+<Voltage>532</Voltage>
+<Time>0</Time>
+</Float>
+<EQ>
+<Voltage>552</Voltage>
+<Time>0</Time>
+</EQ>
+<Re_Float>
+<Voltage>520</Voltage>
+</Re_Float>
+<Re_Bulk>
+<Voltage>484</Voltage>
+</Re_Bulk>
+<AC_Charger_Input_Limit>1200</AC_Charger_Input_Limit>
+</Charger>
+<Grid_tie Mode="Enabled">
+<Voltage>532</Voltage>
+<Window>IEEE</Window>
+</Grid_tie>
+<AC_Input_Priority>Grid</AC_Input_Priority>
+<Mini_Grid>
+<LBX_Voltage>512</LBX_Voltage>
+<LBX_Delay>2</LBX_Delay>
+</Mini_Grid>
+<Grid_Zero>
+<Voltage>512</Voltage>
+<Max_Amps>1200</Max_Amps>
+</Grid_Zero>
+<AC1_input>
+<Input_type>Grid Tied</Input_type>
+<Input_size>2000</Input_size>
+<Transfer_Delay>50</Transfer_Delay>
+<Maximum_Input_Voltage>130</Maximum_Input_Voltage>
+<Minimum_Input_Voltage>105</Minimum_Input_Voltage>
+<Connect_Delay>2</Connect_Delay>
+</AC1_input>
+<AC2_input>
+<Input_type>Generator</Input_type>
+<Input_size>250</Input_size>
+<Transfer_Delay>50</Transfer_Delay>
+<Maximum_Input_Voltage>130</Maximum_Input_Voltage>
+<Minimum_Input_Voltage>105</Minimum_Input_Voltage>
+<Connect_Delay>2</Connect_Delay>
+</AC2_input>
+<Stack Mode="Slave">
+<Master_Power_Save_Level>0</Master_Power_Save_Level>
+<Slave_Power_Save_Level>1</Slave_Power_Save_Level>
+</Stack>
+<AUX_Output Mode="Vent Fan">
+<Operation_Mode>Auto</Operation_Mode>
+<On_Delay>5</On_Delay>
+<Off_Delay>5</Off_Delay>
+<High_Setpoint_Voltage>560</High_Setpoint_Voltage>
+<Low_Setpoint_Voltage>440</Low_Setpoint_Voltage>
+<High_Setpoint_AC_Amps>30</High_Setpoint_AC_Amps>
+<Low_Setpoint_AC_Amps>15</Low_Setpoint_AC_Amps>
+</AUX_Output>
+<Relay Mode="Gen Alert">
+<Operation_Mode>Auto</Operation_Mode>
+<On_Delay>5</On_Delay>
+<Off_Delay>5</Off_Delay>
+<High_Setpoint_Voltage>560</High_Setpoint_Voltage>
+<Low_Setpoint_Voltage>440</Low_Setpoint_Voltage>
+<High_Setpoint_AC_Amps>30</High_Setpoint_AC_Amps>
+<Low_Setpoint_AC_Amps>15</Low_Setpoint_AC_Amps>
+</Relay>
+</Device>
+</Port>
+<Port Num="4">
+<Device Type="CC">
+<Model Type="FM">
+<Firmware>003.003.000</Firmware>
+<Charger>
+<Absorb>
+<Voltage>554</Voltage>
+<Time>30</Time>
+<End_Amps>100</End_Amps>
+</Absorb>
+<Rebulk_Voltage>524</Rebulk_Voltage>
+<Float_Voltage>535</Float_Voltage>
+<EQ>
+<Voltage>560</Voltage>
+<Time>1</Time>
+<Auto_Interval>0</Auto_Interval>
+</EQ>
+<Output_Limit>800</Output_Limit>
+</Charger>
+<Wakeup>
+<Interval>5</Interval>
+<VOC_Change>60</VOC_Change>
+</Wakeup>
+<Snooze_Amps>6</Snooze_Amps>
+<MPPT Mode="Auto">
+<Sweep_Mode>Half</Sweep_Mode>
+<Max_Sweep>90</Max_Sweep>
+<Upick_Percentage>77</Upick_Percentage>
+<Restart_Mode>0</Restart_Mode>
+</MPPT>
+<GT_Mode>Enabled</GT_Mode>
+<Remote_Temp_Sensor_Comp Mode="Wide">
+<Maximum_RTS_Voltage>556</Maximum_RTS_Voltage>
+<Minimum_RTS_Voltage>484</Minimum_RTS_Voltage>
+</Remote_Temp_Sensor_Comp>
+<AUX_Output Mode="Vent Fan">
+<Operation_Mode>Off</Operation_Mode>
+<Polarity>active high</Polarity>
+<AUX_Error_Low_Batt_Voltage>460</AUX_Error_Low_Batt_Voltage>
+<AUX_Low_Batt_Disconnect>
+<Disconnect_Voltage>544</Disconnect_Voltage>
+<Disconnect_Delay>1</Disconnect_Delay>
+<Reconnect_Voltage>576</Reconnect_Voltage>
+</AUX_Low_Batt_Disconnect>
+<AUX_Vent_Fan_Voltage>576</AUX_Vent_Fan_Voltage>
+<AUX_Diversion>
+<Hold_Time>1</Hold_Time>
+<Delay>0</Delay>
+<Relative_Voltage>0</Relative_Voltage>
+<Hysteresis_Voltage>2</Hysteresis_Voltage>
+</AUX_Diversion>
+<AUX_PV_Trigger>
+<Trigger_Voltage>1400</Trigger_Voltage>
+<Hold_Time>0</Hold_Time>
+</AUX_PV_Trigger>
+<AUX_Nite_Light>
+<Threshold_Voltage>100</Threshold_Voltage>
+<On_Hyst_Time>1</On_Hyst_Time>
+<Off_Hyst_Time>1</Off_Hyst_Time>
+<On_Hours>4</On_Hours>
+</AUX_Nite_Light>
+</AUX_Output>
+</Model>
+</Device>
+</Port>
+<Port Num="5">
+<Device Type="CC">
+<Model Type="FM">
+<Firmware>003.003.000</Firmware>
+<Charger>
+<Absorb>
+<Voltage>554</Voltage>
+<Time>30</Time>
+<End_Amps>100</End_Amps>
+</Absorb>
+<Rebulk_Voltage>524</Rebulk_Voltage>
+<Float_Voltage>535</Float_Voltage>
+<EQ>
+<Voltage>560</Voltage>
+<Time>1</Time>
+<Auto_Interval>0</Auto_Interval>
+</EQ>
+<Output_Limit>800</Output_Limit>
+</Charger>
+<Wakeup>
+<Interval>5</Interval>
+<VOC_Change>60</VOC_Change>
+</Wakeup>
+<Snooze_Amps>6</Snooze_Amps>
+<MPPT Mode="Auto">
+<Sweep_Mode>Half</Sweep_Mode>
+<Max_Sweep>90</Max_Sweep>
+<Upick_Percentage>77</Upick_Percentage>
+<Restart_Mode>0</Restart_Mode>
+</MPPT>
+<GT_Mode>Enabled</GT_Mode>
+<Remote_Temp_Sensor_Comp Mode="Wide">
+<Maximum_RTS_Voltage>556</Maximum_RTS_Voltage>
+<Minimum_RTS_Voltage>484</Minimum_RTS_Voltage>
+</Remote_Temp_Sensor_Comp>
+<AUX_Output Mode="Vent Fan">
+<Operation_Mode>Off</Operation_Mode>
+<Polarity>active high</Polarity>
+<AUX_Error_Low_Batt_Voltage>460</AUX_Error_Low_Batt_Voltage>
+<AUX_Low_Batt_Disconnect>
+<Disconnect_Voltage>544</Disconnect_Voltage>
+<Disconnect_Delay>1</Disconnect_Delay>
+<Reconnect_Voltage>576</Reconnect_Voltage>
+</AUX_Low_Batt_Disconnect>
+<AUX_Vent_Fan_Voltage>576</AUX_Vent_Fan_Voltage>
+<AUX_Diversion>
+<Hold_Time>1</Hold_Time>
+<Delay>0</Delay>
+<Relative_Voltage>0</Relative_Voltage>
+<Hysteresis_Voltage>2</Hysteresis_Voltage>
+</AUX_Diversion>
+<AUX_PV_Trigger>
+<Trigger_Voltage>1400</Trigger_Voltage>
+<Hold_Time>0</Hold_Time>
+</AUX_PV_Trigger>
+<AUX_Nite_Light>
+<Threshold_Voltage>100</Threshold_Voltage>
+<On_Hyst_Time>1</On_Hyst_Time>
+<Off_Hyst_Time>1</Off_Hyst_Time>
+<On_Hours>4</On_Hours>
+</AUX_Nite_Light>
+</AUX_Output>
+</Model>
+</Device>
+</Port>
+</System_Config>

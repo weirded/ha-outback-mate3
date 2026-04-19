@@ -265,7 +265,7 @@ class OutbackMate3(DataUpdateCoordinator[None]):
                 # silently takes the integration offline until HA restart.
                 try:
                     self._handle_message(payload)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     _LOGGER.exception("Dropped malformed WS message: %r", payload)
             elif msg.type == WSMsgType.ERROR:
                 _LOGGER.warning("WS error: %s", ws.exception())
