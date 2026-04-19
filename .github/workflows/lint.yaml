@@ -41,10 +41,11 @@ jobs:
       - name: Install mypy + runtime deps needed for type-checking
         # homeassistant pulls in the stubs mypy needs to resolve the
         # integration's HA imports; aiohttp is the add-on's only runtime dep
-        # (pin matches outback_mate3_addon/requirements.txt).
+        # (pin matches outback_mate3_addon/requirements.txt); pytest +
+        # syrupy are needed so mypy can resolve test-only imports.
         run: |
           pip install mypy==1.19.1
-          pip install homeassistant aiohttp==3.11.11 voluptuous
+          pip install homeassistant aiohttp==3.11.11 voluptuous pytest syrupy
 
       # Two invocations because `tests/` and `outback_mate3_addon/tests/`
       # both expose a module named `tests.conftest`, which trips mypy's

@@ -15,6 +15,17 @@ _REPO = Path(__file__).resolve().parent.parent
 if str(_REPO) not in sys.path:
     sys.path.insert(0, str(_REPO))
 
+# pycares>=5.0 spawns a daemon thread "_run_safe_shutdown_loop" the first time
+# any c-ares channel is destroyed. PHACC's per-test cleanup check rejects any
+# thread outside its allowlist, and since the thread is lazily created during
+# HA setup, the first test to use DNS fails teardown. Warm the singleton here
+# so the thread exists in `threads_before` and is ignored as pre-existing.
+import pycares  # noqa: E402
+
+_warmup_channel = pycares.Channel()
+_warmup_channel.close()
+del _warmup_channel
+
 pytest_plugins = ["pytest_homeassistant_custom_component"]
 
 

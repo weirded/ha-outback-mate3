@@ -35,8 +35,13 @@ jobs:
       - name: Build add-on (${{ matrix.arch }})
         uses: home-assistant/builder@2025.03.0
         with:
+          # --image supplies a tag template; without it the builder constructs
+          # an invalid `/:<version>` tag and aborts. We don't set `image:` in
+          # config.yaml because that would make local Supervisor installs pull
+          # from this registry instead of building locally.
           args: |
             --test \
             --${{ matrix.arch }} \
             --target outback_mate3_addon \
+            --image ghcr.io/weirded/{arch}-addon-outback-mate3 \
             --addon
