@@ -1,17 +1,25 @@
 # Changelog
 
-## 0.1.0 — 2026-04-18
+The add-on and its bundled integration share a single version number; see
+the top-level [`CHANGELOG.md`](../CHANGELOG.md) for the combined history.
 
-Initial release.
+## 2.0.0 — unreleased
 
-- UDP listener on configurable port (default 57027) parses MATE3 streaming
-  telemetry.
-- WebSocket broadcast server at `/ws` (default port 8099) for the
-  Outback MATE3 Home Assistant integration.
-- Automatic Supervisor discovery announce on startup — the integration
-  surfaces under Settings → Devices & Services → Discovered with no manual
-  configuration.
-- `host_network: true` so the MATE3 on the LAN can reach this add-on
-  consistently across HA OS, Supervised, and Container installs.
-- Per-MAC update throttle (configurable, default 30 s) mirrors the
-  pre-2.0 integration's behavior.
+First release of the split architecture. The add-on owns the MATE3 UDP
+listener (`host_network: true`, default port 57027) and the HTTP
+`CONFIG.xml` poller, and exposes a WebSocket broadcast server at `/ws`
+(default TCP port **28099**, changed from 8099 in a late pre-release to avoid
+common port collisions).
+
+Notable bits:
+
+- Ships the matching Home Assistant integration bundled under
+  `bundled_integration/outback_mate3/` and drops it into
+  `/config/custom_components/outback_mate3/` on first start, so users only
+  install the add-on.
+- Announces itself to Supervisor for Hass.io auto-discovery.
+- Per-MAC update throttle (default 30 s) keeps HA's recorder calm despite
+  the MATE3's 1 Hz stream.
+- CONFIG.xml poll surfaces firmware, nameplate, and every configured
+  setpoint as diagnostic sensors (disabled-by-default on the HA side).
+- Translated add-on options in Supervisor.

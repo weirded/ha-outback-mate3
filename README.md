@@ -21,31 +21,38 @@ If you're on HA Container or HA Core, use at your own risk — the add-on needs 
 
 ## How it works
 
-Two moving parts:
+Two moving parts live inside Home Assistant — the **add-on** (UDP listener + HTTP config poller + WebSocket server) and the **integration** (WebSocket client that creates HA devices and sensors). The add-on ships the integration on first run, so you only install the add-on:
 
 ```
-                ┌───────────────────────┐
-                │  Outback MATE3        │
-                │  (on your LAN, udp    │
-                │   broadcast @ 57027,  │
-                │   http @ 80)          │
-                └───────────┬───────────┘
-                            │  UDP stream (live) + HTTP poll (config)
-                            ▼
-    Home Assistant OS / Supervised
-  ┌────────────────────────────────────┐
-  │  outback_mate3 add-on              │
-  │    - binds UDP 57027 (host_net)    │
-  │    - parses MATE3 frames           │
-  │    - polls CONFIG.xml every 5 min  │
-  │    - WebSocket @ :8099/ws          │◄── integration connects here
-  │    - ships companion integration   │
-  │      into /config on startup       │
-  └────────────────────────────────────┘
+   ┌───────────────────┐
+   │  Outback MATE3    │
+   │  on your LAN      │
+   │  (UDP broadcast   │
+   │   @ 57027,        │
+   │   HTTP @ 80)      │
+   └─────────┬─────────┘
+             │ UDP live stream + HTTP config poll (every 5 min)
+             ▼
+   ════════════════════════════════════════════════════════════════════
+   Home Assistant OS / Supervised
+   ════════════════════════════════════════════════════════════════════
+   ┌────────────────────────────────┐        ┌─────────────────────────┐
+   │ outback_mate3 add-on           │        │ outback_mate3           │
+   │  • binds UDP :57027 (host_net) │        │ integration             │
+   │  • parses MATE3 frames         │  ws    │  • DataUpdateCoordinator│
+   │  • polls CONFIG.xml            │◄──────►│  • creates HA devices + │
+   │  • WebSocket server @ :28099   │:28099/ws│    sensors              │
+   │  • ships integration into      │        │  • auto-discovered by HA│
+   │    /config/custom_components/  │        │    on first add-on start│
+   └────────────────────────────────┘        └────────────┬────────────┘
+                                                          │
+                                                          ▼
+                                              Home Assistant UI, Energy
+                                              Dashboard, automations
 ```
 
-1. **The add-on** runs inside Home Assistant. It owns the UDP socket (HA Core can't bind UDP reliably on HAOS), parses MATE3 frames, polls the MATE3's `CONFIG.xml` every 5 min for firmware + setpoints, and exposes a structured WebSocket stream.
-2. **The bundled integration** is a thin aiohttp WebSocket client subclassing `DataUpdateCoordinator` that creates the HA devices + sensors and mirrors the add-on's state. The add-on drops it into `/config/custom_components/outback_mate3/` on first start so you don't have to install two things.
+1. **The add-on** owns the UDP socket (HA Core can't bind UDP reliably on HAOS), parses MATE3 frames, polls the MATE3's `CONFIG.xml` every 5 min for firmware + setpoints, and exposes a structured WebSocket stream.
+2. **The integration** is a thin aiohttp WebSocket client subclassing `DataUpdateCoordinator` that creates HA devices + sensors and mirrors the add-on's state. The add-on drops it into `/config/custom_components/outback_mate3/` on first start so you don't have to install two things; Home Assistant auto-discovers it via Hass.io discovery.
 
 ## Installation
 
@@ -55,7 +62,7 @@ Or manually:
 
 1. **Settings → Add-ons → Add-on Store → ⋮ → Repositories** and add `https://github.com/weirded/ha-outback-mate3`. Reload.
 2. Find **Outback MATE3** in the store and click **Install**.
-3. Click **Start**. Default options (UDP 57027, WS 8099, config poll 300 s) work out of the box.
+3. Click **Start**. Default options (UDP 57027, WS 28099, config poll 300 s) work out of the box.
 4. **Restart Home Assistant** so the bundled integration loads — the add-on will have dropped it into `/config/custom_components/outback_mate3/` on first start.
 5. A **Discovered: Outback MATE3** card appears under **Settings → Devices & Services**. Click **Submit**. Done.
 
@@ -72,7 +79,7 @@ The add-on uses the MATE3's UDP streaming protocol. Configure your MATE3 to send
 <img width="333" alt="image" src="https://github.com/user-attachments/assets/901fe6d2-e2d2-4d18-b52b-91fd214d74fe" />
 
 - Press the LOCK button
-- Enter user code 141
+- Enter the installer code. The factory default is **141**, but whoever commissioned your system may have changed it — use whatever code unlocks Settings at your site.
 - Navigate to Settings > System > Data Stream
 - Ensure `Network Data Stream` shows `Enabled`
 - Ensure `Destination IP` is the IP address of your Home Assistant instance
@@ -91,33 +98,34 @@ The 1.x integration bound a UDP socket inside the Home Assistant core container,
 
 ## Available Sensors
 
-### System Device
-Combined metrics for your entire Outback system:
-- From Grid (W) - Power from/to grid (positive = consumption, negative = production)
-- Solar Production (W) - Total solar production
-- From Battery (W) - Battery power flow (positive = discharge, negative = charge)
-- To Loads (W) - Total power to loads (From Grid + From Battery)
-- Battery Voltage (V) - System battery voltage (averaged from charge controllers)
-- Solar Production Energy (kWh) - Daily solar production
+The integration creates three HA device types: one **Outback System** (aggregates), one **Outback Inverter** per inverter the MATE3 sees, and one **Outback Charge Controller** per charge controller. Live UDP-stream metrics below are enabled-by-default; CONFIG.xml-derived diagnostic sensors are all disabled-by-default — enable the handful you want from the device page in HA.
 
-### Inverter Device
-Per-inverter metrics:
-- L1/L2 Grid Power (W) - Power from/to grid per leg
-- L1/L2 Inverter Power (W) - Inverter output power per leg
-- L1/L2 Charger Power (W) - Charger input power per leg
-- L1/L2 AC Input Voltage (V) - AC input voltage per leg
-- L1/L2 AC Output Voltage (V) - AC output voltage per leg
-- L1/L2 Buy Current (A) - Grid buy current per leg
-- L1/L2 Sell Current (A) - Grid sell current per leg
+### Outback System (one per install)
+Live aggregates computed from all inverters + charge controllers:
+- **From Grid** (W), **Solar Production** (W), **From Battery** (W), **To Loads** (W) — all four signed (positive/negative encodes direction).
+- **Battery Voltage** (V) — averaged from the charge controllers.
+- **Solar Production Energy** (kWh, totalizing) — Energy-Dashboard ready.
+- **Receiving Data from MATE3** (binary) — flips to Off after 5 minutes without a UDP frame.
 
-### Charge Controller Device
-Per-charge controller metrics:
-- PV Current (A)
-- PV Voltage (V)
-- Output Current (A)
-- Output Power (W)
-- Battery Voltage (V)
-- Daily kWh
+Diagnostic (disabled-by-default) from the CONFIG.xml poll: MATE3 firmware version; data-stream target (catches "saved but not applied"); SD-card log mode; system type / nominal V / battery Ah / PV W / max inverter kW / max charger kW / generator kW; Low-SOC warn/error; AC-coupled mode; global CC output cap; SunSpec/Modbus settings; FNDC integration; all three Grid Mode Schedules (enable, start, stop, mode); HVT (high-battery transfer) and LGT (load grid transfer) blocks; full Advanced Generator Start block (51 fields — enable mode, VDC/SOC/load/temp/exercise/quiet-time triggers, generator profile, run-limits, warm-up/cool-down, DC-gen absorb/float/bulk/EQ setpoints); and Grid_Use / Grid_Use_P2 / Grid_Use_P3 TOU schedules.
+
+### Outback Inverter (one per inverter)
+Live per-inverter (positive/negative values encode direction where applicable):
+- **L1 / L2 / Total** for Inverter Current, Charger Current, Buy Current, Sell Current.
+- **L1 / L2 / Total** for AC Input Voltage, AC Output Voltage.
+- **L1 / L2 / Total** for Grid Power, Inverter Power, Charger Power.
+- **Battery Voltage** (V).
+- **Inverter Mode**, **AC Mode**, **Grid Mode** as enum sensors.
+
+Diagnostic (disabled-by-default) from CONFIG.xml: firmware version, nameplate type, configured inverter mode, low/high battery cut-out/cut-in voltages + delays, AC output voltage, charger mode, absorb/float/EQ/re-bulk/re-float setpoints + times, grid-tie mode/voltage/window (IEEE/UL), AC1 and AC2 input priority/type/size/min/max voltage, stack mode.
+
+### Outback Charge Controller (one per charge controller)
+Live per-CC:
+- PV Current (A), PV Voltage (V), PV Power (W).
+- Output Current (A), Output Power (W), Battery Voltage (V).
+- **Charge Mode** as an enum sensor.
+
+Diagnostic (disabled-by-default) from CONFIG.xml: firmware, model type (FM/FM80/FMX/FlexMax Extreme), absorb/float/EQ/re-bulk setpoints + times + end-amps, output-limit cap, MPPT mode/sweep/max-sweep, grid-tie enable.
 
 ## Energy Dashboard Setup
 

@@ -1,5 +1,5 @@
 name: "Outback MATE3"
-version: "2.0.0-dev13"
+version: "2.0.0-dev14"
 slug: outback_mate3
 description: >-
   Listens for Outback MATE3 UDP streaming telemetry and relays parsed device
@@ -29,7 +29,7 @@ map:
   - homeassistant_config:rw
 options:
   udp_port: 57027
-  ws_port: 8099
+  ws_port: 28099
   log_level: info
   min_update_interval_s: 30
   config_poll_interval_s: 300

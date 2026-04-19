@@ -47,7 +47,7 @@ def _configure_logging(level_name: str) -> None:
 
 async def run() -> None:
     udp_port = _env_int("UDP_PORT", 57027)
-    ws_port = _env_int("WS_PORT", 8099)
+    ws_port = _env_int("WS_PORT", 28099)
     log_level = os.environ.get("LOG_LEVEL", "info")
     min_interval = _env_float("MIN_UPDATE_INTERVAL_S", 30.0)
     config_poll_interval = _env_float("CONFIG_POLL_INTERVAL_S", 300.0)

@@ -237,6 +237,54 @@ async def test_config_snapshot_only_creates_diagnostics_after_poll(
     )
 
 
+async def test_receiving_data_binary_sensor_flips_on_snapshot(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """The connectivity binary sensor turns on once UDP-derived data arrives."""
+    fake_addon.messages = [SNAPSHOT_PAYLOAD]
+    entry = MockConfigEntry(
+        domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2
+    )
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    # After the snapshot lands, the binary sensor should read "on". Initial
+    # state right after setup is "off" (no UDP yet), so poll until it flips.
+    for _ in range(100):
+        st = hass.states.get("binary_sensor.mate3_system_receiving_data")
+        if st is not None and st.state == "on":
+            break
+        await asyncio.sleep(0.05)
+    assert st is not None and st.state == "on", (
+        f"binary sensor never flipped to on; last state={st and st.state}"
+    )
+
+
+async def test_receiving_data_binary_sensor_is_off_without_udp(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """With only a config_snapshot (no UDP devices), the sensor stays off."""
+    # Empty devices list = no UDP-derived payloads applied yet, even after
+    # the WS connection is fully up and a config_snapshot has arrived.
+    fake_addon.messages = [{"type": "snapshot", "devices": []}, CONFIG_PAYLOAD]
+    entry = MockConfigEntry(
+        domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2
+    )
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    # Give the WS loop a moment to process both messages.
+    for _ in range(20):
+        st = hass.states.get("binary_sensor.mate3_system_receiving_data")
+        if st is not None:
+            break
+        await asyncio.sleep(0.05)
+    assert st is not None
+    assert st.state == "off"
+
+
 async def test_reconnects_after_addon_drops_ws(
     hass: HomeAssistant, fake_addon: _FakeAddOn
 ) -> None:

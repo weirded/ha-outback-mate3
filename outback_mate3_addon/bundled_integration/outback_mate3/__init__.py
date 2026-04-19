@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Any
 
 import aiohttp
@@ -25,10 +26,10 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 DOMAIN = "outback_mate3"
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 CONF_URL = "url"
-DEFAULT_URL = "ws://local-outback-mate3:8099/ws"
+DEFAULT_URL = "ws://local-outback-mate3:28099/ws"
 
 KIND_INVERTER = "inverter"
 KIND_CHARGE_CONTROLLER = "charge_controller"
@@ -131,6 +132,12 @@ class OutbackMate3(DataUpdateCoordinator):
         self._running = False
         self._add_entities_callback: AddEntitiesCallback | None = None
 
+        # Monotonic timestamp of the most recently-applied UDP-derived payload
+        # (snapshot with devices, device_added, or state_updated). Used by the
+        # `binary_sensor.mate3_system_receiving_data` connectivity entity; None
+        # means we've never received a UDP frame yet.
+        self.last_udp_at: float | None = None
+
         # Per-MAC state dicts that sensor.py reads from directly.
         self.inverters: dict[str, dict[int, dict[str, Any]]] = {}
         self.charge_controllers: dict[str, dict[int, dict[str, Any]]] = {}
@@ -170,6 +177,10 @@ class OutbackMate3(DataUpdateCoordinator):
     async def _ws_loop(self) -> None:
         """Connect to the add-on and consume events; reconnect with backoff."""
         backoff = _INITIAL_BACKOFF_S
+        # Warn once on the first consecutive connect failure; drop to DEBUG
+        # while we keep retrying so the HA log doesn't fill up with one WARN
+        # every <backoff>s when the add-on is stopped.
+        warned_while_disconnected = False
         while self._running:
             try:
                 async with aiohttp.ClientSession() as session:
@@ -179,13 +190,21 @@ class OutbackMate3(DataUpdateCoordinator):
                         _LOGGER.info("Connected to MATE3 add-on at %s", self.url)
                         self._connected = True
                         backoff = _INITIAL_BACKOFF_S
+                        warned_while_disconnected = False
                         await self._consume(ws)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001
-                _LOGGER.warning(
-                    "MATE3 add-on connection to %s failed: %s", self.url, exc
-                )
+                if not warned_while_disconnected:
+                    _LOGGER.warning(
+                        "MATE3 add-on connection to %s failed: %s (retrying)",
+                        self.url, exc,
+                    )
+                    warned_while_disconnected = True
+                else:
+                    _LOGGER.debug(
+                        "MATE3 add-on still unreachable at %s: %s", self.url, exc
+                    )
 
             self._connected = False
             self._mark_entities_stale()
@@ -272,6 +291,9 @@ class OutbackMate3(DataUpdateCoordinator):
         else:
             _LOGGER.debug("Ignoring unknown device kind %r", kind)
             return
+
+        # Any UDP-derived payload is fresh evidence the MATE3 is streaming.
+        self.last_udp_at = time.monotonic()
 
         # Preserve legacy device_key format so existing entity unique IDs stay stable.
         device_key = f"{mac}_{type_code}_{index}"

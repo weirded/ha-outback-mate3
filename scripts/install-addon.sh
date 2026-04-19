@@ -198,6 +198,6 @@ Tail logs:
   ssh $PVE_HOST 'docker exec hassio_cli ha apps logs $FULL_SLUG'
 
 WebSocket URL for the integration:
-  ws://<ha-host-or-ip>:8099/ws
+  ws://<ha-host-or-ip>:28099/ws
 
 EOF

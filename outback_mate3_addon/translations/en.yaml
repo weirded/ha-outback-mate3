@@ -1,0 +1,33 @@
+configuration:
+  udp_port:
+    name: UDP port
+    description: >-
+      Port the MATE3 streams telemetry to. Must match the Destination Port
+      configured on the MATE3 itself (Settings → System → Data Stream). Outback's
+      convention is 57027.
+  ws_port:
+    name: WebSocket port
+    description: >-
+      TCP port this add-on exposes for the Outback MATE3 integration's WebSocket
+      client. Only change this if another add-on on the same host already claims
+      the default.
+  log_level:
+    name: Log level
+    description: >-
+      How verbose the add-on log is. Bump to `debug` when troubleshooting to see
+      every UDP datagram and every CONFIG.xml poll diff.
+  min_update_interval_s:
+    name: Minimum update interval (seconds)
+    description: >-
+      Per-MAC throttle. Frames arriving sooner than this after the last accepted
+      frame are dropped — keeps HA's recorder from drowning in the MATE3's 1 Hz
+      stream.
+  config_poll_interval_s:
+    name: CONFIG.xml poll interval (seconds)
+    description: >-
+      How often to pull `http://<mate3>/CONFIG.xml` for firmware versions and
+      setpoint diagnostic sensors. Set to `0` to disable the poll entirely (the
+      UDP live-data stream keeps working either way).
+network:
+  28099/tcp: Outback MATE3 WebSocket endpoint (for the integration)
+  57027/udp: Outback MATE3 telemetry ingress
