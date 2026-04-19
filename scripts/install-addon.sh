@@ -156,15 +156,17 @@ log "Reloading Supervisor store"
 ha_cli "store reload --no-progress" >/dev/null 2>&1 \
   || ha_cli "store reload" >/dev/null 2>&1 || true
 
-# Check if already installed: `ha apps info <slug>` exits 0 if installed
+# Check install state via `apps info --raw-json`. On this Supervisor version
+# the `installed` field is absent/None for both installed and not-installed
+# apps, so we key off the more reliable signals: `version` is null for a
+# store-only app and set to the installed version for an installed app;
+# `state` is "unknown" for not-installed vs "started"/"stopped" when installed.
 INFO_JSON=$(ha_cli "apps info $FULL_SLUG --raw-json" 2>/dev/null || echo '{"data":{}}')
-# `installed` is the authoritative flag; `version` is null on a not-yet-
-# installed store app (which `read` with a default IFS would mis-split).
-INSTALLED=$(python3 -c "import sys,json; print('1' if json.loads(sys.stdin.read()).get('data',{}).get('installed') else '0')" <<<"$INFO_JSON")
 INSTALLED_VERSION=$(python3 -c "import sys,json; print(json.loads(sys.stdin.read()).get('data',{}).get('version') or '')" <<<"$INFO_JSON")
 LATEST_VERSION=$(python3 -c "import sys,json; print(json.loads(sys.stdin.read()).get('data',{}).get('version_latest') or '')" <<<"$INFO_JSON")
+STATE=$(python3 -c "import sys,json; print(json.loads(sys.stdin.read()).get('data',{}).get('state') or '')" <<<"$INFO_JSON")
 
-if [[ "$INSTALLED" != "1" ]]; then
+if [[ -z "$INSTALLED_VERSION" && "$STATE" == "unknown" ]]; then
   log "Installing $FULL_SLUG (first build can take several minutes)"
   HA_CLI_TIMEOUT=900 ha_cli "apps install $FULL_SLUG" >/dev/null
 elif [[ "$INSTALLED_VERSION" != "$LATEST_VERSION" ]]; then

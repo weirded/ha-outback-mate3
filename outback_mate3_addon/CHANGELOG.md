@@ -3,13 +3,13 @@
 The add-on and its bundled integration share a single version number; see
 the top-level [`CHANGELOG.md`](../CHANGELOG.md) for the combined history.
 
-## 2.0.0 — unreleased
+## 2.0.0 — 2026-04-18
 
 First release of the split architecture. The add-on owns the MATE3 UDP
 listener (`host_network: true`, default port 57027) and the HTTP
 `CONFIG.xml` poller, and exposes a WebSocket broadcast server at `/ws`
-(default TCP port **28099**, changed from 8099 in a late pre-release to avoid
-common port collisions).
+(default TCP port **28099**, chosen to avoid the common 8099 collision across
+other HA add-ons).
 
 Notable bits:
 

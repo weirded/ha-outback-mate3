@@ -1,10 +1,9 @@
 # Changelog
 
-All notable changes to the integration and the companion add-on. The two now
-share a single version number (`2.0.0-devN` while stabilizing; next cut is
-`2.0.0`).
+All notable changes to the integration and the companion add-on. The two
+share a single version number.
 
-## 2.0.0 — unreleased
+## 2.0.0 — 2026-04-18
 
 The 2.0 cut. First release of the split architecture. The integration no
 longer listens for MATE3 UDP packets directly; a new companion
@@ -53,7 +52,7 @@ install, one device entry in **Settings → Devices & Services → Discovered**
   stack mode, MPPT settings, AUX output, Relay, Diversion, PV Trigger,
   Nite Light, HVT, LGT, Grid Mode Schedules, full Advanced Generator Start
   block, and all three Grid_Use TOU profiles. All disabled-by-default.
-- **Connection-health binary sensor** — `binary_sensor.mate3_receiving_data_from_mate3`
+- **Connection-health binary sensor** — `binary_sensor.mate3_system_receiving_data`
   flips off after 300 s without a UDP frame, so automations can notice when
   the MATE3 stops streaming (cable pulled, firmware destination-IP glitch,
   power cycle). See the B19 note below.
