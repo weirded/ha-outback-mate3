@@ -145,6 +145,21 @@ If you're not seeing data:
 1. Verify MATE3 network connectivity
 2. Enable debug logging and check Home Assistant logs for any error messages
 
+See [`docs/troubleshooting.md`](docs/troubleshooting.md) for a symptom-driven
+walkthrough of the common failure modes (discovery card missing,
+`MATE3 Connected` off, Energy Dashboard skipping the sensors, repairs
+issues, etc.) and [`docs/faq.md`](docs/faq.md) for common questions.
+
+## Further reading
+
+- [`docs/architecture.md`](docs/architecture.md) — why the integration is
+  split into two halves, why WebSocket, the security model, and the
+  single-version coupling.
+- [`docs/troubleshooting.md`](docs/troubleshooting.md) — symptom → diagnosis
+  walkthroughs.
+- [`docs/faq.md`](docs/faq.md) — common questions.
+- [`CHANGELOG.md`](CHANGELOG.md) — decision history + what shipped when.
+
 ## License
 
 MIT — see [`LICENSE`](LICENSE).

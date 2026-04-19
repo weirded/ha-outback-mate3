@@ -818,3 +818,50 @@ async def test_addon_offline_issue_cleared_on_reconnect(
     # A connect transition should clear it.
     mate3._on_connected()
     assert registry.async_get_issue(DOMAIN, ISSUE_ADDON_OFFLINE) is None
+
+
+# --- syrupy snapshot tests ------------------------------------------------
+
+
+async def test_entity_states_snapshot(
+    hass: HomeAssistant, fake_addon: _FakeAddOn, snapshot
+) -> None:
+    """Pin down the public entity surface: if state/attrs drift, the snapshot fails.
+
+    Covers live UDP sensors (system aggregates, inverter, charge controller)
+    and the ``MATE3 Connected`` binary sensor. Diagnostic config entities
+    aren't loaded here (no ``config_snapshot`` in the payload) so the snapshot
+    stays small and focused on the live-telemetry surface.
+    """
+    fake_addon.messages = [SNAPSHOT_PAYLOAD]
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    # Wait for the snapshot payload to fully populate before sampling.
+    await _wait_for_state(hass, f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power")
+    for _ in range(40):
+        if hass.states.get("binary_sensor.mate3_system_connected") is not None:
+            break
+        await asyncio.sleep(0.05)
+
+    # Serialize a deterministic, MAC-stable projection. We keep entity_id,
+    # state, and the subset of attributes that actually change with
+    # behavior (excludes `friendly_name` collisions and volatile timestamps).
+    watched = sorted(
+        s.entity_id for s in hass.states.async_all()
+        if s.entity_id.startswith(("sensor.mate3_", "binary_sensor.mate3_"))
+    )
+    projection = []
+    for eid in watched:
+        st = hass.states.get(eid)
+        assert st is not None, f"entity {eid} vanished between listing and snapshotting"
+        projection.append({
+            "entity_id": eid,
+            "state": st.state,
+            "unit": st.attributes.get("unit_of_measurement"),
+            "device_class": st.attributes.get("device_class"),
+            "state_class": st.attributes.get("state_class"),
+        })
+    assert projection == snapshot

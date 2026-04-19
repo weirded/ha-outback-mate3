@@ -100,16 +100,21 @@ log "Copying tarball to $PVE_HOST"
 REMOTE_STAGE="/tmp/outback_integration-$$.tar"
 scp -q "$TARBALL" "$PVE_HOST:$REMOTE_STAGE"
 
+# Chunks are staged under a script-specific prefix so install-addon.sh and
+# install-integration.sh can run in parallel without clobbering each other's
+# /tmp/c.* files on the guest.
+CHUNK_PREFIX="integ"
 log "Pushing tarball to VM $VMID via qga file-write (chunked)"
-ssh "$PVE_HOST" bash -s "$PVE_NODE" "$VMID" "$REMOTE_STAGE" <<'REMOTE'
+ssh "$PVE_HOST" bash -s "$PVE_NODE" "$VMID" "$REMOTE_STAGE" "$CHUNK_PREFIX" <<'REMOTE'
 set -euo pipefail
 PVE_NODE="$1"
 VMID="$2"
 SRC="$3"
+PREFIX="$4"
 CHUNK_DIR=$(mktemp -d)
 trap 'rm -rf "$CHUNK_DIR" "$SRC"' EXIT
-split -b 40000 -a 3 -d "$SRC" "$CHUNK_DIR/c."
-for f in "$CHUNK_DIR"/c.*; do
+split -b 40000 -a 3 -d "$SRC" "$CHUNK_DIR/$PREFIX."
+for f in "$CHUNK_DIR/$PREFIX".*; do
   name=$(basename "$f")
   B64=$(base64 -w0 < "$f")
   pvesh create "/nodes/$PVE_NODE/qemu/$VMID/agent/file-write" \
@@ -122,8 +127,8 @@ REMOTE
 log "Extracting into $GUEST_TARGET"
 guest_exec "
 set -e
-cat /tmp/c.* > $GUEST_TAR
-rm -f /tmp/c.*
+cat /tmp/${CHUNK_PREFIX}.* > $GUEST_TAR
+rm -f /tmp/${CHUNK_PREFIX}.*
 mkdir -p $(dirname "$GUEST_TARGET")
 rm -rf $GUEST_TARGET
 cd $(dirname "$GUEST_TARGET")
