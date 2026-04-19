@@ -72,3 +72,8 @@ After every turn that changes files in the repo:
 
 Do all four unless the user explicitly says not to. Changes the user can't
 see sitting on my disk don't count as delivered.
+
+**Exception — work-documentation-only turns**: if a turn only edits planning
+or working docs (`TASKS.md`, `archive/TASKS-*.md`, `docs/**`, `README.md`,
+`CHANGELOG.md`, etc.) and touches no shipping code, skip the bump and the
+deploy. A commit is still fine but not required — ask if unsure.

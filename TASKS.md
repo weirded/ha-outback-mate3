@@ -21,6 +21,18 @@ via `./scripts/bump-dev-version.sh`.
   sensor was already fine — it averages the two CC battery voltages, not the
   inverters — but the per-inverter sensors will now show the correct value.)_
 
+- [ ] **F2** — Charge-controller `kwh_today` sensor is stuck at 0. Parser reads
+  `values[13]`, which is always `00` on the real hardware (verified on hass-4
+  against live UDP). Pre-existing from the upstream integration — the 2.0
+  rewrite carried it over unchanged. MATE3 does not transmit daily kWh via UDP.
+  Either drop the sensor, or synthesize it as `daily_ah × nominal_battery_v / 1000`
+  once F3 lands. See `docs/audit/2.0.1-sensor-audit.md` for evidence.
+
+- [ ] **F3** — Charge-controller daily Ah is not exposed. `values[12]` (4-digit)
+  is the MATE3 "Daily Ah" reading (69 / 36 Ah on hass-4 at capture time). Add a
+  `daily_ah` sensor (unit `Ah`, `device_class=None`, `state_class=total_increasing`
+  with a daily reset). See `docs/audit/2.0.1-sensor-audit.md`.
+
 ## Deferred — add-on / integration decoupling (post-2.0.1)
 
 Today the integration hard-codes knowledge that derives from the MATE3
