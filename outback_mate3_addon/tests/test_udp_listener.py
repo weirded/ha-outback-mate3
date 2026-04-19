@@ -1,4 +1,5 @@
 """End-to-end test: UDP datagram in → WebSocket event out."""
+
 from __future__ import annotations
 
 import asyncio

@@ -9,6 +9,7 @@ Waits for the first UDP datagram before the first poll, since without it
 we don't know which IP to reach. Subsequent polls iterate every known
 source on each tick.
 """
+
 from __future__ import annotations
 
 import asyncio

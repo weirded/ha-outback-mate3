@@ -6,6 +6,7 @@ materialize and respond to state updates + reconnects. Phase 17 expanded
 coverage to config-flow paths (user/hassio/reconfigure + error variants),
 migrations, malformed payloads, and diagnostics.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -151,22 +152,16 @@ async def _wait_for_state(hass: HomeAssistant, entity_id: str, timeout: float = 
 # --- tests ----------------------------------------------------------------
 
 
-async def test_snapshot_creates_udp_entities(
-    hass: HomeAssistant, fake_addon: _FakeAddOn
-) -> None:
+async def test_snapshot_creates_udp_entities(hass: HomeAssistant, fake_addon: _FakeAddOn) -> None:
     """A snapshot payload should materialize sensor entities for each device."""
     fake_addon.messages = [SNAPSHOT_PAYLOAD]
 
-    entry = MockConfigEntry(
-        domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2
-    )
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    inv_state = await _wait_for_state(
-        hass, f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power"
-    )
+    inv_state = await _wait_for_state(hass, f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power")
     assert float(inv_state.state) == 500
 
     cc_state = await _wait_for_state(
@@ -179,9 +174,7 @@ async def test_state_updated_refreshes_entities(
     hass: HomeAssistant, fake_addon: _FakeAddOn
 ) -> None:
     fake_addon.messages = [SNAPSHOT_PAYLOAD]
-    entry = MockConfigEntry(
-        domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2
-    )
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -219,9 +212,7 @@ async def test_config_snapshot_only_creates_diagnostics_after_poll(
     from homeassistant.helpers import entity_registry as er
 
     fake_addon.messages = [SNAPSHOT_PAYLOAD]  # no config_snapshot yet
-    entry = MockConfigEntry(
-        domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2
-    )
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -242,9 +233,9 @@ async def test_config_snapshot_only_creates_diagnostics_after_poll(
             break
         await asyncio.sleep(0.05)
     assert entry is not None, "firmware diagnostic entity never registered"
-    assert entry.disabled_by is er.RegistryEntryDisabler.INTEGRATION, (
-        f"expected disabled-by-default config sensor, got disabled_by={entry.disabled_by}"
-    )
+    assert (
+        entry.disabled_by is er.RegistryEntryDisabler.INTEGRATION
+    ), f"expected disabled-by-default config sensor, got disabled_by={entry.disabled_by}"
 
 
 async def test_connected_binary_sensor_flips_on_snapshot(
@@ -252,9 +243,7 @@ async def test_connected_binary_sensor_flips_on_snapshot(
 ) -> None:
     """The connectivity binary sensor turns on once UDP-derived data arrives."""
     fake_addon.messages = [SNAPSHOT_PAYLOAD]
-    entry = MockConfigEntry(
-        domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2
-    )
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -266,9 +255,9 @@ async def test_connected_binary_sensor_flips_on_snapshot(
         if st is not None and st.state == "on":
             break
         await asyncio.sleep(0.05)
-    assert st is not None and st.state == "on", (
-        f"binary sensor never flipped to on; last state={st and st.state}"
-    )
+    assert (
+        st is not None and st.state == "on"
+    ), f"binary sensor never flipped to on; last state={st and st.state}"
 
 
 async def test_connected_binary_sensor_is_off_without_udp(
@@ -278,9 +267,7 @@ async def test_connected_binary_sensor_is_off_without_udp(
     # Empty devices list = no UDP-derived payloads applied yet, even after
     # the WS connection is fully up and a config_snapshot has arrived.
     fake_addon.messages = [{"type": "snapshot", "devices": []}, CONFIG_PAYLOAD]
-    entry = MockConfigEntry(
-        domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2
-    )
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -295,14 +282,10 @@ async def test_connected_binary_sensor_is_off_without_udp(
     assert st.state == "off"
 
 
-async def test_reconnects_after_addon_drops_ws(
-    hass: HomeAssistant, fake_addon: _FakeAddOn
-) -> None:
+async def test_reconnects_after_addon_drops_ws(hass: HomeAssistant, fake_addon: _FakeAddOn) -> None:
     """Killing the add-on's sockets should trigger reconnect + new snapshot."""
     fake_addon.messages = [SNAPSHOT_PAYLOAD]
-    entry = MockConfigEntry(
-        domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2
-    )
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -499,10 +482,13 @@ async def test_config_flow_reconfigure_updates_url(
     # the fresh WS task's aiohttp session leaves a DNS resolver timer when
     # pointed at a bogus hostname, so short-circuit start() during the
     # reload to keep PHACC's lingering-timer check happy.
-    with patch(
-        "custom_components.outback_mate3.config_flow._probe_ws_url",
-        return_value=None,
-    ), patch("custom_components.outback_mate3.OutbackMate3.start"):
+    with (
+        patch(
+            "custom_components.outback_mate3.config_flow._probe_ws_url",
+            return_value=None,
+        ),
+        patch("custom_components.outback_mate3.OutbackMate3.start"),
+    ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN,
             context={
@@ -601,7 +587,7 @@ async def test_malformed_config_snapshot_is_ignored(
     """config_snapshot missing ``mac`` or ``config`` must not crash the loop."""
     fake_addon.messages = [
         SNAPSHOT_PAYLOAD,
-        {"type": "config_snapshot"},          # missing both mac and config
+        {"type": "config_snapshot"},  # missing both mac and config
         {"type": "config_snapshot", "mac": MAC},  # missing config
         {"type": "config_snapshot", "mac": MAC, "config": "not-a-dict"},
         CONFIG_PAYLOAD,  # valid one should still be applied
@@ -623,9 +609,7 @@ async def test_malformed_config_snapshot_is_ignored(
 # --- device removal ------------------------------------------------------
 
 
-async def test_remove_stale_device_allowed(
-    hass: HomeAssistant, fake_addon: _FakeAddOn
-) -> None:
+async def test_remove_stale_device_allowed(hass: HomeAssistant, fake_addon: _FakeAddOn) -> None:
     """async_remove_config_entry_device returns True for devices no longer seen."""
     from custom_components.outback_mate3 import async_remove_config_entry_device
     from homeassistant.helpers import device_registry as dr
@@ -646,9 +630,7 @@ async def test_remove_stale_device_allowed(
     assert await async_remove_config_entry_device(hass, entry, stale_device) is True
 
 
-async def test_remove_live_device_blocked(
-    hass: HomeAssistant, fake_addon: _FakeAddOn
-) -> None:
+async def test_remove_live_device_blocked(hass: HomeAssistant, fake_addon: _FakeAddOn) -> None:
     """async_remove_config_entry_device returns False for currently-known devices."""
     from custom_components.outback_mate3 import async_remove_config_entry_device
     from homeassistant.helpers import device_registry as dr
@@ -671,9 +653,7 @@ async def test_remove_live_device_blocked(
 # --- diagnostics ---------------------------------------------------------
 
 
-async def test_diagnostics_snapshot(
-    hass: HomeAssistant, fake_addon: _FakeAddOn
-) -> None:
+async def test_diagnostics_snapshot(hass: HomeAssistant, fake_addon: _FakeAddOn) -> None:
     """Diagnostics exposes coordinator state; redaction set is honored."""
     from custom_components.outback_mate3.diagnostics import (
         async_get_config_entry_diagnostics,
@@ -761,9 +741,7 @@ async def test_hello_version_mismatch_creates_repairs_issue(
     }
 
 
-async def test_addon_offline_issue_raised_after_grace(
-    hass: HomeAssistant, socket_enabled
-) -> None:
+async def test_addon_offline_issue_raised_after_grace(hass: HomeAssistant, socket_enabled) -> None:
     """A WS that can't connect raises the `addon_offline` issue after the grace window.
 
     Points the entry at a URL nothing's listening on, shrinks the grace
@@ -850,18 +828,21 @@ async def test_entity_states_snapshot(
     # state, and the subset of attributes that actually change with
     # behavior (excludes `friendly_name` collisions and volatile timestamps).
     watched = sorted(
-        s.entity_id for s in hass.states.async_all()
+        s.entity_id
+        for s in hass.states.async_all()
         if s.entity_id.startswith(("sensor.mate3_", "binary_sensor.mate3_"))
     )
     projection = []
     for eid in watched:
         st = hass.states.get(eid)
         assert st is not None, f"entity {eid} vanished between listing and snapshotting"
-        projection.append({
-            "entity_id": eid,
-            "state": st.state,
-            "unit": st.attributes.get("unit_of_measurement"),
-            "device_class": st.attributes.get("device_class"),
-            "state_class": st.attributes.get("state_class"),
-        })
+        projection.append(
+            {
+                "entity_id": eid,
+                "state": st.state,
+                "unit": st.attributes.get("unit_of_measurement"),
+                "device_class": st.attributes.get("device_class"),
+                "state_class": st.attributes.get("state_class"),
+            }
+        )
     assert projection == snapshot

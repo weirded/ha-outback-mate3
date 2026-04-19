@@ -6,6 +6,7 @@ per MAC, and the live inverter/charge-controller state. MAC addresses
 (which Outback uses as stable device identifiers but some users still
 consider sensitive) are redacted by default.
 """
+
 from __future__ import annotations
 
 import time

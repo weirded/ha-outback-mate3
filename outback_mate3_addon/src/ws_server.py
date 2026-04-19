@@ -11,6 +11,7 @@ client can't stall the others.
 Ping/pong is handled by aiohttp's protocol-level heartbeat
 (:class:`WebSocketResponse` ``heartbeat`` argument).
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -100,9 +101,7 @@ class WSServer:
         # don't know our own version (e.g. unit tests that don't set it) so
         # the test fakes don't have to hand-drain an extra frame.
         if self._addon_version is not None:
-            await ws.send_json(
-                {"type": "hello", "addon_version": self._addon_version}
-            )
+            await ws.send_json({"type": "hello", "addon_version": self._addon_version})
         await ws.send_json({"type": "snapshot", "devices": self._registry.snapshot()})
         # Replay the last known config for each MAC so new clients get the
         # full picture without having to wait for the next poll interval.
@@ -182,9 +181,7 @@ class WSServer:
                 _LOGGER.debug("Dropping unresponsive WS client: %r", result)
                 self._clients.discard(ws)
 
-    async def _send_to(
-        self, ws: web.WebSocketResponse, messages: list[dict[str, Any]]
-    ) -> None:
+    async def _send_to(self, ws: web.WebSocketResponse, messages: list[dict[str, Any]]) -> None:
         """Send ``messages`` to a single client within the configured timeout."""
         async with asyncio.timeout(self._send_timeout_s):
             for msg in messages:

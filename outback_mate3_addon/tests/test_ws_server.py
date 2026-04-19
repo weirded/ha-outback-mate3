@@ -1,4 +1,5 @@
 """Tests for the WebSocket broadcast server."""
+
 from __future__ import annotations
 
 import asyncio
@@ -38,6 +39,7 @@ async def ws_setup():
 
 # --- event_to_message -------------------------------------------------------
 
+
 def test_event_to_message_for_device_added():
     evt = DeviceAdded(mac="A", kind=KIND_INVERTER, index=1, state={"x": 1})
     assert event_to_message(evt) == {
@@ -60,6 +62,7 @@ def test_event_to_message_rejects_unknown_type():
 
 
 # --- Snapshot on connect ----------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_new_client_receives_snapshot(ws_setup):
@@ -102,6 +105,7 @@ async def test_snapshot_contains_state(ws_setup):
 
 
 # --- Broadcast --------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_broadcast_delivers_to_connected_client(ws_setup):
@@ -188,9 +192,7 @@ def test_enqueue_broadcast_full_queue_drops_and_counts():
     server = WSServer(_populated_registry(), heartbeat=100, queue_max=3)
     # No broadcaster running; the queue has capacity 3 — push 5 and see 2 drops.
     for i in range(5):
-        server.enqueue_broadcast(
-            [StateUpdated(mac="A", kind=KIND_INVERTER, index=i, state={})]
-        )
+        server.enqueue_broadcast([StateUpdated(mac="A", kind=KIND_INVERTER, index=i, state={})])
     assert server.dropped_batches == 2
 
 

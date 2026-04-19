@@ -140,8 +140,12 @@ def _parse_inverter(values: list[str]) -> dict[str, Any]:
     l2_ac_output_voltage = float(values[8 + 7]) * ac_factor
 
     # Positive grid power = buying (consumption), negative = selling (production).
-    l1_grid_power = (l1_buy_current * l1_ac_input_voltage) - (l1_sell_current * l1_ac_output_voltage)
-    l2_grid_power = (l2_buy_current * l2_ac_input_voltage) - (l2_sell_current * l2_ac_output_voltage)
+    l1_grid_power = (l1_buy_current * l1_ac_input_voltage) - (
+        l1_sell_current * l1_ac_output_voltage
+    )
+    l2_grid_power = (l2_buy_current * l2_ac_input_voltage) - (
+        l2_sell_current * l2_ac_output_voltage
+    )
 
     l1_inverter_power = l1_inverter_current * l1_ac_output_voltage
     l1_charger_power = l1_charger_current * l1_ac_input_voltage

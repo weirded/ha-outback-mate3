@@ -25,9 +25,8 @@ jobs:
       - name: Ruff lint
         run: ruff check .
 
-      # `ruff format --check` is intentionally not enforced yet — 19 files
-      # want whitespace-only reformats as of 2.0.0. Turning this on will be
-      # a single sweep commit as part of Phase 17 (17.11 pre-commit setup).
+      - name: Ruff format
+        run: ruff format --check .
 
   mypy:
     runs-on: ubuntu-latest

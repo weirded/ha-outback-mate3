@@ -1,4 +1,5 @@
 """Pytest config — makes the add-on's src/ importable as the top-level package."""
+
 from __future__ import annotations
 
 import sys

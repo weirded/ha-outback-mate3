@@ -5,6 +5,7 @@ Flips to off after ``STALE_AFTER_S`` seconds without a UDP datagram, so
 automations can notice when the MATE3 stops streaming (cable pulled,
 firmware destination-IP glitch, power cycle).
 """
+
 from __future__ import annotations
 
 import time
@@ -56,9 +57,7 @@ class OutbackMate3ConnectedSensor(BinarySensorEntity):
         #     off→on transition immediately.
         #  2. a 30s timer — captures the on→off transition (no WS messages
         #     to hook when the stream has gone silent).
-        self.async_on_remove(
-            self._mate3.async_add_listener(self._refresh)
-        )
+        self.async_on_remove(self._mate3.async_add_listener(self._refresh))
         self.async_on_remove(
             async_track_time_interval(self.hass, self._timer_tick, CONNECTIVITY_POLL_INTERVAL)
         )

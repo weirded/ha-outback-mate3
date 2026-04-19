@@ -1,4 +1,5 @@
 """Tests for the MATE3 CONFIG.xml parser."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -20,6 +21,7 @@ def test_top_level_sections(config):
 
 # --- system nameplate ------------------------------------------------------
 
+
 def test_system_nameplate(config):
     sys = config["system"]
     assert sys["system_type"] == "Grid Tied"
@@ -39,6 +41,7 @@ def test_empty_installer_fields_not_in_output(config):
 
 
 # --- mate3 block -----------------------------------------------------------
+
 
 def test_mate3_firmware_and_stream(config):
     m = config["mate3"]
@@ -71,6 +74,7 @@ def test_ipv4_normalization(config):
 
 
 # --- Phase 15: system-wide setpoints and coordination ---------------------
+
 
 def test_low_soc_thresholds(config):
     m = config["mate3"]
@@ -135,6 +139,7 @@ def test_load_grid_transfer(config):
 
 # --- inverters -------------------------------------------------------------
 
+
 def test_inverter_count(config):
     # Two GS inverters on this system.
     assert len(config["inverters"]) == 2
@@ -182,6 +187,7 @@ def test_inverter_stack_mode(config):
 
 # --- charge controllers ----------------------------------------------------
 
+
 def test_cc_count(config):
     assert len(config["charge_controllers"]) == 2
 
@@ -209,6 +215,7 @@ def test_cc_mppt(config):
 
 # --- expanded CC coverage (AUX, Wakeup, RTS, MPPT extras) ------------------
 
+
 def test_cc_wakeup_and_snooze(config):
     cc = config["charge_controllers"][0]
     assert cc["wakeup_interval"] == 5
@@ -232,6 +239,7 @@ def test_cc_aux_pv_trigger_and_nite_light(config):
 
 
 # --- expanded inverter coverage (Search, Stack, Mini-Grid, AUX, Relay) -----
+
 
 def test_inverter_search(config):
     inv = config["inverters"][0]
@@ -275,6 +283,7 @@ def test_inverter_ac_input_sizes(config):
 
 # --- robustness ------------------------------------------------------------
 
+
 def test_rejects_non_system_config_root():
     with pytest.raises(ValueError):
         parse_config(b"<Something_Else/>")
@@ -282,6 +291,7 @@ def test_rejects_non_system_config_root():
 
 def test_malformed_xml_raises_parse_error():
     import xml.etree.ElementTree as ET
+
     with pytest.raises(ET.ParseError):
         parse_config(b"<not really xml")
 

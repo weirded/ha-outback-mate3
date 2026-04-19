@@ -14,6 +14,7 @@ isn't enabled. The top-level keys are:
 - ``inverters``         — list of dicts, one per inverter port (in MATE3 port order)
 - ``charge_controllers`` — list of dicts, one per charge controller port
 """
+
 from __future__ import annotations
 
 import logging
@@ -216,7 +217,9 @@ def _parse_mate3(root: ET.Element) -> dict[str, Any]:
         out["lgt_connect_delay"] = _int(lgt.find("Load_Connect_Delay"))
         out["lgt_disconnect_delay"] = _int(lgt.find("Load_Disconnect_Delay"))
         out["lgt_low_battery_connect_voltage"] = _volt_tenths(lgt.find("Low_Battery_Connect"))
-        out["lgt_high_battery_disconnect_voltage"] = _volt_tenths(lgt.find("High_Battery_Disconnect"))
+        out["lgt_high_battery_disconnect_voltage"] = _volt_tenths(
+            lgt.find("High_Battery_Disconnect")
+        )
 
     # --- Advanced Generator Start (~50 fields under one block) ---
     ags = remote.find("Advance_Generator_Start")
@@ -230,7 +233,9 @@ def _parse_mate3(root: ET.Element) -> dict[str, Any]:
         out["ags_fault_time"] = _int(ags.find("Fault_Time"))
         out["ags_ac_input_reconnect_delay"] = _int(ags.find("AC_Input_Reconnect_Delay"))
         out["ags_dc_generator_absorb_time"] = _int(ags.find("DC_Generator_Absorb_Time"))
-        out["ags_dc_generator_absorb_voltage"] = _volt_tenths(ags.find("DC_Generator_Absorb_Voltage"))
+        out["ags_dc_generator_absorb_voltage"] = _volt_tenths(
+            ags.find("DC_Generator_Absorb_Voltage")
+        )
         fndc_fc = ags.find("FNDC_Full_Charge")
         if fndc_fc is not None:
             out["ags_fndc_full_charge_mode"] = fndc_fc.get("Mode")
@@ -488,7 +493,9 @@ def parse_config(xml_bytes: bytes) -> dict[str, Any]:
     return out
 
 
-async def fetch_config(host: str, timeout: aiohttp.ClientTimeout | None = None) -> dict[str, Any] | None:
+async def fetch_config(
+    host: str, timeout: aiohttp.ClientTimeout | None = None
+) -> dict[str, Any] | None:
     """Fetch + parse CONFIG.xml from ``host``. Returns ``None`` on failure."""
     url = f"http://{host}/CONFIG.xml"
     try:

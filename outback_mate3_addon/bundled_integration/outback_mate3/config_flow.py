@@ -1,4 +1,5 @@
 """Config flow for Outback MATE3 integration."""
+
 from __future__ import annotations
 
 import asyncio
@@ -46,9 +47,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._discovered_url: str | None = None
         self._discovered_name: str | None = None
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the initial step."""
         errors: dict[str, str] = {}
 
@@ -74,9 +73,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_hassio(
-        self, discovery_info: HassioServiceInfo
-    ) -> ConfigFlowResult:
+    async def async_step_hassio(self, discovery_info: HassioServiceInfo) -> ConfigFlowResult:
         """Handle auto-discovery from the Outback MATE3 Supervisor add-on."""
         host = discovery_info.config["host"]
         port = discovery_info.config["port"]

@@ -6,6 +6,7 @@ parsing; this integration is a thin reactive client that turns
 ``snapshot`` / ``device_added`` / ``state_updated`` events into HA entity
 lifecycle and state updates.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -211,9 +212,10 @@ class OutbackMate3(DataUpdateCoordinator[None]):
         warned_while_disconnected = False
         while self._running:
             try:
-                async with aiohttp.ClientSession() as session, session.ws_connect(
-                    self.url, heartbeat=WS_HEARTBEAT_S
-                ) as ws:
+                async with (
+                    aiohttp.ClientSession() as session,
+                    session.ws_connect(self.url, heartbeat=WS_HEARTBEAT_S) as ws,
+                ):
                     _LOGGER.info("Connected to MATE3 add-on at %s", self.url)
                     self._connected = True
                     backoff = INITIAL_BACKOFF_S
@@ -230,13 +232,12 @@ class OutbackMate3(DataUpdateCoordinator[None]):
                 if not warned_while_disconnected:
                     _LOGGER.warning(
                         "MATE3 add-on connection to %s failed: %s (retrying)",
-                        self.url, exc,
+                        self.url,
+                        exc,
                     )
                     warned_while_disconnected = True
                 else:
-                    _LOGGER.debug(
-                        "MATE3 add-on still unreachable at %s: %s", self.url, exc
-                    )
+                    _LOGGER.debug("MATE3 add-on still unreachable at %s: %s", self.url, exc)
 
             self._connected = False
             self._mark_entities_stale()

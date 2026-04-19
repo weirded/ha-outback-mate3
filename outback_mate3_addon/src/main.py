@@ -5,6 +5,7 @@ pulls them out of ``/data/options.json`` via bashio), wires the pipeline
 (UDP → parser → registry → WebSocket broadcast), and serves both the UDP
 listener and the HTTP/WebSocket server until SIGTERM/SIGINT.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -57,7 +58,11 @@ async def run() -> None:
     _configure_logging(log_level)
     _LOGGER.info(
         "Starting Outback MATE3 relay v%s: UDP :%d → WS :%d (throttle %.1fs, config poll %.0fs)",
-        addon_version or "unknown", udp_port, ws_port, min_interval, config_poll_interval,
+        addon_version or "unknown",
+        udp_port,
+        ws_port,
+        min_interval,
+        config_poll_interval,
     )
 
     registry = DeviceRegistry(min_update_interval_s=min_interval)
@@ -78,9 +83,7 @@ async def run() -> None:
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stop.set)
 
-    poller = asyncio.create_task(
-        config_poller.run(registry, server, config_poll_interval, stop)
-    )
+    poller = asyncio.create_task(config_poller.run(registry, server, config_poll_interval, stop))
     # Single consumer that drains the WSServer's broadcast queue and fans
     # events out to clients. Having exactly one serializes ordering across
     # the UDP and config-poll producers.

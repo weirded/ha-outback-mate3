@@ -1,6 +1,7 @@
 """asyncio UDP listener that wires MATE3 frames through the parser,
 registry, and WebSocket broadcast.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -28,12 +29,8 @@ class _Mate3DatagramProtocol(asyncio.DatagramProtocol):
         remote_ip = addr[0]
         if remote_ip not in self._seen_sources:
             self._seen_sources.add(remote_ip)
-            _LOGGER.info(
-                "First UDP datagram from %s (%d bytes)", remote_ip, len(data)
-            )
-        _LOGGER.debug(
-            "UDP %d bytes from %s: %r", len(data), remote_ip, data[:80]
-        )
+            _LOGGER.info("First UDP datagram from %s (%d bytes)", remote_ip, len(data))
+        _LOGGER.debug("UDP %d bytes from %s: %r", len(data), remote_ip, data[:80])
         self._on_datagram(data, remote_ip)
 
     def error_received(self, exc: Exception) -> None:
@@ -64,14 +61,10 @@ async def start_listener(
                 remote_ip,
             )
             return
-        _LOGGER.debug(
-            "Parsed %d device updates from %s", len(updates), remote_ip
-        )
+        _LOGGER.debug("Parsed %d device updates from %s", len(updates), remote_ip)
         events = registry.apply(updates, remote_ip=remote_ip)
         if not events:
-            _LOGGER.debug(
-                "Registry produced no events for %s (likely throttled)", remote_ip
-            )
+            _LOGGER.debug("Registry produced no events for %s (likely throttled)", remote_ip)
             return
         _LOGGER.debug("Broadcasting %d events", len(events))
         # Non-blocking, bounded enqueue. The single broadcaster consumer

@@ -4,6 +4,7 @@ Expected values were taken by running the original integration's parser
 (``custom_components/outback_mate3/__init__.py``) against the same fixtures,
 so any divergence here would represent a behavior change.
 """
+
 from __future__ import annotations
 
 import math
@@ -28,6 +29,7 @@ def _load(name: str) -> bytes:
 
 # --- Frame structure ---------------------------------------------------------
 
+
 def test_telemetry_00_returns_four_devices():
     updates = parse_frame(_load("telemetry_00.bin"), REMOTE_IP)
     assert len(updates) == 4
@@ -49,6 +51,7 @@ def test_all_telemetry_fixtures_parse_to_four_devices():
 
 # --- Noise frames (non-telemetry) should be ignored --------------------------
 
+
 @pytest.mark.parametrize("fixture", ["noise_fsop.bin", "noise_httpost.bin"])
 def test_noise_frames_return_empty(fixture):
     assert parse_frame(_load(fixture), REMOTE_IP) == []
@@ -66,6 +69,7 @@ def test_non_utf8_payload_is_ignored():
 
 
 # --- Inverter value correctness (from telemetry_00.bin) ----------------------
+
 
 @pytest.fixture
 def t00_devices():
@@ -117,10 +121,9 @@ def test_inverter_2_values(t00_devices):
 
 # --- Charge controller value correctness (from telemetry_00.bin) -------------
 
+
 def test_charge_controller_1_values(t00_devices):
-    cc = next(
-        u for u in t00_devices if u.kind == KIND_CHARGE_CONTROLLER and u.index == 1
-    ).state
+    cc = next(u for u in t00_devices if u.kind == KIND_CHARGE_CONTROLLER and u.index == 1).state
     _approx(cc["pv_current"], 11.0)
     _approx(cc["pv_voltage"], 88.0)
     _approx(cc["output_current"], 18.0)
@@ -132,9 +135,7 @@ def test_charge_controller_1_values(t00_devices):
 
 
 def test_charge_controller_2_values(t00_devices):
-    cc = next(
-        u for u in t00_devices if u.kind == KIND_CHARGE_CONTROLLER and u.index == 2
-    ).state
+    cc = next(u for u in t00_devices if u.kind == KIND_CHARGE_CONTROLLER and u.index == 2).state
     _approx(cc["pv_current"], 8.0)
     _approx(cc["pv_voltage"], 85.0)
     _approx(cc["battery_voltage"], 53.5)
@@ -143,6 +144,7 @@ def test_charge_controller_2_values(t00_devices):
 
 # --- 240V AC factor branch ---------------------------------------------------
 
+
 def test_port_10_charge_controller_is_not_dropped():
     """R5 regression: the old filter required blocks to start with '0', which
     silently dropped any device on port 10+. Build a synthetic frame with a
@@ -150,7 +152,7 @@ def test_port_10_charge_controller_is_not_dropped():
     # CC block minimal: id, type=3, v2, v3 (output_current), v4 (pv_current),
     # v5 (pv_voltage), then fill up through v13 (kwh_today) — indices
     # referenced by _parse_charge_controller.
-    cc_fields = ["10","3","0","7","5","80","0","0","0","0","1","534","0","0.5"]
+    cc_fields = ["10", "3", "0", "7", "5", "80", "0", "0", "0", "0", "1", "534", "0", "0.5"]
     payload = f"[AAAAAA-BBBBBB]<{','.join(cc_fields)}>".encode()
     updates = parse_frame(payload, REMOTE_IP)
     assert len(updates) == 1
@@ -174,7 +176,29 @@ def test_240v_ac_factor_doubles_voltage():
     # Build a synthetic inverter block where values[6] > 150.
     # Layout: <id,type,v2..v20,...> — we need at least indices 2..20 populated.
     # Index:     0  1  2  3  4  5  6   7  8  9 10 11 12 13  14  15  16 17  18 19 20
-    fields = ["01","6","1","0","0","0","200","00","100","0","0","0","0","0","0","0","0","0","0","0","0"]
+    fields = [
+        "01",
+        "6",
+        "1",
+        "0",
+        "0",
+        "0",
+        "200",
+        "00",
+        "100",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+        "0",
+    ]
     payload = f"[AAAAAA-BBBBBB]<{','.join(fields)}>".encode()
     updates = parse_frame(payload, REMOTE_IP)
     assert len(updates) == 1
@@ -184,6 +208,7 @@ def test_240v_ac_factor_doubles_voltage():
 
 
 # --- Object identity ---------------------------------------------------------
+
 
 def test_device_update_is_immutable():
     with pytest.raises(Exception):

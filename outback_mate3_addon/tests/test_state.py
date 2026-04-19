@@ -1,4 +1,5 @@
 """Tests for DeviceRegistry."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -27,6 +28,7 @@ def _updates(filename: str) -> list[DeviceUpdate]:
 
 
 # --- First-time ingestion ---------------------------------------------------
+
 
 def test_first_frame_emits_device_added_for_every_device():
     clock = FakeClock(datetime(2026, 4, 17, 12, 0, 0))
@@ -63,6 +65,7 @@ def test_snapshot_reflects_registered_devices():
 
 
 # --- Throttling ------------------------------------------------------------
+
 
 def test_frame_within_throttle_window_is_dropped():
     clock = FakeClock(datetime(2026, 4, 17, 12, 0, 0))
@@ -101,6 +104,7 @@ def test_throttle_is_per_mac():
 
 # --- Update semantics ------------------------------------------------------
 
+
 def test_second_frame_for_same_device_emits_state_updated_not_added():
     clock = FakeClock(datetime(2026, 4, 17, 12, 0, 0))
     reg = DeviceRegistry(min_update_interval_s=0, clock=clock)
@@ -121,8 +125,7 @@ def test_registry_stores_latest_state():
 
     state = reg.device(MAC, KIND_INVERTER, 1)
     last_frame_inv1 = next(
-        u for u in _updates("telemetry_04.bin")
-        if u.kind == KIND_INVERTER and u.index == 1
+        u for u in _updates("telemetry_04.bin") if u.kind == KIND_INVERTER and u.index == 1
     ).state
     assert state == last_frame_inv1
 

@@ -8,6 +8,7 @@ add-on stops, it withdraws the announcement.
 Outside Home Assistant (plain Docker), ``SUPERVISOR_TOKEN`` is unset — the
 announce/withdraw calls are no-ops in that case so the add-on still boots.
 """
+
 from __future__ import annotations
 
 import logging
@@ -37,9 +38,7 @@ async def announce(ws_port: int) -> str | None:
     headers = {"Authorization": f"Bearer {token}"}
     async with aiohttp.ClientSession(timeout=_HTTP_TIMEOUT) as session:
         try:
-            async with session.get(
-                f"{_SUPERVISOR_URL}/addons/self/info", headers=headers
-            ) as resp:
+            async with session.get(f"{_SUPERVISOR_URL}/addons/self/info", headers=headers) as resp:
                 resp.raise_for_status()
                 info = await resp.json()
         except Exception as exc:
@@ -68,8 +67,7 @@ async def announce(ws_port: int) -> str | None:
     if not uuid:
         _LOGGER.warning("Supervisor accepted announce but returned no uuid: %s", body)
         return None
-    _LOGGER.info("Announced discovery to Supervisor (uuid=%s, host=%s:%d)",
-                 uuid, hostname, ws_port)
+    _LOGGER.info("Announced discovery to Supervisor (uuid=%s, host=%s:%d)", uuid, hostname, ws_port)
     return uuid
 
 
