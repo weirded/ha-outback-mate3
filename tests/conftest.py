@@ -20,14 +20,21 @@ if str(_REPO) not in sys.path:
 # thread outside its allowlist, and since the thread is lazily created during
 # HA setup, the first test to use DNS fails teardown. Warm the singleton here
 # so the thread exists in `threads_before` and is ignored as pre-existing.
-import pycares  # noqa: E402
+# If pycares isn't installed (it's a transitive HA dep, but shouldn't bring
+# down conftest collection if that ever changes), the warmup is a no-op —
+# no pycares means no pycares thread means nothing for PHACC to reject.
+try:
+    import pycares  # noqa: E402
+except ImportError:
+    pycares = None  # type: ignore[assignment]
 
-_warmup_channel = pycares.Channel()
-# close() only exists on pycares>=5.0 (which is what triggers the daemon thread
-# we're warming up for). On older pycares the warmup is a no-op.
-if hasattr(_warmup_channel, "close"):
-    _warmup_channel.close()
-del _warmup_channel
+if pycares is not None:
+    _warmup_channel = pycares.Channel()
+    # close() only exists on pycares>=5.0 (which is what triggers the daemon
+    # thread we're warming up for). On older pycares the warmup is a no-op.
+    if hasattr(_warmup_channel, "close"):
+        _warmup_channel.close()
+    del _warmup_channel
 
 pytest_plugins = ["pytest_homeassistant_custom_component"]
 

@@ -54,6 +54,12 @@ LL_TOKEN_NAME="${LL_TOKEN_NAME:-ha-outback-mate3-onboarding}"
 
 command -v jq >/dev/null || { echo "jq is required" >&2; exit 2; }
 command -v curl >/dev/null || { echo "curl is required" >&2; exit 2; }
+command -v python3 >/dev/null || { echo "python3 is required" >&2; exit 2; }
+# The long-lived-token step below embeds a Python script that imports aiohttp.
+# Check up front so we fail fast with a clear install hint instead of a
+# ModuleNotFoundError 30 seconds into the onboarding flow.
+python3 -c 'import aiohttp' 2>/dev/null \
+  || { echo "python3 aiohttp package is required (pip install aiohttp)" >&2; exit 2; }
 
 log() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*" >&2; }
 

@@ -18,11 +18,18 @@ if str(_ADDON_ROOT) not in sys.path:
 # any thread outside its allowlist, so the first test to trigger DNS fails
 # teardown. Warm the singleton here so the thread exists in `threads_before`
 # and is ignored as pre-existing.
-import pycares  # noqa: E402
+# Guarded: no pycares means no pycares thread means nothing to warm up.
+try:
+    import pycares  # noqa: E402
+except ImportError:
+    pycares = None  # type: ignore[assignment]
 
-_warmup_channel = pycares.Channel()
-_warmup_channel.close()
-del _warmup_channel
+if pycares is not None:
+    _warmup_channel = pycares.Channel()
+    # close() only exists on pycares>=5.0; older versions are a no-op.
+    if hasattr(_warmup_channel, "close"):
+        _warmup_channel.close()
+    del _warmup_channel
 
 
 @pytest.fixture(autouse=True)

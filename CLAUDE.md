@@ -6,8 +6,9 @@
 - `outback_mate3_addon/` — Home Assistant add-on (UDP listener + WebSocket broadcast server)
 - `scripts/` — test-VM lifecycle automation
 - `tests/fixtures/mate3_frames/` — real UDP payloads captured from a live MATE3 (device serial obfuscated)
-- `docs/superpowers/specs/` — design docs
-- `TASKS.md` — phased task breakdown, checkboxes reflect reality
+- `archive/TASKS-2.0.0.md` — phased task breakdown for the 2.0 cycle
+  (checkboxes reflect reality; a new `TASKS.md` gets opened at the repo
+  root when the next release cycle starts)
 
 ## Test infrastructure
 
@@ -60,11 +61,13 @@ After every turn that changes files in the repo:
                                         # if either of those two scripts changed
     ```
 
-3. **Update TASKS.md**: for any tasks completed this turn, annotate with the
-   current version — e.g. `- [x] B4 - ... _(2.0.0-dev3)_`. This is how we
-   derive the changelog.
+3. **Update the active task log**: for any tasks completed this turn,
+   annotate with the current version — e.g. `- [x] B4 - ... _(2.0.0-dev3)_`.
+   This is how we derive the changelog. The active log is `TASKS.md` at the
+   repo root if one exists; otherwise use the most recent
+   `archive/TASKS-*.md` (currently `archive/TASKS-2.0.0.md`).
 
-4. **Commit** everything (the bump, the code changes, the TASKS.md annotation)
+4. **Commit** everything (the bump, the code changes, the task-log annotation)
    to the current branch (`weirded/ha-addon-plan`) with a clear message.
 
 Do all four unless the user explicitly says not to. Changes the user can't
