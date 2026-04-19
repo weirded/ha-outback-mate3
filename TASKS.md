@@ -256,15 +256,15 @@ _Bigger-surface changes that move the integration from Bronze toward Gold._
 - [x] **17.1** Create `custom_components/outback_mate3/diagnostics.py` — `async_get_config_entry_diagnostics` returning entry data + coordinator snapshot with sensitive-field redaction. _(2.0.0-dev17)_
 - [x] **17.2** Create `custom_components/outback_mate3/strings.json` with translatable names for entity classes + exceptions; regenerate `translations/en.json` from it. _(2.0.0-dev17)_
 - [x] **17.3** Add `async_step_reconfigure(self, user_input)` to `custom_components/outback_mate3/config_flow.py` so users can change the WS URL post-setup without deleting/recreating the entry. _(2.0.0-dev17)_
-- [ ] **17.4** Split `custom_components/outback_mate3/sensor.py` into `sensor.py` (live UDP sensors) + `sensor_config.py` (400+ config-derived diagnostic sensors) — or drive config-derived entities from a declarative table.
+- [x] **17.4** Split `custom_components/outback_mate3/sensor.py` into `sensor.py` (live UDP sensors) + `sensor_config.py` (400+ config-derived diagnostic sensors). `sensor.py` shrank from 992 lines to 390; `sensor_config.py` owns `OutbackConfigDiagnosticSensor`, the declarative `_SYSTEM_/_INVERTER_/_CC_CONFIG_SENSORS` tables, the `_sys` / `_m3` / `_inv` / `_cc` getter helpers, and `create_config_entities`. `__init__.py`'s lazy import in `_apply_config` now points at `.sensor_config`. _(2.0.0-dev18)_
 - [x] **17.5** Parameterize `DataUpdateCoordinator[None]` and migrate from `hass.data[DOMAIN][entry_id]` to `ConfigEntry.runtime_data`. Added `type MateConfigEntry = ConfigEntry[OutbackMate3]` alias re-exported from `__init__.py` so platforms get typed access. _(2.0.0-dev17)_
 - [x] **17.6** Replace broad `except Exception` with narrow `(aiohttp.ClientError, TimeoutError, OSError)` for transient WS failures in `__init__.py`. _(2.0.0-dev17)_
-- [ ] **17.7** Expand `tests/test_integration.py`: config-flow paths (user, hassio, reconfigure, error handling), malformed payload, backoff sequence, stale-device cleanup. Target ≥ 80 % line coverage.
+- [x] **17.7** Expand `tests/test_integration.py` from 6 tests to 22. Added coverage for: config-flow user happy path, user-step probe errors (`cannot_connect` / `timeout` / `bad_handshake` / `unknown` via parametrize), duplicate abort, hassio-confirm happy path, hassio rediscovery updating URL in place, reconfigure happy path + reconfigure probe error, v1→v2 `async_migrate_entry`, unknown WS message type, malformed `config_snapshot` payloads, stale-device removal allowed, live-device removal blocked, and diagnostics snapshot. _(2.0.0-dev18)_
 - [ ] **17.8** Add `outback_mate3_addon/logo.png` (512×512 PNG).
 - [x] **17.9** Add `.github/workflows/builder.yaml` — multi-arch add-on build via `home-assistant/builder` action (all 5 archs). _(2.0.0-dev17)_
 - [x] **17.10** Add `.github/dependabot.yml` — GitHub Actions + pip ecosystems. _(2.0.0-dev17)_
 - [x] **17.11** Add `.pre-commit-config.yaml` + `.editorconfig`. _(2.0.0-dev17)_
-- [ ] **17.12** Flip `quality_scale` from `"bronze"` to `"silver"` once 17.1–17.7 land; revisit `"gold"` after running through the HA checklist entry-by-entry.
+- [x] **17.12** Flip `quality_scale` from `"bronze"` to `"silver"` now that 17.1–17.7 have landed. Revisit `"gold"` after running through the HA checklist entry-by-entry. _(2.0.0-dev18)_
 
 ### Bug fixes surfaced while doing Phase 17
 - [x] **17.A** `create_device_entities` would raise `KeyError` when a snapshot was processed in order (inverter first, charge_controller second) because it indexed both `mate3.inverters[mac]` and `mate3.charge_controllers[mac]` unconditionally. Switched both iterations to `.get(mac, {})`. _(2.0.0-dev17)_

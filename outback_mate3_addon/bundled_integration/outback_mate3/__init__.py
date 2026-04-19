@@ -276,7 +276,7 @@ class OutbackMate3(DataUpdateCoordinator[None]):
         if self._add_entities_callback is None:
             return
         self._config_entities_created.add(mac)
-        from .sensor import create_config_entities
+        from .sensor_config import create_config_entities
 
         entities = create_config_entities(self, mac)
         if entities:

@@ -2,17 +2,22 @@
 
 Covers Phase 9 of TASKS.md: stand up a fake version of the add-on's WS
 endpoint, wire the integration to it, and assert the right entities
-materialize and respond to state updates + reconnects.
+materialize and respond to state updates + reconnects. Phase 17 expanded
+coverage to config-flow paths (user/hassio/reconfigure + error variants),
+migrations, malformed payloads, and diagnostics.
 """
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import patch
 
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestServer
-from custom_components.outback_mate3 import CONF_URL, DOMAIN
+from custom_components.outback_mate3 import CONF_URL, DEFAULT_URL, DOMAIN
+from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 # PHACC disables sockets by default so accidental internet hits fail loudly.
@@ -327,3 +332,359 @@ async def test_reconnects_after_addon_drops_ws(
         await asyncio.sleep(0.05)
     assert st is not None, f"{eid} never re-appeared after reconnect"
     assert st.state == "999", f"expected 999 after reconnect, last seen {st.state!r}"
+
+
+# --- config flow: user step ----------------------------------------------
+
+
+async def test_config_flow_user_step_creates_entry(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """Happy path — the user step probes the URL, then creates an entry."""
+    fake_addon.messages = [SNAPSHOT_PAYLOAD]
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    assert result["type"] == "form"
+    assert result["step_id"] == "user"
+    assert result["errors"] in (None, {})
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_URL: fake_addon.url}
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] == "create_entry"
+    assert result["data"] == {CONF_URL: fake_addon.url}
+
+
+@pytest.mark.parametrize(
+    "probe_error",
+    ["cannot_connect", "timeout", "bad_handshake", "unknown"],
+)
+async def test_config_flow_user_step_surfaces_probe_errors(
+    hass: HomeAssistant, probe_error: str
+) -> None:
+    """Each ``_probe_ws_url`` error code should surface under ``errors['base']``."""
+    with patch(
+        "custom_components.outback_mate3.config_flow._probe_ws_url",
+        return_value=probe_error,
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_URL: "ws://bogus:28099/ws"}
+        )
+
+    assert result["type"] == "form"
+    assert result["step_id"] == "user"
+    assert result["errors"] == {"base": probe_error}
+
+
+async def test_config_flow_user_step_aborts_duplicate(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """A second entry for the same URL is rejected as already configured."""
+    fake_addon.messages = [SNAPSHOT_PAYLOAD]
+    existing = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_URL: fake_addon.url},
+        version=2,
+        unique_id=f"mate3_{fake_addon.url}",
+    )
+    existing.add_to_hass(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_URL: fake_addon.url}
+    )
+    assert result["type"] == "abort"
+    assert result["reason"] == "already_configured"
+
+
+# --- config flow: hassio discovery ---------------------------------------
+
+
+async def test_config_flow_hassio_confirm_creates_entry(
+    hass: HomeAssistant,
+) -> None:
+    """Hassio discovery → confirmation step → create_entry."""
+    discovery = HassioServiceInfo(
+        config={"host": "abc_outback_mate3", "port": 28099},
+        name="Outback MATE3",
+        slug="abc_outback_mate3",
+        uuid="abc-uuid",
+    )
+
+    # The created entry would spin up a real WS loop against a bogus host —
+    # aiohttp's DNS resolver leaves a timer that PHACC flags as "lingering".
+    # Short-circuit start() so this flow-only test doesn't need a live server.
+    with patch("custom_components.outback_mate3.OutbackMate3.start"):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={"source": config_entries.SOURCE_HASSIO},
+            data=discovery,
+        )
+        assert result["type"] == "form"
+        assert result["step_id"] == "hassio_confirm"
+
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        await hass.async_block_till_done()
+
+    assert result["type"] == "create_entry"
+    assert result["data"] == {CONF_URL: "ws://abc_outback_mate3:28099/ws"}
+
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_config_flow_hassio_rediscovery_updates_url(
+    hass: HomeAssistant,
+) -> None:
+    """A repeat announce with a different port should update the existing entry."""
+    existing = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_URL: "ws://abc_outback_mate3:28099/ws"},
+        version=2,
+        unique_id="hassio_abc_outback_mate3",
+    )
+    existing.add_to_hass(hass)
+
+    discovery = HassioServiceInfo(
+        config={"host": "abc_outback_mate3", "port": 29099},  # port changed
+        name="Outback MATE3",
+        slug="abc_outback_mate3",
+        uuid="abc-uuid",
+    )
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_HASSIO},
+        data=discovery,
+    )
+    assert result["type"] == "abort"
+    assert result["reason"] == "already_configured"
+    assert existing.data[CONF_URL] == "ws://abc_outback_mate3:29099/ws"
+
+
+# --- config flow: reconfigure --------------------------------------------
+
+
+async def test_config_flow_reconfigure_updates_url(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """Reconfigure lets users retarget the WS URL without deleting the entry."""
+    fake_addon.messages = [SNAPSHOT_PAYLOAD]
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_URL: fake_addon.url},
+        version=2,
+        unique_id=f"mate3_{fake_addon.url}",
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    new_url = "ws://another-host:28099/ws"
+    # async_update_reload_and_abort reloads the entry under the new URL;
+    # the fresh WS task's aiohttp session leaves a DNS resolver timer when
+    # pointed at a bogus hostname, so short-circuit start() during the
+    # reload to keep PHACC's lingering-timer check happy.
+    with patch(
+        "custom_components.outback_mate3.config_flow._probe_ws_url",
+        return_value=None,
+    ), patch("custom_components.outback_mate3.OutbackMate3.start"):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={
+                "source": config_entries.SOURCE_RECONFIGURE,
+                "entry_id": entry.entry_id,
+            },
+        )
+        assert result["type"] == "form"
+        assert result["step_id"] == "reconfigure"
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_URL: new_url}
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] == "abort"
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_URL] == new_url
+    await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_config_flow_reconfigure_surfaces_probe_error(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """A probe failure during reconfigure keeps the form open with an error."""
+    fake_addon.messages = [SNAPSHOT_PAYLOAD]
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_URL: fake_addon.url},
+        version=2,
+        unique_id=f"mate3_{fake_addon.url}",
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    with patch(
+        "custom_components.outback_mate3.config_flow._probe_ws_url",
+        return_value="cannot_connect",
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={
+                "source": config_entries.SOURCE_RECONFIGURE,
+                "entry_id": entry.entry_id,
+            },
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_URL: "ws://offline:28099/ws"}
+        )
+
+    assert result["type"] == "form"
+    assert result["errors"] == {"base": "cannot_connect"}
+    # URL is unchanged.
+    assert entry.data[CONF_URL] == fake_addon.url
+    await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+
+
+# --- migration -----------------------------------------------------------
+
+
+async def test_migrate_v1_to_v2(hass: HomeAssistant) -> None:
+    """Legacy UDP-port entries should migrate to the new URL form."""
+    from custom_components.outback_mate3 import async_migrate_entry
+
+    entry = MockConfigEntry(domain=DOMAIN, data={"port": 57027}, version=1)
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry) is True
+    assert entry.version == 2
+    assert entry.data == {CONF_URL: DEFAULT_URL}
+
+
+# --- malformed / unknown WS messages -------------------------------------
+
+
+async def test_unknown_message_type_does_not_crash(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """An unknown ``type`` field should be ignored; later messages still work."""
+    fake_addon.messages = [{"type": "garbage_we_dont_know"}, SNAPSHOT_PAYLOAD]
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    # Snapshot following the garbage message must still materialize entities.
+    await _wait_for_state(hass, f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power")
+
+
+async def test_malformed_config_snapshot_is_ignored(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """config_snapshot missing ``mac`` or ``config`` must not crash the loop."""
+    fake_addon.messages = [
+        SNAPSHOT_PAYLOAD,
+        {"type": "config_snapshot"},          # missing both mac and config
+        {"type": "config_snapshot", "mac": MAC},  # missing config
+        {"type": "config_snapshot", "mac": MAC, "config": "not-a-dict"},
+        CONFIG_PAYLOAD,  # valid one should still be applied
+    ]
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    await _wait_for_state(hass, f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power")
+    # The valid CONFIG_PAYLOAD should have landed in config_by_mac.
+    for _ in range(40):
+        if MAC in entry.runtime_data.config_by_mac:
+            break
+        await asyncio.sleep(0.05)
+    assert MAC in entry.runtime_data.config_by_mac
+
+
+# --- device removal ------------------------------------------------------
+
+
+async def test_remove_stale_device_allowed(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """async_remove_config_entry_device returns True for devices no longer seen."""
+    from custom_components.outback_mate3 import async_remove_config_entry_device
+    from homeassistant.helpers import device_registry as dr
+
+    fake_addon.messages = [SNAPSHOT_PAYLOAD]
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    await _wait_for_state(hass, f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power")
+
+    # Construct a synthetic DeviceEntry identifier for a MAC we've never seen.
+    stale_device = dr.DeviceEntry(
+        id="stale_id",
+        identifiers={(DOMAIN, "inverter_GHOSTMAC99999_7")},
+        config_entries={entry.entry_id},
+    )
+    assert await async_remove_config_entry_device(hass, entry, stale_device) is True
+
+
+async def test_remove_live_device_blocked(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """async_remove_config_entry_device returns False for currently-known devices."""
+    from custom_components.outback_mate3 import async_remove_config_entry_device
+    from homeassistant.helpers import device_registry as dr
+
+    fake_addon.messages = [SNAPSHOT_PAYLOAD]
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    await _wait_for_state(hass, f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power")
+
+    live_device = dr.DeviceEntry(
+        id="live_id",
+        identifiers={(DOMAIN, f"inverter_{MAC}_1")},
+        config_entries={entry.entry_id},
+    )
+    assert await async_remove_config_entry_device(hass, entry, live_device) is False
+
+
+# --- diagnostics ---------------------------------------------------------
+
+
+async def test_diagnostics_snapshot(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """Diagnostics exposes coordinator state; redaction set is honored."""
+    from custom_components.outback_mate3.diagnostics import (
+        async_get_config_entry_diagnostics,
+    )
+
+    fake_addon.messages = [SNAPSHOT_PAYLOAD, CONFIG_PAYLOAD]
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    await _wait_for_state(hass, f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power")
+
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+    assert diag["entry"]["version"] == 2
+    assert diag["entry"]["domain"] == DOMAIN
+    assert diag["coordinator"] is not None
+    assert diag["coordinator"]["url"] == fake_addon.url
+    assert diag["coordinator"]["connected"] is True
+    assert MAC in diag["coordinator"]["by_mac"]
