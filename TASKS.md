@@ -253,18 +253,21 @@ _Low-risk additive changes that unblock later gold work. Target: Bronze on the H
 
 _Bigger-surface changes that move the integration from Bronze toward Gold._
 
-- [ ] **17.1** Create `custom_components/outback_mate3/diagnostics.py` — `async_get_config_entry_diagnostics` returning entry data + coordinator snapshot with sensitive-field redaction.
-- [ ] **17.2** Create `custom_components/outback_mate3/strings.json` with translatable names for entity classes + exceptions; regenerate `translations/en.json` from it.
-- [ ] **17.3** Add `async_step_reconfigure(self, user_input)` to `custom_components/outback_mate3/config_flow.py` so users can change the WS URL post-setup without deleting/recreating the entry.
+- [x] **17.1** Create `custom_components/outback_mate3/diagnostics.py` — `async_get_config_entry_diagnostics` returning entry data + coordinator snapshot with sensitive-field redaction. _(2.0.0-dev17)_
+- [x] **17.2** Create `custom_components/outback_mate3/strings.json` with translatable names for entity classes + exceptions; regenerate `translations/en.json` from it. _(2.0.0-dev17)_
+- [x] **17.3** Add `async_step_reconfigure(self, user_input)` to `custom_components/outback_mate3/config_flow.py` so users can change the WS URL post-setup without deleting/recreating the entry. _(2.0.0-dev17)_
 - [ ] **17.4** Split `custom_components/outback_mate3/sensor.py` into `sensor.py` (live UDP sensors) + `sensor_config.py` (400+ config-derived diagnostic sensors) — or drive config-derived entities from a declarative table.
-- [ ] **17.5** Parameterize `DataUpdateCoordinator[None]` and migrate from `hass.data[DOMAIN][entry_id]` to `ConfigEntry.runtime_data`.
-- [ ] **17.6** Replace broad `except Exception` with `ConfigEntryNotReady` + specific exceptions for transient WS failures in `__init__.py`.
+- [x] **17.5** Parameterize `DataUpdateCoordinator[None]` and migrate from `hass.data[DOMAIN][entry_id]` to `ConfigEntry.runtime_data`. Added `type MateConfigEntry = ConfigEntry[OutbackMate3]` alias re-exported from `__init__.py` so platforms get typed access. _(2.0.0-dev17)_
+- [x] **17.6** Replace broad `except Exception` with narrow `(aiohttp.ClientError, TimeoutError, OSError)` for transient WS failures in `__init__.py`. _(2.0.0-dev17)_
 - [ ] **17.7** Expand `tests/test_integration.py`: config-flow paths (user, hassio, reconfigure, error handling), malformed payload, backoff sequence, stale-device cleanup. Target ≥ 80 % line coverage.
 - [ ] **17.8** Add `outback_mate3_addon/logo.png` (512×512 PNG).
-- [ ] **17.9** Add `.github/workflows/builder.yaml` — multi-arch add-on build via `home-assistant/builder` action (all 5 archs).
-- [ ] **17.10** Add `.github/dependabot.yml` — GitHub Actions + pip ecosystems.
-- [ ] **17.11** Add `.pre-commit-config.yaml` + `.editorconfig`.
+- [x] **17.9** Add `.github/workflows/builder.yaml` — multi-arch add-on build via `home-assistant/builder` action (all 5 archs). _(2.0.0-dev17)_
+- [x] **17.10** Add `.github/dependabot.yml` — GitHub Actions + pip ecosystems. _(2.0.0-dev17)_
+- [x] **17.11** Add `.pre-commit-config.yaml` + `.editorconfig`. _(2.0.0-dev17)_
 - [ ] **17.12** Flip `quality_scale` from `"bronze"` to `"silver"` once 17.1–17.7 land; revisit `"gold"` after running through the HA checklist entry-by-entry.
+
+### Bug fixes surfaced while doing Phase 17
+- [x] **17.A** `create_device_entities` would raise `KeyError` when a snapshot was processed in order (inverter first, charge_controller second) because it indexed both `mate3.inverters[mac]` and `mate3.charge_controllers[mac]` unconditionally. Switched both iterations to `.get(mac, {})`. _(2.0.0-dev17)_
 
 ## Phase 18 — Platinum-adjacent polish (Wave 3)
 

@@ -34,18 +34,20 @@ from .const import (
     WS_HEARTBEAT_S,
 )
 
-__all__ = ["CONF_URL", "DEFAULT_URL", "DOMAIN", "OutbackMate3"]
+__all__ = ["CONF_URL", "DEFAULT_URL", "DOMAIN", "MateConfigEntry", "OutbackMate3"]
+
+# ConfigEntry[OutbackMate3] gives platforms typed access to the coordinator
+# via `entry.runtime_data` without any cast/assertion dance.
+type MateConfigEntry = ConfigEntry["OutbackMate3"]
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: MateConfigEntry) -> bool:
     """Set up Outback MATE3 from a config entry."""
-    hass.data.setdefault(DOMAIN, {})
-
     url = entry.data.get(CONF_URL, DEFAULT_URL)
     mate3 = OutbackMate3(hass, url)
-    hass.data[DOMAIN][entry.entry_id] = mate3
+    entry.runtime_data = mate3
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -53,17 +55,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: MateConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        mate3 = hass.data[DOMAIN].pop(entry.entry_id)
-        await mate3.stop()
+        await entry.runtime_data.stop()
     return unload_ok
 
 
 async def async_remove_config_entry_device(
-    hass: HomeAssistant, entry: ConfigEntry, device: dr.DeviceEntry
+    hass: HomeAssistant, entry: MateConfigEntry, device: dr.DeviceEntry
 ) -> bool:
     """Allow users to remove stale MATE3 devices via the UI.
 
@@ -71,9 +72,7 @@ async def async_remove_config_entry_device(
     (i.e. not in self.inverters / self.charge_controllers); returning False
     would block the delete button in HA.
     """
-    mate3: OutbackMate3 | None = hass.data.get(DOMAIN, {}).get(entry.entry_id)
-    if mate3 is None:
-        return True
+    mate3 = entry.runtime_data
 
     # Identifiers look like ("outback_mate3", "inverter_<MAC>_<index>")
     # or ("outback_mate3", "system"). If the device still matches a live
@@ -120,8 +119,14 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-class OutbackMate3(DataUpdateCoordinator):
-    """Reactive WebSocket client that mirrors the add-on's device state."""
+class OutbackMate3(DataUpdateCoordinator[None]):
+    """Reactive WebSocket client that mirrors the add-on's device state.
+
+    Parameterized with ``None`` because we don't ship a polled payload —
+    entity state lives on ``self.inverters`` / ``self.charge_controllers`` /
+    ``self.config_by_mac`` and ``async_set_updated_data(None)`` is only used
+    as a broadcast notification to CoordinatorEntity subscribers.
+    """
 
     def __init__(self, hass: HomeAssistant, url: str) -> None:
         super().__init__(hass, _LOGGER, name=DOMAIN)
@@ -191,7 +196,11 @@ class OutbackMate3(DataUpdateCoordinator):
                     await self._consume(ws)
             except asyncio.CancelledError:
                 raise
-            except Exception as exc:
+            except (aiohttp.ClientError, TimeoutError, OSError) as exc:
+                # Transient network failures: add-on stopped, Supervisor
+                # routing hiccup, TCP reset, DNS flap, heartbeat timeout.
+                # Log once at WARNING then drop to DEBUG while we retry so
+                # the HA log isn't flooded with "add-on not running" noise.
                 if not warned_while_disconnected:
                     _LOGGER.warning(
                         "MATE3 add-on connection to %s failed: %s (retrying)",

@@ -111,3 +111,36 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "url": self._discovered_url,
             },
         )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Let users update the WS URL post-setup without deleting the entry.
+
+        Reaches here when the user clicks "Reconfigure" on the entry card —
+        typically to retarget the add-on after a hostname change or when
+        running against a remote add-on over the internal network.
+        """
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+        current_url = entry.data.get(CONF_URL, DEFAULT_URL)
+
+        if user_input is not None:
+            url = user_input[CONF_URL]
+            error = await _probe_ws_url(url)
+            if error is None:
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates={CONF_URL: url},
+                )
+            errors["base"] = error
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_URL, default=current_url): str,
+                }
+            ),
+            errors=errors,
+        )

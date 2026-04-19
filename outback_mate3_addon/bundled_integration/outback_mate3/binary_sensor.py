@@ -13,23 +13,21 @@ from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 
-from . import OutbackMate3
+from . import MateConfigEntry, OutbackMate3
 from .const import CONNECTIVITY_POLL_INTERVAL, DOMAIN, STALE_AFTER_S
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: MateConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    mate3: OutbackMate3 = hass.data[DOMAIN][config_entry.entry_id]
-    async_add_entities([OutbackReceivingDataSensor(mate3)])
+    async_add_entities([OutbackReceivingDataSensor(config_entry.runtime_data)])
 
 
 class OutbackReceivingDataSensor(BinarySensorEntity):

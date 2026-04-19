@@ -8,7 +8,6 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     EntityCategory,
     UnitOfElectricCurrent,
@@ -21,18 +20,18 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import OutbackMate3
+from . import MateConfigEntry, OutbackMate3
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: MateConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Outback MATE3 sensors."""
-    mate3: OutbackMate3 = hass.data[DOMAIN][config_entry.entry_id]
+    mate3 = config_entry.runtime_data
     _LOGGER.debug("Setting up sensors for Outback MATE3")
 
     # Store the callback for adding entities later when devices are discovered
@@ -95,8 +94,11 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> list[Sensor
 
     mate3.discovered_devices.add(f"combined_{mac_address}")
 
-    # Add inverter sensors
-    for device_id, _inverter in mate3.inverters[mac_address].items():
+    # Add inverter sensors. Use .get() because this function fires on the
+    # first UDP device seen for a MAC — which might be either the inverter
+    # or the charge controller depending on which arrived first; the other
+    # dict may not yet have an entry for this MAC.
+    for device_id, _inverter in mate3.inverters.get(mac_address, {}).items():
         _LOGGER.debug("Creating sensors for inverter %d from MAC %s", device_id, mac_address)
         entities.extend([
             # Current sensors
@@ -173,8 +175,8 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> list[Sensor
                                 SensorDeviceClass.ENUM, None),
         ])
 
-    # Add charge controller sensors
-    for device_id, _charge_controller in mate3.charge_controllers[mac_address].items():
+    # Add charge controller sensors (see note above — mac may not be in this dict yet).
+    for device_id, _charge_controller in mate3.charge_controllers.get(mac_address, {}).items():
         _LOGGER.debug("Creating sensors for charge controller %d from MAC %s", device_id, mac_address)
         entities.extend([
             OutbackChargeControllerSensor(mate3, mac_address, device_id, "pv_current", "PV Current",

@@ -14,7 +14,7 @@
                 "description": "The Outback MATE3 add-on is running. Add it to Home Assistant so it can stream telemetry to this integration via {url}?"
             },
             "reconfigure": {
-                "title": "Outback MATE3 \u2014 reconfigure",
+                "title": "Outback MATE3 — reconfigure",
                 "description": "Point this entry at a different add-on WebSocket endpoint. Useful if the add-on slug, hostname, or port has changed.",
                 "data": {
                     "url": "Add-on WebSocket URL"
