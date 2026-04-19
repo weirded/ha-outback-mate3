@@ -178,7 +178,9 @@ def _parse_inverter(values: list[str]) -> dict[str, Any]:
         "charger_current": l1_charger_current + l2_charger_current,
         "total_ac_input_voltage": l1_ac_input_voltage + l2_ac_input_voltage,
         "total_ac_output_voltage": l1_ac_output_voltage + l2_ac_output_voltage,
-        "battery_voltage": float(values[12]),
+        # Radian battery voltage lands in the 20th CSV field as tenths of a volt;
+        # the old values[12] read was L2 sell current (always 0 on the test system).
+        "battery_voltage": float(values[19]) / 10.0,
     }
 
     state["inverter_mode"] = _INVERTER_MODE.get(int(values[16]), "unknown")

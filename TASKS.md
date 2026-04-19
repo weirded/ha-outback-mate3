@@ -10,17 +10,16 @@ via `./scripts/bump-dev-version.sh`.
 
 ## Bugs
 
-- [ ] **F1** — Inverter battery voltage reads 0. `sensor.mate3_<mac>_inverter_<n>_battery_voltage`
-  is stuck at 0 V on the live system. CC battery voltage reads correctly, so the
-  aggregate/average is also wrong (it's anchored by the zeros from the inverters).
-  Suspect: `outback_mate3_addon/src/parser.py:181` reads `float(values[12])` without
-  the `/10.0` tenths-of-a-volt scaling the charge-controller branch applies at
-  line 197 — but a scaling error would show ~480, not 0, so more likely the index
-  is wrong or the field is unpopulated on the Radian inverters we test against.
-  Plan: capture a fresh UDP frame from the live MATE3, diff against the
-  `tests/fixtures/mate3_frames/` fixtures to find the right index for Radian
-  inverter battery voltage, add a regression test asserting a non-zero parsed
-  value, fix the parser.
+- [x] **F1** — Inverter battery voltage reads 0. _(2.0.1-dev2; parser was reading
+  `values[12]` which is L2 sell current (always 0 on the test system). Radian
+  inverter battery voltage actually sits at `values[19]` as integer tenths of a
+  volt (`532` → 53.2 V). Fixed in `outback_mate3_addon/src/parser.py`; updated
+  `test_inverter_1_values` + `test_inverter_2_values` to assert 53.2 V. Cross-checked
+  against a fresh UDP capture from hass-4 (MATE3 at 192.168.200.9) and against
+  the Radian GS8048 "Serial Data Stream" PRELIMINARY spec, now checked in at
+  `docs/protocol/mate3-radian-udp-stream.pdf`. The system-level battery-voltage
+  sensor was already fine — it averages the two CC battery voltages, not the
+  inverters — but the per-inverter sensors will now show the correct value.)_
 
 ## Release cut — 2.0.1
 
