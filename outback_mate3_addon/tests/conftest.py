@@ -20,7 +20,7 @@ if str(_ADDON_ROOT) not in sys.path:
 # and is ignored as pre-existing.
 # Guarded: no pycares means no pycares thread means nothing to warm up.
 try:
-    import pycares  # noqa: E402
+    import pycares
 except ImportError:
     pycares = None  # type: ignore[assignment]
 

@@ -24,7 +24,7 @@ if str(_REPO) not in sys.path:
 # down conftest collection if that ever changes), the warmup is a no-op —
 # no pycares means no pycares thread means nothing for PHACC to reject.
 try:
-    import pycares  # noqa: E402
+    import pycares
 except ImportError:
     pycares = None  # type: ignore[assignment]
 
