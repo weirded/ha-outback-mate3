@@ -12,6 +12,18 @@ _ADDON_ROOT = Path(__file__).resolve().parent.parent
 if str(_ADDON_ROOT) not in sys.path:
     sys.path.insert(0, str(_ADDON_ROOT))
 
+# pycares>=5.0 spawns a daemon thread "_run_safe_shutdown_loop" the first time
+# any c-ares channel is destroyed. PHACC's per-test cleanup check (autouse via
+# entry-point plugin — applies even to add-on tests that don't use HA) rejects
+# any thread outside its allowlist, so the first test to trigger DNS fails
+# teardown. Warm the singleton here so the thread exists in `threads_before`
+# and is ignored as pre-existing.
+import pycares  # noqa: E402
+
+_warmup_channel = pycares.Channel()
+_warmup_channel.close()
+del _warmup_channel
+
 
 @pytest.fixture(autouse=True)
 def _enable_socket():
