@@ -27,7 +27,7 @@ jobs:
       version: ${{ steps.derive.outputs.version }}
       is_prerelease: ${{ steps.derive.outputs.is_prerelease }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Derive tag version
         id: derive
@@ -69,7 +69,7 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
