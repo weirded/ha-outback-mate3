@@ -33,7 +33,7 @@ jobs:
         run: ./scripts/sync-bundled-integration.sh
 
       - name: Build add-on (${{ matrix.arch }})
-        uses: home-assistant/builder@2025.03.0
+        uses: home-assistant/builder@2026.03.2
         with:
           # --docker-hub + --image together produce the tag
           # `ghcr.io/weirded/<arch>-addon-outback-mate3:<version>`. Without
