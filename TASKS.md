@@ -21,6 +21,43 @@ via `./scripts/bump-dev-version.sh`.
   sensor was already fine — it averages the two CC battery voltages, not the
   inverters — but the per-inverter sensors will now show the correct value.)_
 
+## Deferred — add-on / integration decoupling (post-2.0.1)
+
+Today the integration hard-codes knowledge that derives from the MATE3
+UDP/HTTP protocol: field names emitted by `outback_mate3_addon/src/parser.py`,
+the spelling and set of mode strings (`inverting`, `bulk`, ...), per-field
+unit / device_class / state_class, and the shape of the MATE3 HTTP config JSON
+consumed by `custom_components/outback_mate3/sensor_config.py`. The WS
+contract between the two is thin (parsed `state` dicts), but the *semantic*
+contract — field names, enum values, units — is duplicated. Goal: make the
+add-on the sole source of MATE3 knowledge and reduce the integration to a
+generic WS-to-HA renderer.
+
+- [ ] **D1** — Add-on emits an `entity_schema` WS message (after `hello`,
+  before `snapshot`) describing each entity per device kind: `key`, `unit`,
+  `device_class`, `state_class`, `entity_category`, `translation_key`, plus
+  enum `options` for mode fields. Add `protocol_version` to the `hello`
+  message.
+- [ ] **D2** — Publish the MATE3 HTTP config schema the same way — either as
+  a field list attached to `config_snapshot` or as a separate
+  `config_schema` message — so the ~300-line table in
+  `custom_components/outback_mate3/sensor_config.py` is driven by the add-on
+  instead of maintained in parallel.
+- [ ] **D3** — Rewrite `custom_components/outback_mate3/sensor.py` +
+  `sensor_config.py` as a generic factory that materializes entities from
+  the received schema. Delete the per-field hard-coded tables.
+- [ ] **D4** — Integration raises a Repairs issue when the add-on's
+  `protocol_version` is newer than it knows how to render, removing the
+  implicit requirement that both sides stay in version lockstep.
+- [ ] **D5** — Translation labels stay in `custom_components/outback_mate3/translations/`
+  keyed by the schema's `translation_key` (HA store compliance), but the
+  canonical set of keys — including mode enum values — is validated against
+  what the add-on advertises so the parser can't emit a string the
+  integration has no label for.
+- [ ] **D6** — Reconcile `outback_mate3_addon/bundled_integration/` with the
+  decoupled integration (regenerate from the new generic renderer, or drop
+  the snapshot once the integration is HA-store-published).
+
 ## Release cut — 2.0.1
 
 - [ ] **C1** Final version bump `2.0.1-dev<N>` → `2.0.1` (drop `-dev` suffix)
