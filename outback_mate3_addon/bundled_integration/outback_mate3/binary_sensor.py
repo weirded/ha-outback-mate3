@@ -1,14 +1,13 @@
 """Binary sensors for the Outback MATE3 integration.
 
 Ships one sensor today: ``Receiving Data from MATE3`` on the Outback System
-device. Flips to off after ``_STALE_AFTER_S`` seconds without a UDP
+device. Flips to off after ``STALE_AFTER_S`` seconds without a UDP
 datagram, so automations can notice when the MATE3 stops streaming (cable
 pulled, firmware destination-IP glitch, power cycle).
 """
 from __future__ import annotations
 
 import time
-from datetime import timedelta
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -20,10 +19,8 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 
-from . import DOMAIN, OutbackMate3
-
-_STALE_AFTER_S = 300.0
-_POLL_INTERVAL = timedelta(seconds=30)
+from . import OutbackMate3
+from .const import CONNECTIVITY_POLL_INTERVAL, DOMAIN, STALE_AFTER_S
 
 
 async def async_setup_entry(
@@ -65,7 +62,7 @@ class OutbackReceivingDataSensor(BinarySensorEntity):
             self._mate3.async_add_listener(self._refresh)
         )
         self.async_on_remove(
-            async_track_time_interval(self.hass, self._timer_tick, _POLL_INTERVAL)
+            async_track_time_interval(self.hass, self._timer_tick, CONNECTIVITY_POLL_INTERVAL)
         )
 
     @callback
@@ -81,4 +78,4 @@ class OutbackReceivingDataSensor(BinarySensorEntity):
         last = self._mate3.last_udp_at
         if last is None:
             return False
-        return (time.monotonic() - last) < _STALE_AFTER_S
+        return (time.monotonic() - last) < STALE_AFTER_S

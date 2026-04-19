@@ -227,9 +227,9 @@ _Low-risk additive changes that unblock later gold work. Target: Bronze on the H
 
 - [x] **16.1** Declare `quality_scale: "bronze"` in `custom_components/outback_mate3/manifest.json`. _(2.0.0-dev1)_
 - [x] **16.2** Add empty `custom_components/outback_mate3/py.typed` marker so downstream type-checkers honor our annotations. _(2.0.0-dev1)_
-- [ ] **16.3** Create `custom_components/outback_mate3/const.py` and move scattered literals (domain, default WS URL, backoff, heartbeat, entity-timeout constants) into it. No behavior change.
-- [ ] **16.4** Switch the `solar_production_energy` sensor (and any other energy totalizers) from `SensorStateClass.MEASUREMENT` to `SensorStateClass.TOTAL_INCREASING` so the Energy Dashboard treats them as totalizers.
-- [ ] **16.5** Set `entity_category = EntityCategory.DIAGNOSTIC` on every config-derived 400+ sensor. (The `entity_registry_enabled_default=False` flip landed in 15.14 — this is the category flag on top.)
+- [x] **16.3** Create `custom_components/outback_mate3/const.py` and move scattered literals (domain, default WS URL, backoff, heartbeat, entity-timeout constants) into it. No behavior change. _(2.0.0-dev16)_
+- [x] **16.4** Switch the `solar_production_energy` sensor (and any other energy totalizers) from `SensorStateClass.MEASUREMENT` to `SensorStateClass.TOTAL_INCREASING` so the Energy Dashboard treats them as totalizers. Also fixes ENUM sensors which were incorrectly advertising `state_class=measurement`. _(2.0.0-dev16)_
+- [x] **16.5** Set `entity_category = EntityCategory.DIAGNOSTIC` on every config-derived 400+ sensor — already satisfied via `OutbackConfigDiagnosticSensor._attr_entity_category` (no change needed). _(2.0.0-dev16)_
 
 ### Add-on
 

@@ -17,26 +17,26 @@ from typing import Any
 import aiohttp
 from aiohttp import ClientWebSocketResponse, WSMsgType
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
+from .const import (
+    CONF_URL,
+    DEFAULT_URL,
+    DOMAIN,
+    INITIAL_BACKOFF_S,
+    KIND_CHARGE_CONTROLLER,
+    KIND_INVERTER,
+    MAX_BACKOFF_S,
+    PLATFORMS,
+    WS_HEARTBEAT_S,
+)
+
+__all__ = ["CONF_URL", "DEFAULT_URL", "DOMAIN", "OutbackMate3"]
+
 _LOGGER = logging.getLogger(__name__)
-
-DOMAIN = "outback_mate3"
-PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]
-
-CONF_URL = "url"
-DEFAULT_URL = "ws://local-outback-mate3:28099/ws"
-
-KIND_INVERTER = "inverter"
-KIND_CHARGE_CONTROLLER = "charge_controller"
-
-_INITIAL_BACKOFF_S = 1.0
-_MAX_BACKOFF_S = 30.0
-_WS_HEARTBEAT_S = 30.0
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -174,7 +174,7 @@ class OutbackMate3(DataUpdateCoordinator):
 
     async def _ws_loop(self) -> None:
         """Connect to the add-on and consume events; reconnect with backoff."""
-        backoff = _INITIAL_BACKOFF_S
+        backoff = INITIAL_BACKOFF_S
         # Warn once on the first consecutive connect failure; drop to DEBUG
         # while we keep retrying so the HA log doesn't fill up with one WARN
         # every <backoff>s when the add-on is stopped.
@@ -182,11 +182,11 @@ class OutbackMate3(DataUpdateCoordinator):
         while self._running:
             try:
                 async with aiohttp.ClientSession() as session, session.ws_connect(
-                    self.url, heartbeat=_WS_HEARTBEAT_S
+                    self.url, heartbeat=WS_HEARTBEAT_S
                 ) as ws:
                     _LOGGER.info("Connected to MATE3 add-on at %s", self.url)
                     self._connected = True
-                    backoff = _INITIAL_BACKOFF_S
+                    backoff = INITIAL_BACKOFF_S
                     warned_while_disconnected = False
                     await self._consume(ws)
             except asyncio.CancelledError:
@@ -212,7 +212,7 @@ class OutbackMate3(DataUpdateCoordinator):
                 await asyncio.sleep(backoff)
             except asyncio.CancelledError:
                 break
-            backoff = min(backoff * 2, _MAX_BACKOFF_S)
+            backoff = min(backoff * 2, MAX_BACKOFF_S)
 
     async def _consume(self, ws: ClientWebSocketResponse) -> None:
         async for msg in ws:

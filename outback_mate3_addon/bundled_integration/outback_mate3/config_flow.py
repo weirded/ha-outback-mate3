@@ -10,7 +10,7 @@ from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 
-from . import CONF_URL, DEFAULT_URL, DOMAIN
+from .const import CONF_URL, DEFAULT_URL, DOMAIN
 
 
 async def _probe_ws_url(url: str, timeout_s: float = 5.0) -> str | None:

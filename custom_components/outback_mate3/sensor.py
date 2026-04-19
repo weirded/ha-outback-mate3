@@ -21,7 +21,8 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import DOMAIN, OutbackMate3
+from . import OutbackMate3
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -255,7 +256,16 @@ class OutbackBaseSensor(CoordinatorEntity, SensorEntity):
 
         self._attr_device_class = device_class
         self._attr_native_unit_of_measurement = unit
-        self._attr_state_class = SensorStateClass.MEASUREMENT
+        # ENUM sensors return strings, so they must not carry a numeric state_class.
+        # Energy counters (kwh_today) reset to 0 at midnight — the HA Energy dashboard
+        # needs TOTAL_INCREASING to treat the daily reset as a counter rollover and
+        # integrate correctly. Everything else is an instantaneous measurement.
+        if device_class == SensorDeviceClass.ENUM:
+            self._attr_state_class = None
+        elif device_class == SensorDeviceClass.ENERGY:
+            self._attr_state_class = SensorStateClass.TOTAL_INCREASING
+        else:
+            self._attr_state_class = SensorStateClass.MEASUREMENT
 
         # Set unique ID based on device type
         if device_type == "system":
