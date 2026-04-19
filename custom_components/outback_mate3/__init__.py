@@ -259,7 +259,14 @@ class OutbackMate3(DataUpdateCoordinator[None]):
                 except ValueError:
                     _LOGGER.warning("Non-JSON WS message: %r", msg.data[:80])
                     continue
-                self._handle_message(payload)
+                # The WS is a system boundary: a malformed frame from the
+                # add-on (schema drift, partial rollout, bug) must not tear
+                # down the reconnect loop — it's fire-and-forget, dying here
+                # silently takes the integration offline until HA restart.
+                try:
+                    self._handle_message(payload)
+                except Exception:  # noqa: BLE001
+                    _LOGGER.exception("Dropped malformed WS message: %r", payload)
             elif msg.type == WSMsgType.ERROR:
                 _LOGGER.warning("WS error: %s", ws.exception())
                 return

@@ -606,6 +606,37 @@ async def test_malformed_config_snapshot_is_ignored(
     assert MAC in entry.runtime_data.config_by_mac
 
 
+async def test_malformed_device_payloads_do_not_kill_ws_loop(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """device_added / state_updated / snapshot entries missing required keys
+    must not raise out of the WS loop — the reconnect task is fire-and-forget,
+    so a single bad frame would silently take the integration offline until HA
+    restart. The valid SNAPSHOT_PAYLOAD queued afterwards must still apply."""
+    fake_addon.messages = [
+        {"type": "device_added"},  # missing everything
+        {"type": "device_added", "mac": MAC, "kind": "inverter", "index": 1},  # no state
+        {"type": "state_updated", "mac": MAC, "kind": "inverter"},  # no index/state
+        # snapshot with one good entry and one malformed entry — the good one
+        # must still be processed.
+        {
+            "type": "snapshot",
+            "devices": [
+                {"mac": MAC, "kind": "inverter"},  # missing index/state
+                SNAPSHOT_PAYLOAD["devices"][0],
+            ],
+        },
+        SNAPSHOT_PAYLOAD,  # valid follow-up
+    ]
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    # If the loop died on the first malformed device_added, this never resolves.
+    await _wait_for_state(hass, f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power")
+
+
 # --- device removal ------------------------------------------------------
 
 

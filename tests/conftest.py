@@ -23,7 +23,10 @@ if str(_REPO) not in sys.path:
 import pycares  # noqa: E402
 
 _warmup_channel = pycares.Channel()
-_warmup_channel.close()
+# close() only exists on pycares>=5.0 (which is what triggers the daemon thread
+# we're warming up for). On older pycares the warmup is a no-op.
+if hasattr(_warmup_channel, "close"):
+    _warmup_channel.close()
 del _warmup_channel
 
 pytest_plugins = ["pytest_homeassistant_custom_component"]
