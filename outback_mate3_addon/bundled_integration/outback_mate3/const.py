@@ -22,3 +22,12 @@ WS_HEARTBEAT_S = 30.0
 # `binary_sensor.mate3_system_receiving_data` — connectivity indicator.
 STALE_AFTER_S = 300.0
 CONNECTIVITY_POLL_INTERVAL = timedelta(seconds=30)
+
+# Repairs issue IDs.
+ISSUE_ADDON_OFFLINE = "addon_offline"
+ISSUE_VERSION_DRIFT = "version_drift"
+
+# How long the add-on may be unreachable before we create the `addon_offline`
+# Repairs issue. Keeps short Supervisor restarts / network hiccups from
+# opening (and immediately re-closing) a Repair every reconnect cycle.
+ADDON_OFFLINE_GRACE_S = 60.0

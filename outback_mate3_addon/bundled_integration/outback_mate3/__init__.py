@@ -19,14 +19,19 @@ from aiohttp import ClientWebSocketResponse, WSMsgType
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.loader import async_get_integration
 
 from .const import (
+    ADDON_OFFLINE_GRACE_S,
     CONF_URL,
     DEFAULT_URL,
     DOMAIN,
     INITIAL_BACKOFF_S,
+    ISSUE_ADDON_OFFLINE,
+    ISSUE_VERSION_DRIFT,
     KIND_CHARGE_CONTROLLER,
     KIND_INVERTER,
     MAX_BACKOFF_S,
@@ -46,7 +51,11 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(hass: HomeAssistant, entry: MateConfigEntry) -> bool:
     """Set up Outback MATE3 from a config entry."""
     url = entry.data.get(CONF_URL, DEFAULT_URL)
-    mate3 = OutbackMate3(hass, url)
+    integration = await async_get_integration(hass, DOMAIN)
+    # integration.version is an AwesomeVersion; coerce to str so string equality
+    # against the add-on's self-reported version string works cleanly.
+    integration_version = str(integration.version) if integration.version else None
+    mate3 = OutbackMate3(hass, url, integration_version=integration_version)
     entry.runtime_data = mate3
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -59,7 +68,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: MateConfigEntry) -> boo
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        await entry.runtime_data.stop()
+        mate3 = entry.runtime_data
+        await mate3.stop()
+        # Clear any Repairs issues we raised so a subsequent setup starts clean.
+        ir.async_delete_issue(hass, DOMAIN, ISSUE_ADDON_OFFLINE)
+        ir.async_delete_issue(hass, DOMAIN, ISSUE_VERSION_DRIFT)
     return unload_ok
 
 
@@ -128,10 +141,13 @@ class OutbackMate3(DataUpdateCoordinator[None]):
     as a broadcast notification to CoordinatorEntity subscribers.
     """
 
-    def __init__(self, hass: HomeAssistant, url: str) -> None:
+    def __init__(
+        self, hass: HomeAssistant, url: str, *, integration_version: str | None = None
+    ) -> None:
         super().__init__(hass, _LOGGER, name=DOMAIN)
         self.hass = hass
         self.url = url
+        self.integration_version = integration_version
 
         self._task: asyncio.Task | None = None
         self._running = False
@@ -159,6 +175,12 @@ class OutbackMate3(DataUpdateCoordinator[None]):
         self._config_entities_created: set[str] = set()
 
         self._connected = False
+        # Populated by the add-on's `hello` message on first connect; drives
+        # the `version_drift` Repairs issue.
+        self.addon_version: str | None = None
+        # Scheduled `addon_offline` issue creation. Cancelled on reconnect so
+        # brief Supervisor restarts don't flap a Repair in and out.
+        self._addon_offline_handle: asyncio.TimerHandle | None = None
 
     def set_add_entities_callback(self, callback: AddEntitiesCallback) -> None:
         self._add_entities_callback = callback
@@ -171,6 +193,9 @@ class OutbackMate3(DataUpdateCoordinator[None]):
 
     async def stop(self) -> None:
         self._running = False
+        if self._addon_offline_handle is not None:
+            self._addon_offline_handle.cancel()
+            self._addon_offline_handle = None
         if self._task is not None:
             self._task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -193,6 +218,7 @@ class OutbackMate3(DataUpdateCoordinator[None]):
                     self._connected = True
                     backoff = INITIAL_BACKOFF_S
                     warned_while_disconnected = False
+                    self._on_connected()
                     await self._consume(ws)
             except asyncio.CancelledError:
                 raise
@@ -214,6 +240,7 @@ class OutbackMate3(DataUpdateCoordinator[None]):
 
             self._connected = False
             self._mark_entities_stale()
+            self._on_disconnected()
             if not self._running:
                 break
             _LOGGER.debug("Reconnecting to %s in %.1fs", self.url, backoff)
@@ -240,6 +267,9 @@ class OutbackMate3(DataUpdateCoordinator[None]):
 
     def _handle_message(self, msg: dict[str, Any]) -> None:
         mtype = msg.get("type")
+        if mtype == "hello":
+            self._apply_hello(msg)
+            return
         if mtype == "snapshot":
             # Reset per-device state but keep discovered_devices so we don't
             # re-announce entities HA already knows about.
@@ -257,6 +287,78 @@ class OutbackMate3(DataUpdateCoordinator[None]):
             _LOGGER.debug("Ignoring unknown WS message type %r", mtype)
             return
         self.async_set_updated_data(None)
+
+    def _apply_hello(self, payload: dict[str, Any]) -> None:
+        addon_version = payload.get("addon_version")
+        if not isinstance(addon_version, str) or not addon_version:
+            _LOGGER.debug("hello without addon_version: %r", payload)
+            return
+        self.addon_version = addon_version
+        self._reconcile_version_drift()
+
+    def _reconcile_version_drift(self) -> None:
+        """Create or clear the version_drift Repairs issue.
+
+        The add-on and integration ship together and share a single version
+        string. A mismatch means the user upgraded one half but not the other.
+        """
+        if not self.integration_version or not self.addon_version:
+            return
+        if self.integration_version == self.addon_version:
+            ir.async_delete_issue(self.hass, DOMAIN, ISSUE_VERSION_DRIFT)
+            return
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            ISSUE_VERSION_DRIFT,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key=ISSUE_VERSION_DRIFT,
+            translation_placeholders={
+                "integration_version": self.integration_version,
+                "addon_version": self.addon_version,
+            },
+        )
+
+    def _on_connected(self) -> None:
+        """Hook called each time the WS handshake succeeds.
+
+        Cancels any pending `addon_offline` issue creation and clears an
+        already-raised issue so a reconnect inside the grace window never
+        flashes a Repair the user notices.
+        """
+        if self._addon_offline_handle is not None:
+            self._addon_offline_handle.cancel()
+            self._addon_offline_handle = None
+        ir.async_delete_issue(self.hass, DOMAIN, ISSUE_ADDON_OFFLINE)
+
+    def _on_disconnected(self) -> None:
+        """Hook called each time the WS loop drops the connection.
+
+        Starts (or leaves running) a grace timer that raises the
+        `addon_offline` Repairs issue. Short Supervisor bounces or TCP
+        hiccups complete a reconnect before the timer fires, so they never
+        surface as a Repair.
+        """
+        if not self._running:
+            return
+        if self._addon_offline_handle is not None:
+            return
+        self._addon_offline_handle = self.hass.loop.call_later(
+            ADDON_OFFLINE_GRACE_S, self._raise_addon_offline
+        )
+
+    def _raise_addon_offline(self) -> None:
+        self._addon_offline_handle = None
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            ISSUE_ADDON_OFFLINE,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key=ISSUE_ADDON_OFFLINE,
+            translation_placeholders={"url": self.url},
+        )
 
     def _apply_config(self, payload: dict[str, Any]) -> None:
         mac = payload.get("mac")

@@ -42,6 +42,8 @@ async def async_get_config_entry_diagnostics(
     coordinator_snapshot: dict[str, Any] = {
         "url": mate3.url,
         "connected": mate3.is_connected,
+        "integration_version": mate3.integration_version,
+        "addon_version": mate3.addon_version,
         "seconds_since_last_udp": seconds_since_udp,
         "discovered_devices": sorted(mate3.discovered_devices),
         "config_entities_created": sorted(mate3._config_entities_created),

@@ -52,15 +52,16 @@ async def run() -> None:
     log_level = os.environ.get("LOG_LEVEL", "info")
     min_interval = _env_float("MIN_UPDATE_INTERVAL_S", 30.0)
     config_poll_interval = _env_float("CONFIG_POLL_INTERVAL_S", 300.0)
+    addon_version = os.environ.get("ADDON_VERSION", "").strip() or None
 
     _configure_logging(log_level)
     _LOGGER.info(
-        "Starting Outback MATE3 relay: UDP :%d → WS :%d (throttle %.1fs, config poll %.0fs)",
-        udp_port, ws_port, min_interval, config_poll_interval,
+        "Starting Outback MATE3 relay v%s: UDP :%d → WS :%d (throttle %.1fs, config poll %.0fs)",
+        addon_version or "unknown", udp_port, ws_port, min_interval, config_poll_interval,
     )
 
     registry = DeviceRegistry(min_update_interval_s=min_interval)
-    server = WSServer(registry)
+    server = WSServer(registry, addon_version=addon_version)
 
     runner = web.AppRunner(server.app)
     await runner.setup()

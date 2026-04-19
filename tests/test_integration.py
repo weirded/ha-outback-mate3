@@ -88,6 +88,7 @@ class _FakeAddOn:
 
     def __init__(self) -> None:
         self.messages: list[dict] = []
+        self.hello_version: str | None = None
         self.connected: list[web.WebSocketResponse] = []
         self.app = web.Application()
         self.app.router.add_get("/ws", self._handle)
@@ -97,6 +98,8 @@ class _FakeAddOn:
         # teardown and PHACC catches that as a lingering-timer error.
         ws = web.WebSocketResponse()
         await ws.prepare(request)
+        if self.hello_version is not None:
+            await ws.send_json({"type": "hello", "addon_version": self.hello_version})
         for msg in self.messages:
             await ws.send_json(msg)
         self.connected.append(ws)
@@ -688,3 +691,128 @@ async def test_diagnostics_snapshot(
     assert diag["coordinator"]["url"] == fake_addon.url
     assert diag["coordinator"]["connected"] is True
     assert MAC in diag["coordinator"]["by_mac"]
+
+
+# --- repairs: add-on offline + version drift -------------------------------
+
+
+async def _get_coordinator(hass: HomeAssistant, entry: MockConfigEntry):
+    return entry.runtime_data
+
+
+async def test_hello_matching_version_clears_version_drift(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """A hello whose addon_version matches the integration's should raise no issue."""
+    from custom_components.outback_mate3.const import ISSUE_VERSION_DRIFT
+    from homeassistant.helpers import issue_registry as ir
+
+    fake_addon.messages = [SNAPSHOT_PAYLOAD]
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    mate3 = entry.runtime_data
+    # Pretend the add-on handshake advertised the same version we carry.
+    fake_addon.hello_version = mate3.integration_version
+    # Trigger reconnect by closing and waiting for the loop to reopen.
+    await fake_addon.close_all()
+    for _ in range(60):
+        if mate3.addon_version == mate3.integration_version:
+            break
+        await asyncio.sleep(0.05)
+    assert mate3.addon_version == mate3.integration_version
+
+    registry = ir.async_get(hass)
+    assert registry.async_get_issue(DOMAIN, ISSUE_VERSION_DRIFT) is None
+
+
+async def test_hello_version_mismatch_creates_repairs_issue(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """A mismatched addon_version should raise the version_drift Repairs issue."""
+    from custom_components.outback_mate3.const import ISSUE_VERSION_DRIFT
+    from homeassistant.helpers import issue_registry as ir
+
+    fake_addon.hello_version = "9.9.9-not-a-real-version"
+    fake_addon.messages = [SNAPSHOT_PAYLOAD]
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    mate3 = entry.runtime_data
+    for _ in range(60):
+        if mate3.addon_version == "9.9.9-not-a-real-version":
+            break
+        await asyncio.sleep(0.05)
+    assert mate3.addon_version == "9.9.9-not-a-real-version"
+
+    registry = ir.async_get(hass)
+    issue = registry.async_get_issue(DOMAIN, ISSUE_VERSION_DRIFT)
+    assert issue is not None
+    assert issue.severity == ir.IssueSeverity.WARNING
+    assert issue.translation_placeholders == {
+        "integration_version": mate3.integration_version,
+        "addon_version": "9.9.9-not-a-real-version",
+    }
+
+
+async def test_addon_offline_issue_raised_after_grace(
+    hass: HomeAssistant, socket_enabled
+) -> None:
+    """A WS that can't connect raises the `addon_offline` issue after the grace window.
+
+    Points the entry at a URL nothing's listening on, shrinks the grace
+    constant so the timer fires quickly, and asserts the Repairs issue shows
+    up. The real grace is 60 s; we use 0.05 s in the test.
+    """
+    from custom_components.outback_mate3.const import ISSUE_ADDON_OFFLINE
+    from homeassistant.helpers import issue_registry as ir
+
+    bogus_url = "ws://127.0.0.1:1/ws"  # nothing listens on port 1
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: bogus_url}, version=2)
+    entry.add_to_hass(hass)
+    with patch("custom_components.outback_mate3.ADDON_OFFLINE_GRACE_S", 0.05):
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        registry = ir.async_get(hass)
+        for _ in range(80):
+            if registry.async_get_issue(DOMAIN, ISSUE_ADDON_OFFLINE) is not None:
+                break
+            await asyncio.sleep(0.05)
+
+    issue = registry.async_get_issue(DOMAIN, ISSUE_ADDON_OFFLINE)
+    assert issue is not None
+    assert issue.translation_placeholders == {"url": bogus_url}
+
+    # Unload so the reconnect loop + scheduled timers don't leak into teardown.
+    await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def test_addon_offline_issue_cleared_on_reconnect(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """A reconnect after the issue is raised should delete it."""
+    from custom_components.outback_mate3 import OutbackMate3
+    from custom_components.outback_mate3.const import ISSUE_ADDON_OFFLINE
+    from homeassistant.helpers import issue_registry as ir
+
+    fake_addon.messages = [SNAPSHOT_PAYLOAD]
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    mate3: OutbackMate3 = entry.runtime_data
+    registry = ir.async_get(hass)
+
+    # Force-raise the issue synchronously.
+    mate3._raise_addon_offline()
+    assert registry.async_get_issue(DOMAIN, ISSUE_ADDON_OFFLINE) is not None
+
+    # A connect transition should clear it.
+    mate3._on_connected()
+    assert registry.async_get_issue(DOMAIN, ISSUE_ADDON_OFFLINE) is None

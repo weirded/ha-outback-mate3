@@ -43,5 +43,15 @@
                 "name": "Receiving Data from MATE3"
             }
         }
+    },
+    "issues": {
+        "addon_offline": {
+            "title": "Outback MATE3 add-on is not running",
+            "description": "The integration can't reach the companion add-on at {url}. Start or restart the 'Outback MATE3' add-on in Settings \u2192 Add-ons \u2192 Outback MATE3."
+        },
+        "version_drift": {
+            "title": "Integration and add-on versions don't match",
+            "description": "The Outback MATE3 integration is at version {integration_version} but the add-on is at {addon_version}. They ship together and should be kept on the same version; update whichever is behind."
+        }
     }
 }

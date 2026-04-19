@@ -70,10 +70,12 @@ class WSServer:
         heartbeat: float = HEARTBEAT_S,
         queue_max: int = _BROADCAST_QUEUE_MAX,
         send_timeout_s: float = _SEND_TIMEOUT_S,
+        addon_version: str | None = None,
     ) -> None:
         self._registry = registry
         self._heartbeat = heartbeat
         self._send_timeout_s = send_timeout_s
+        self._addon_version = addon_version
         self._clients: set[web.WebSocketResponse] = set()
         self._queue: asyncio.Queue[list[Event]] = asyncio.Queue(maxsize=queue_max)
         self._dropped_batches = 0
@@ -93,6 +95,14 @@ class WSServer:
         ws = web.WebSocketResponse(heartbeat=self._heartbeat)
         await ws.prepare(request)
 
+        # Send a hello first so the integration can surface a Repairs issue
+        # if its own manifest version doesn't match ours. Omitted when we
+        # don't know our own version (e.g. unit tests that don't set it) so
+        # the test fakes don't have to hand-drain an extra frame.
+        if self._addon_version is not None:
+            await ws.send_json(
+                {"type": "hello", "addon_version": self._addon_version}
+            )
         await ws.send_json({"type": "snapshot", "devices": self._registry.snapshot()})
         # Replay the last known config for each MAC so new clients get the
         # full picture without having to wait for the next poll interval.

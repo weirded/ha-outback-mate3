@@ -6,10 +6,11 @@ WS_PORT="$(bashio::config 'ws_port')"
 LOG_LEVEL="$(bashio::config 'log_level')"
 MIN_UPDATE_INTERVAL_S="$(bashio::config 'min_update_interval_s')"
 CONFIG_POLL_INTERVAL_S="$(bashio::config 'config_poll_interval_s')"
+ADDON_VERSION="$(bashio::addon.version)"
 
-export UDP_PORT WS_PORT LOG_LEVEL MIN_UPDATE_INTERVAL_S CONFIG_POLL_INTERVAL_S
+export UDP_PORT WS_PORT LOG_LEVEL MIN_UPDATE_INTERVAL_S CONFIG_POLL_INTERVAL_S ADDON_VERSION
 
-bashio::log.info "Outback MATE3: UDP :${UDP_PORT} -> WS :${WS_PORT} (throttle ${MIN_UPDATE_INTERVAL_S}s, config poll ${CONFIG_POLL_INTERVAL_S}s, log ${LOG_LEVEL})"
+bashio::log.info "Outback MATE3 v${ADDON_VERSION}: UDP :${UDP_PORT} -> WS :${WS_PORT} (throttle ${MIN_UPDATE_INTERVAL_S}s, config poll ${CONFIG_POLL_INTERVAL_S}s, log ${LOG_LEVEL})"
 
 # --- Deploy bundled integration into HA's config dir -----------------------
 # B9: the add-on ships the companion integration in its image. On every start

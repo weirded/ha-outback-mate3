@@ -73,6 +73,26 @@ async def test_new_client_receives_snapshot(ws_setup):
 
 
 @pytest.mark.asyncio
+async def test_hello_prefixes_snapshot_when_version_known():
+    """When addon_version is configured, the first frame is a hello carrying it."""
+    server = WSServer(_populated_registry(), heartbeat=100, addon_version="2.0.0-dev18")
+    async with TestClient(TestServer(server.app)) as client, client.ws_connect("/ws") as ws:
+        first = await asyncio.wait_for(ws.receive_json(), timeout=2)
+        assert first == {"type": "hello", "addon_version": "2.0.0-dev18"}
+        second = await asyncio.wait_for(ws.receive_json(), timeout=2)
+        assert second["type"] == "snapshot"
+
+
+@pytest.mark.asyncio
+async def test_hello_omitted_when_version_unset():
+    """Without addon_version (the test-fixture default), snapshot arrives first."""
+    server = WSServer(_populated_registry(), heartbeat=100)
+    async with TestClient(TestServer(server.app)) as client, client.ws_connect("/ws") as ws:
+        first = await asyncio.wait_for(ws.receive_json(), timeout=2)
+        assert first["type"] == "snapshot"
+
+
+@pytest.mark.asyncio
 async def test_snapshot_contains_state(ws_setup):
     _, ws_client = ws_setup
     async with ws_client.ws_connect("/ws") as ws:

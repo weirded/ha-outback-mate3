@@ -271,7 +271,7 @@ _Bigger-surface changes that move the integration from Bronze toward Gold._
 
 ## Phase 18 — Platinum-adjacent polish (Wave 3)
 
-- [ ] **18.1** Create `custom_components/outback_mate3/repairs.py` — repairs flow for add-on offline / version drift.
+- [x] **18.1** Raise two Home Assistant Repairs issues: `addon_offline` (surfaces after a `ADDON_OFFLINE_GRACE_S = 60 s` grace so brief Supervisor bounces don't flap it) and `version_drift` (raised when the add-on's self-reported `addon_version` doesn't match the integration's manifest version). Both are non-fixable `ir.IssueSeverity.WARNING` issues driven from coordinator connect/disconnect transitions — no `repairs.py` needed for a flow since the user's action (restart add-on, upgrade one half) happens outside HA. WS protocol gained a `hello` frame (add-on → integration) carrying `addon_version`; add-on reads its version via `bashio::addon.version` in `run.sh` → `ADDON_VERSION` env var → `WSServer(addon_version=...)`. `translations/en.json` + `strings.json` carry the two `issues` translation keys with `{url}` and `{integration_version}/{addon_version}` placeholders. Diagnostics snapshot now exposes both versions. _(2.0.0-dev19)_
 - [ ] **18.2** Add snapshot tests via `syrupy` for entity state.
 - [ ] **18.3** Add `async_step_reauth(self, entry_data)` to config_flow (no-op until auth is added, but wired for forward compat).
 - [ ] **18.4** Finish B20 — MyPy strict across both components, wire into `.github/workflows/lint.yaml`.
