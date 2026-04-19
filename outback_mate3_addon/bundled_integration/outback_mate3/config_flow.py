@@ -15,21 +15,30 @@ from .const import CONF_URL, DEFAULT_URL, DOMAIN
 
 
 async def _probe_ws_url(url: str, timeout_s: float = 5.0) -> str | None:
-    """Return ``None`` on success, or a short error code on failure."""
+    """Return ``None`` on success, or a short error code on failure.
+
+    The add-on sends ``hello`` (when it knows its version) before ``snapshot``,
+    and may follow with ``config_snapshot`` frames. Skip the leading framing
+    messages and treat receipt of ``snapshot`` as a successful handshake.
+    """
     try:
         async with aiohttp.ClientSession() as session:
             async with asyncio.timeout(timeout_s):
                 async with session.ws_connect(url) as ws:
-                    msg = await ws.receive()
-                    if msg.type != aiohttp.WSMsgType.TEXT:
+                    while True:
+                        msg = await ws.receive()
+                        if msg.type != aiohttp.WSMsgType.TEXT:
+                            return "bad_handshake"
+                        try:
+                            payload = msg.json()
+                        except ValueError:
+                            return "bad_handshake"
+                        msg_type = payload.get("type")
+                        if msg_type == "snapshot":
+                            return None
+                        if msg_type in {"hello", "config_snapshot"}:
+                            continue
                         return "bad_handshake"
-                    try:
-                        payload = msg.json()
-                    except ValueError:
-                        return "bad_handshake"
-                    if payload.get("type") != "snapshot":
-                        return "bad_handshake"
-                    return None
     except TimeoutError:
         return "timeout"
     except aiohttp.ClientError:

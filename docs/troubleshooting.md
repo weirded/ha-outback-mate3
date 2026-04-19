@@ -12,7 +12,7 @@ discovery card under **Settings → Devices & Services**. If it's missing:
 2. **Did you restart Home Assistant after the first add-on start?** The
    bundled integration is dropped into `/config/custom_components/` on the
    add-on's first start, but HA only loads it on the next restart.
-3. **Check the add-on log** for lines like `Supervisor discovery announced`.
+3. **Check the add-on log** for lines like `Announced discovery to Supervisor`.
    If those are missing, the add-on couldn't reach Supervisor — usually a
    permissions issue (`hassio_api: true` is required in the add-on
    `config.yaml` — this repository's add-on already declares it).
@@ -39,10 +39,10 @@ off, the add-on isn't hearing from your MATE3. Check in this order:
    show you whether packets are arriving at all. If they're not, it's a
    network problem (VLAN, firewall, switch port isolation).
 4. **Add-on logs.** Settings → Add-ons → Outback MATE3 → Log tab. Look for
-   lines starting `udp: received` — they log at INFO only when a new source
-   IP first appears, so a running system logs nothing UDP-related after
-   steady state. If you see `udp: listening on 0.0.0.0:57027` and nothing
-   else, no packets are arriving.
+   a line like `First UDP datagram from <ip> (<N> bytes)` — it logs at INFO
+   only when a new source IP first appears, so a running system logs nothing
+   UDP-related after steady state. If you see `Listening for MATE3 UDP on
+   0.0.0.0:57027` and nothing else, no packets are arriving.
 
 ## All sensors show **Unavailable**
 

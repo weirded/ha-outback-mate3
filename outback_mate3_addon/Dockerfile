@@ -25,8 +25,11 @@ COPY bundled_integration/outback_mate3/ /opt/integration/outback_mate3/
 COPY run.sh /etc/services.d/outback_mate3/run
 RUN chmod a+x /etc/services.d/outback_mate3/run
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD python3 -c "import socket, sys; s=socket.socket(); s.settimeout(3); s.connect(('127.0.0.1', 28099)); s.close()" || exit 1
+# No HEALTHCHECK: the WS port is user-configurable (ws_port option), so a
+# fixed-port probe would falsely report unhealthy whenever the user retargets
+# the port. Supervisor relies on s6-overlay supervising the service and
+# restarting the container if /init exits, which is a stronger signal than
+# a port poke anyway.
 
 LABEL \
   io.hass.name="Outback MATE3" \
