@@ -27,6 +27,16 @@ PVE_HOST="${PVE_HOST:-pve}"
 VMID="${VMID:-106}"
 INTEGRATION_DIR="${INTEGRATION_DIR:-custom_components/outback_mate3}"
 SKIP_RESTART="${SKIP_RESTART:-0}"
+# Proxmox cluster node name used in pvesh API paths (/nodes/<node>/...).
+# Defaults match the single-host `pve` install; override PVE_NODE explicitly
+# for clusters, or leave empty to auto-detect from `pvesh get /nodes`.
+PVE_NODE="${PVE_NODE:-}"
+
+if [[ -z "$PVE_NODE" ]]; then
+  PVE_NODE=$(ssh "$PVE_HOST" "pvesh get /nodes --output-format json" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['node'])" 2>/dev/null) \
+    || { echo "Couldn't auto-detect PVE_NODE; set PVE_NODE explicitly" >&2; exit 3; }
+fi
 
 INTEGRATION_NAME="$(basename "$INTEGRATION_DIR")"
 INTEGRATION_PARENT="$(dirname "$INTEGRATION_DIR")"
@@ -45,17 +55,17 @@ guest_exec() {
   local remote_script
   remote_script=$(ssh "$PVE_HOST" mktemp -t guest_exec.XXXXXX)
   printf '%s' "$script" | ssh "$PVE_HOST" "cat > $remote_script"
-  ssh "$PVE_HOST" "VMID=$VMID TIMEOUT_S=$timeout_s SCRIPT_FILE=$remote_script bash -s" <<'REMOTE'
+  ssh "$PVE_HOST" "PVE_NODE=$PVE_NODE VMID=$VMID TIMEOUT_S=$timeout_s SCRIPT_FILE=$remote_script bash -s" <<'REMOTE'
 set -euo pipefail
 TMPJSON=$(mktemp)
 trap 'rm -f "$TMPJSON" "$SCRIPT_FILE"' EXIT
 SCRIPT=$(cat "$SCRIPT_FILE")
-pvesh create "/nodes/pve/qemu/$VMID/agent/exec" \
+pvesh create "/nodes/$PVE_NODE/qemu/$VMID/agent/exec" \
   --command /bin/sh --command -c --command "$SCRIPT" \
   --output-format json > "$TMPJSON"
 PID=$(python3 -c "import sys,json; print(json.load(open(sys.argv[1]))['pid'])" "$TMPJSON")
 for _ in $(seq 1 "$TIMEOUT_S"); do
-  pvesh get "/nodes/pve/qemu/$VMID/agent/exec-status" \
+  pvesh get "/nodes/$PVE_NODE/qemu/$VMID/agent/exec-status" \
     --pid "$PID" --output-format json > "$TMPJSON"
   if python3 -c "import sys,json; sys.exit(0 if json.load(open(sys.argv[1])).get('exited') else 1)" "$TMPJSON"; then
     python3 - "$TMPJSON" <<'PY'
@@ -91,17 +101,18 @@ REMOTE_STAGE="/tmp/outback_integration-$$.tar"
 scp -q "$TARBALL" "$PVE_HOST:$REMOTE_STAGE"
 
 log "Pushing tarball to VM $VMID via qga file-write (chunked)"
-ssh "$PVE_HOST" bash -s "$VMID" "$REMOTE_STAGE" <<'REMOTE'
+ssh "$PVE_HOST" bash -s "$PVE_NODE" "$VMID" "$REMOTE_STAGE" <<'REMOTE'
 set -euo pipefail
-VMID="$1"
-SRC="$2"
+PVE_NODE="$1"
+VMID="$2"
+SRC="$3"
 CHUNK_DIR=$(mktemp -d)
 trap 'rm -rf "$CHUNK_DIR" "$SRC"' EXIT
 split -b 40000 -a 3 -d "$SRC" "$CHUNK_DIR/c."
 for f in "$CHUNK_DIR"/c.*; do
   name=$(basename "$f")
   B64=$(base64 -w0 < "$f")
-  pvesh create "/nodes/pve/qemu/$VMID/agent/file-write" \
+  pvesh create "/nodes/$PVE_NODE/qemu/$VMID/agent/file-write" \
     --encode 0 --file "/tmp/$name" --content "$B64" >/dev/null
 done
 REMOTE

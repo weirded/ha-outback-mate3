@@ -7,7 +7,6 @@ materialize and respond to state updates + reconnects.
 from __future__ import annotations
 
 import asyncio
-from collections import deque
 
 import pytest
 from aiohttp import web
@@ -189,12 +188,15 @@ async def test_state_updated_refreshes_entities(
     }
     await fake_addon.broadcast(updated)
     # Give the client a moment to apply.
+    eid = f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power"
+    st = None
     for _ in range(40):
-        st = hass.states.get(f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power")
+        st = hass.states.get(eid)
         if st and st.state == "-300":
             break
         await asyncio.sleep(0.05)
-    assert st.state == "-300"
+    assert st is not None, f"{eid} vanished before state update was applied"
+    assert st.state == "-300", f"expected -300, last seen {st.state!r}"
 
 
 async def test_config_snapshot_only_creates_diagnostics_after_poll(
@@ -318,9 +320,12 @@ async def test_reconnects_after_addon_drops_ws(
     }
     fake_addon.messages = [new_snap]
 
+    eid = f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power"
+    st = None
     for _ in range(100):  # up to ~5 s — backoff is 1 s
-        st = hass.states.get(f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power")
+        st = hass.states.get(eid)
         if st and st.state == "999":
             break
         await asyncio.sleep(0.05)
-    assert st.state == "999"
+    assert st is not None, f"{eid} never re-appeared after reconnect"
+    assert st.state == "999", f"expected 999 after reconnect, last seen {st.state!r}"

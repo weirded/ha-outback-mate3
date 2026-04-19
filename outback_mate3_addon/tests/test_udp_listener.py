@@ -37,10 +37,17 @@ async def pipeline():
     sockname = transport.get_extra_info("sockname")
     udp_port = sockname[1]
 
+    # Kick off the broadcaster consumer that drains WSServer's queue; in
+    # production this is started by `main.py`.
+    stop = asyncio.Event()
+    broadcaster = asyncio.create_task(server.run_broadcaster(stop))
+
     async with TestClient(TestServer(server.app)) as ws_client:
         yield udp_port, ws_client
 
     transport.close()
+    stop.set()
+    await broadcaster
 
 
 @pytest.mark.asyncio

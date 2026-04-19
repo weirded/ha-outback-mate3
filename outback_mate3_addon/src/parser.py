@@ -25,6 +25,11 @@ _LOGGER = logging.getLogger(__name__)
 
 MAC_PATTERN = re.compile(r"\[([0-9A-F]{6})-([0-9A-F]{6})\]")
 _FRAME_SPLIT = re.compile(r"]<|><|>")
+# A valid device block starts with the port-ID digits followed by a comma —
+# e.g. `01,6,...` (port 1) or `10,3,...` (port 10). This rejects empty
+# trailing fragments from _FRAME_SPLIT without hard-coding a leading digit
+# (which would silently drop any port >= 10).
+_DEVICE_BLOCK = re.compile(r"^\d+,\d+")
 
 KIND_INVERTER = "inverter"
 KIND_CHARGE_CONTROLLER = "charge_controller"
@@ -82,7 +87,7 @@ def parse_frame(data: bytes, remote_ip: str) -> list[DeviceUpdate]:
 
     mac = match.group(1) + match.group(2)
     _, *blocks = _FRAME_SPLIT.split(text)
-    blocks = [b for b in blocks if b.startswith("0")]
+    blocks = [b for b in blocks if _DEVICE_BLOCK.match(b)]
 
     per_type_count: dict[int, int] = {}
     updates: list[DeviceUpdate] = []

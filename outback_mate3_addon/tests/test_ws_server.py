@@ -132,3 +132,89 @@ async def test_disconnected_client_is_removed_from_clients_set(ws_setup):
         assert server.client_count == 1
     await asyncio.sleep(0.1)
     assert server.client_count == 0
+
+
+# --- Backpressure queue + broadcaster (R2) ----------------------------------
+
+
+@pytest.mark.asyncio
+async def test_enqueue_broadcast_is_delivered_via_run_broadcaster(ws_setup):
+    """enqueue_broadcast() + run_broadcaster() == broadcast() as far as the client sees."""
+    server, ws_client = ws_setup
+    stop = asyncio.Event()
+    consumer = asyncio.create_task(server.run_broadcaster(stop))
+    try:
+        async with ws_client.ws_connect("/ws") as ws:
+            await ws.receive_json()  # snapshot
+            await asyncio.sleep(0.05)
+
+            server.enqueue_broadcast(
+                [StateUpdated(mac="A", kind=KIND_INVERTER, index=1, state={"grid_power": 77})]
+            )
+            msg = await asyncio.wait_for(ws.receive_json(), timeout=2)
+            assert msg == {
+                "type": "state_updated",
+                "mac": "A",
+                "kind": KIND_INVERTER,
+                "index": 1,
+                "state": {"grid_power": 77},
+            }
+    finally:
+        stop.set()
+        await consumer
+
+
+def test_enqueue_broadcast_full_queue_drops_and_counts():
+    """When the consumer isn't running, the queue fills up and excess batches drop."""
+    server = WSServer(_populated_registry(), heartbeat=100, queue_max=3)
+    # No broadcaster running; the queue has capacity 3 — push 5 and see 2 drops.
+    for i in range(5):
+        server.enqueue_broadcast(
+            [StateUpdated(mac="A", kind=KIND_INVERTER, index=i, state={})]
+        )
+    assert server.dropped_batches == 2
+
+
+# --- Per-client isolation (R3) ---------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_one_slow_client_does_not_stall_other_clients(ws_setup):
+    """A client that blocks inside send_json should not delay the other client."""
+    server, ws_client = ws_setup
+
+    # Two real clients connected; we'll monkey-patch one's send_json to hang.
+    async with ws_client.ws_connect("/ws") as fast_ws, ws_client.ws_connect("/ws") as _slow_ws:
+        await fast_ws.receive_json()
+        await _slow_ws.receive_json()
+        await asyncio.sleep(0.05)
+
+        # Identify the server-side client objects and wrap one's send_json to
+        # sleep long enough to blow past _SEND_TIMEOUT_S; the other should
+        # receive its broadcast within the normal quick window.
+        server._send_timeout_s = 0.2  # tighten so the test doesn't linger
+        server_clients = list(server._clients)
+        assert len(server_clients) == 2
+        # Wrap an arbitrary one of the two — the test passes as long as the
+        # OTHER client (whichever that is) still gets its message promptly.
+        slow_client = server_clients[0]
+        fast_client = server_clients[1]
+        real_send = slow_client.send_json
+
+        async def stuck_send(*a, **kw):
+            await asyncio.sleep(5.0)  # way longer than the timeout
+
+        slow_client.send_json = stuck_send  # type: ignore[method-assign]
+
+        evt = DeviceAdded(mac="B", kind=KIND_INVERTER, index=7, state={"p": 1})
+        start = asyncio.get_running_loop().time()
+        await server.broadcast([evt])
+        elapsed = asyncio.get_running_loop().time() - start
+
+        # broadcast() must return in roughly the send timeout, not 5 s.
+        assert elapsed < 1.0, f"broadcast stalled for {elapsed:.2f}s; timeout/parallelism broken"
+        # And the slow client got dropped because it timed out.
+        assert slow_client not in server._clients
+        assert fast_client in server._clients
+        # Restore so test cleanup doesn't trip.
+        slow_client.send_json = real_send  # type: ignore[method-assign]

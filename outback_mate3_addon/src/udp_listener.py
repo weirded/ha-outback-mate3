@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
 
 from src.parser import parse_frame
 from src.state import DeviceRegistry
@@ -75,8 +74,11 @@ async def start_listener(
             )
             return
         _LOGGER.debug("Broadcasting %d events", len(events))
-        # Fire-and-forget broadcast; exceptions get logged but don't block ingress.
-        asyncio.create_task(_safe_broadcast(server, events))
+        # Non-blocking, bounded enqueue. The single broadcaster consumer
+        # task in WSServer pulls from here and does the actual fan-out,
+        # so we can't leak an unbounded number of pending send tasks
+        # even if the WS clients stall.
+        server.enqueue_broadcast(events)
 
     transport, _ = await loop.create_datagram_endpoint(
         lambda: _Mate3DatagramProtocol(handle),
@@ -84,10 +86,3 @@ async def start_listener(
     )
     _LOGGER.info("Listening for MATE3 UDP on %s:%d", host, port)
     return transport  # type: ignore[return-value]
-
-
-async def _safe_broadcast(server: WSServer, events: list[Any]) -> None:
-    try:
-        await server.broadcast(events)
-    except Exception:
-        _LOGGER.exception("WS broadcast failed")

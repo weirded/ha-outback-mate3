@@ -79,6 +79,10 @@ async def run() -> None:
     poller = asyncio.create_task(
         config_poller.run(registry, server, config_poll_interval, stop)
     )
+    # Single consumer that drains the WSServer's broadcast queue and fans
+    # events out to clients. Having exactly one serializes ordering across
+    # the UDP and config-poll producers.
+    broadcaster = asyncio.create_task(server.run_broadcaster(stop))
 
     await stop.wait()
 
@@ -87,11 +91,12 @@ async def run() -> None:
     transport.close()
     await server.close_all()
     await runner.cleanup()
-    poller.cancel()
-    try:
-        await poller
-    except asyncio.CancelledError:
-        pass
+    for task in (poller, broadcaster):
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 if __name__ == "__main__":

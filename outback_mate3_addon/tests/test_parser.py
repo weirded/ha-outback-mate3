@@ -144,6 +144,32 @@ def test_charge_controller_2_values(t00_devices):
 
 # --- 240V AC factor branch ---------------------------------------------------
 
+def test_port_10_charge_controller_is_not_dropped():
+    """R5 regression: the old filter required blocks to start with '0', which
+    silently dropped any device on port 10+. Build a synthetic frame with a
+    single charge controller on port 10 and confirm the parser returns it."""
+    # CC block minimal: id, type=3, v2, v3 (output_current), v4 (pv_current),
+    # v5 (pv_voltage), then fill up through v13 (kwh_today) — indices
+    # referenced by _parse_charge_controller.
+    cc_fields = ["10","3","0","7","5","80","0","0","0","0","1","534","0","0.5"]
+    payload = f"[AAAAAA-BBBBBB]<{','.join(cc_fields)}>".encode()
+    updates = parse_frame(payload, REMOTE_IP)
+    assert len(updates) == 1
+    assert updates[0].kind == KIND_CHARGE_CONTROLLER
+    # `index` is type-local; with only one CC in the frame, it's 1.
+    assert updates[0].index == 1
+    _approx(updates[0].state["pv_current"], 5.0)
+    _approx(updates[0].state["pv_voltage"], 80.0)
+
+
+def test_malformed_block_without_port_prefix_is_skipped():
+    """Trailing garbage after the last device should not crash the parser."""
+    payload = b"[AAAAAA-BBBBBB]<01,3,0,1,2,50,0,0,0,0,0,500,0,0><garbage>"
+    updates = parse_frame(payload, REMOTE_IP)
+    assert len(updates) == 1
+    assert updates[0].kind == KIND_CHARGE_CONTROLLER
+
+
 def test_240v_ac_factor_doubles_voltage():
     """If raw L1 input voltage > 150, the parser treats it as 240V-ish and scales all voltages x2."""
     # Build a synthetic inverter block where values[6] > 150.

@@ -54,7 +54,7 @@ async def run(
             changed = registry.set_config(mac, config)
             if changed:
                 _LOGGER.info("Config for %s (%s) changed; broadcasting", mac, host)
-                await server.broadcast([ConfigSnapshot(mac=mac, config=config)])
+                server.enqueue_broadcast([ConfigSnapshot(mac=mac, config=config)])
             else:
                 _LOGGER.debug("Config for %s (%s) unchanged", mac, host)
 

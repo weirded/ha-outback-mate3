@@ -1,7 +1,7 @@
 # Outback MATE3 — Home Assistant Add-on Design
 
-**Date:** 2026-04-17
-**Status:** Proposed (revision 2 — structured WebSocket protocol)
+**Date:** 2026-04-17 (original design), last refreshed 2026-04-18 after the 2.0.0 ship
+**Status:** Implemented and shipped as part of 2.0.0. Protocol, ports, and repository layout below reflect the code as of 2.0.0, not the original proposal. Material differences from the proposal are flagged inline.
 **Scope:** Split the project into (a) a Home Assistant add-on that does all UDP I/O and MATE3 parsing and owns device state, and (b) a slimmed custom integration that connects to the add-on over WebSocket and creates/updates HA entities in response to typed events. The result works on Home Assistant OS.
 
 ## Context
@@ -25,14 +25,16 @@ Our design follows this shape. Our "protocol" is smaller than Z-Wave's, but the 
 ## Chosen Architecture
 
 ```
-┌────────────────┐       UDP :57027       ┌──────────────────────────────┐      WebSocket :8099        ┌──────────────────────┐
-│   MATE3 unit   │ ─────────────────────▶ │   outback_mate3 add-on       │ ──────────────────────────▶ │  HA Core integration │
-│  (on the LAN)  │                        │                              │                             │  (custom component)  │
-└────────────────┘                        │  - UDP listener              │  events:                    │                      │
-                                          │  - MATE3 parser              │    - snapshot               │  - reacts to events  │
-                                          │  - device state registry     │    - device_added           │  - creates HA        │
-                                          │  - WS server, fan-out        │    - state_updated          │    devices/entities  │
-                                          └──────────────────────────────┘                             └──────────────────────┘
+┌────────────────┐       UDP :57027       ┌──────────────────────────────┐       WebSocket :28099       ┌──────────────────────┐
+│   MATE3 unit   │ ─────────────────────▶ │   outback_mate3 add-on       │ ───────────────────────────▶ │  HA Core integration │
+│  (on the LAN)  │         HTTP :80       │                              │   events:                    │  (custom component)  │
+└────────────────┘ ◀───────────────────── │  - UDP listener              │    - snapshot                │                      │
+                   CONFIG.xml pulled       │  - CONFIG.xml poller (5min) │    - device_added            │  - reacts to events  │
+                   every 5 min             │  - MATE3 UDP parser         │    - state_updated           │  - creates HA        │
+                                          │  - device + config registry  │    - config_snapshot         │    devices/entities  │
+                                          │  - bundled integration       │                              │                      │
+                                          │    auto-deploy               │                              │                      │
+                                          └──────────────────────────────┘                              └──────────────────────┘
 ```
 
 Responsibilities:
@@ -40,23 +42,29 @@ Responsibilities:
 | Concern | Owner |
 |---|---|
 | Bind UDP, receive MATE3 packets | **Add-on** |
-| Parse MATE3 frames into device structures | **Add-on** |
+| Parse MATE3 UDP frames into device structures | **Add-on** |
+| Poll MATE3's `CONFIG.xml` over HTTP; surface nameplate + setpoints | **Add-on** |
 | Maintain in-memory registry of known devices and their current state | **Add-on** |
-| Compute system-level aggregates (grid/solar/battery totals) | **Add-on** |
 | Emit typed events on state change | **Add-on** |
+| Announce to Supervisor for Hass.io auto-discovery | **Add-on** |
+| Deploy bundled integration into `/config/custom_components/…` on start | **Add-on** |
 | Connect to add-on over WebSocket | Integration |
-| Create HA devices + entities from `device_added` events | Integration |
+| Create HA devices + entities from `snapshot` / `device_added` | Integration |
 | Push state onto entities on `state_updated` events | Integration |
+| Compute system-level aggregates (grid/solar/battery totals) on demand from per-device state | Integration |
+| Materialize config-derived diagnostic sensors on first `config_snapshot` | Integration |
 | Entity classes, units, `device_class`, `state_class` | Integration |
-| Config flow, config entry, HACS packaging | Integration |
+| Config flow, config entry, HA restart recovery | Integration |
 
 The integration never parses a MATE3 byte. The add-on never knows what a Home Assistant entity is. The WebSocket protocol is the interface.
 
+> **Changed from proposal:** the proposal placed aggregate computation in the add-on and emitted an `aggregates_updated` event. During implementation we realized the integration's existing `sensor.py` already computed totals on demand from per-device state, and the `combined_metrics` dict it computed into was dead code. Aggregates now live entirely on the integration side; there is no `aggregates_updated` event.
+
 ## Protocol (WebSocket at `/ws`)
 
-JSON text frames. Message envelope: `{"type": "...", ...}`.
+JSON text frames. Message envelope: `{"type": "...", ...}`. WS port defaults to **28099** (moved from the originally-proposed 8099 because that port collides with other common HA add-ons).
 
-**On client connect, server sends a snapshot of current state:**
+**On client connect, server sends a snapshot of the currently-known devices, followed by the last-known config snapshot for each MAC that has been polled:**
 ```json
 {
   "type": "snapshot",
@@ -65,19 +73,20 @@ JSON text frames. Message envelope: `{"type": "...", ...}`.
       "mac": "001A2B-000001",
       "kind": "inverter",
       "index": 1,
-      "state": { "l1_grid_power": 123.4, "l2_grid_power": 98.7, /* ... */ }
+      "state": { "l1_grid_power": 123.4, "l2_grid_power": 98.7, "...": "..." }
     },
     {
       "mac": "001A2B-000001",
       "kind": "charge_controller",
       "index": 1,
-      "state": { "pv_current": 4.2, "pv_voltage": 80.1, /* ... */ }
+      "state": { "pv_current": 4.2, "pv_voltage": 80.1, "...": "..." }
     }
-  ],
-  "aggregates": {
-    "001A2B-000001": { "total_grid_power": 222.1, /* ... */ }
-  }
+  ]
 }
+```
+Immediately after, the server sends one `config_snapshot` per known MAC (if any config polls have succeeded), so the new client has the full picture without having to wait up to `config_poll_interval_s` for the next poll:
+```json
+{ "type": "config_snapshot", "mac": "001A2B-000001", "config": { "system": { ... }, "inverters": [ ... ], "charge_controllers": [ ... ], "mate3": { "firmware": "001.004.007", ... } } }
 ```
 
 **On new device seen in a UDP frame:**
@@ -85,46 +94,61 @@ JSON text frames. Message envelope: `{"type": "...", ...}`.
 { "type": "device_added", "mac": "...", "kind": "inverter", "index": 2, "state": { ... } }
 ```
 
-**On any state change (throttled to ≤1 per 30s per MAC, matching current behavior):**
+**On any state change (throttled to ≤1 per 30s per MAC by default — `min_update_interval_s`):**
 ```json
 { "type": "state_updated", "mac": "...", "kind": "inverter", "index": 1, "state": { ... } }
 ```
 
-**On per-MAC aggregate change:**
+**On each successful MATE3 CONFIG.xml poll that changed:**
 ```json
-{ "type": "aggregates_updated", "mac": "...", "aggregates": { ... } }
+{ "type": "config_snapshot", "mac": "...", "config": { ... } }
 ```
+Polls that re-fetch unchanged config do **not** emit an event; the registry only broadcasts on diff.
 
-**Keepalive:** server sends `{"type": "ping"}` every 30s; client replies `{"type": "pong"}`. Missing two pings in a row → client reconnects.
+**Keepalive:** handled at the aiohttp protocol level via the `heartbeat` parameter on both ends (30 s ping interval, automatic reconnect on timeout). No hand-rolled ping/pong JSON frames.
+
+> **Changed from proposal:** originally we specced an `aggregates` block inside `snapshot` plus an `aggregates_updated` event and hand-rolled JSON ping/pong. Aggregates moved to the integration (see above); ping/pong was replaced by aiohttp's built-in heartbeat to avoid reinventing what the library already provides.
 
 Design notes:
-- Full `state` is sent every update (not deltas). Simpler, and payloads are small (<2KB).
-- `mac`, `kind`, `index` together identify a device — same as the current integration's `device_key`.
+- Full `state` is sent every update (not deltas). Simpler, and payloads are small (<2 KB).
+- `mac`, `kind`, `index` together identify a device — same as the pre-2.0 integration's `device_key`.
+- `config_snapshot` stores the CONFIG.xml-derived nameplate + setpoints on `OutbackMate3.config_by_mac[mac]`; the integration materializes config-derived diagnostic sensors on the first successful snapshot per MAC (so MATE3s whose HTTP endpoint is unreachable don't leave phantom "unavailable" entities).
 - No auth. Add-on is on the internal Docker/host network.
+- Inside the add-on, UDP + config-poll events are funneled through a bounded `asyncio.Queue` drained by one broadcaster consumer task, then fanned out to connected clients in parallel with a per-client send timeout so one slow client can't stall the others.
 
 ## Repository Layout
 
 ```
 /
-├── custom_components/outback_mate3/      # existing; becomes a thin WS client
-│   ├── __init__.py                       # connects to add-on, dispatches events to entity layer
-│   ├── config_flow.py                    # asks for WS URL (instead of UDP port)
-│   ├── sensor.py                         # entity classes (mostly unchanged structure)
-│   ├── manifest.json                     # version bump, breaking change
+├── custom_components/outback_mate3/      # thin WS client of the add-on
+│   ├── __init__.py                       # OutbackMate3 coordinator; WS client loop
+│   ├── config_flow.py                    # async_step_hassio + user-URL fallback
+│   ├── sensor.py                         # live UDP entities + config-derived diagnostics
+│   ├── binary_sensor.py                  # Receiving-Data connectivity sensor
+│   ├── manifest.json                     # version (shared with add-on)
 │   └── translations/
-├── outback_mate3_addon/                  # NEW add-on
-│   ├── config.yaml                       # HA add-on manifest
-│   ├── Dockerfile
-│   ├── run.sh
+├── outback_mate3_addon/                  # HA add-on
+│   ├── config.yaml                       # manifest, options, schema, hassio_api,
+│   │                                     # discovery, map: [homeassistant_config:rw]
+│   ├── translations/en.yaml              # Supervisor-UI option labels + port labels
+│   ├── Dockerfile                        # BUILD_FROM multi-arch; bundles integration
+│   ├── build.yaml                        # per-arch base-image map
+│   ├── run.sh                            # bashio; deploys bundled integration on start
 │   ├── requirements.txt                  # aiohttp
+│   ├── bundled_integration/outback_mate3/ # synced copy of custom_components/outback_mate3/
 │   └── src/
 │       ├── main.py                       # entry point; wires pieces
-│       ├── udp_listener.py               # asyncio DatagramProtocol
-│       ├── parser.py                     # MATE3 frame parser (moved from custom_components/__init__.py)
-│       ├── state.py                      # in-memory device registry + aggregate computation
-│       └── ws_server.py                  # aiohttp WS with snapshot + event stream
-├── repository.yaml                       # NEW — makes this repo installable as add-on repo
+│       ├── udp_listener.py               # asyncio DatagramProtocol → enqueue_broadcast
+│       ├── parser.py                     # MATE3 UDP frame parser
+│       ├── mate3_http.py                 # CONFIG.xml fetcher + XML parser
+│       ├── config_poller.py              # periodic HTTP poll + change detection
+│       ├── state.py                      # DeviceRegistry + throttle + config store
+│       ├── ws_server.py                  # aiohttp WS; bounded queue + per-client isolation
+│       └── discovery.py                  # Supervisor /discovery announce/withdraw
+├── scripts/                              # dev harness (Proxmox HAOS VM automation)
+├── repository.yaml                       # makes this repo installable as add-on repo
 ├── docs/
+├── tests/                                # PHACC integration tests
 ├── TASKS.md
 └── README.md
 ```
@@ -134,47 +158,58 @@ Design notes:
 ### Add-on (`outback_mate3_addon/`)
 
 **`config.yaml`** (HA add-on manifest):
-- `slug: outback_mate3`, `name: "Outback MATE3"`, `version: "0.1.0"`
+- `slug: outback_mate3`, `name: "Outback MATE3"`, `version: "2.0.0"`
 - `arch: [aarch64, amd64, armhf, armv7, i386]`
 - `startup: services`, `boot: auto`
 - `host_network: true` (so the MATE3 on the LAN can reach this container's UDP port)
-- `options: { udp_port: 57027, ws_port: 8099, log_level: "info", min_update_interval_s: 30 }`
+- `init: false` (defer to the base image's s6-overlay; Docker's `tini` causes PID-1 conflicts)
+- `hassio_api: true`, `discovery: [outback_mate3]` — lets the add-on announce itself for auto-discovery
+- `map: [homeassistant_config:rw]` — lets `run.sh` drop the bundled integration into `/config/custom_components/outback_mate3/`
+- `options: { udp_port: 57027, ws_port: 28099, log_level: "info", min_update_interval_s: 30, config_poll_interval_s: 300 }`
 - `schema`: matching port/int/list validators
 
-**`src/parser.py`:** pure function `parse_frame(bytes, remote_ip) -> list[DeviceUpdate]`. Lifted from `custom_components/outback_mate3/__init__.py` (methods `_process_data`, `_process_device`, `_process_inverter`, `_process_charge_controller`). No HA imports.
+**`src/parser.py`:** pure function `parse_frame(bytes, remote_ip) -> list[DeviceUpdate]`. No HA imports. Device-block filter keys off the structural pattern `^\d+,\d+` so port IDs ≥ 10 aren't silently dropped.
 
-**`src/state.py`:** holds `devices: dict[(mac, kind, index), dict]` and per-MAC `aggregates: dict[mac, dict]`. Apply a `DeviceUpdate`, returns a change set (new devices and/or state diffs) for the server to emit. Computes aggregates the same way the current `_process_data()` does (total grid/inverter/charger power, averaged voltages).
+**`src/state.py`:** holds `devices: dict[(mac, kind, index), dict]` and `configs: dict[mac, dict]`. `apply(updates) -> list[Event]` emits `DeviceAdded` / `StateUpdated`; `set_config(mac, config) -> changed: bool` stores the CONFIG.xml dict and returns whether it diverged from the previous. Per-MAC 30 s update throttle.
 
-**`src/udp_listener.py`:** `asyncio.DatagramProtocol` on `0.0.0.0:$UDP_PORT`; on packet, call `parser.parse_frame` → `state.apply(...)` → `server.broadcast(events)`.
+**`src/udp_listener.py`:** `asyncio.DatagramProtocol` on `0.0.0.0:$UDP_PORT`; on packet, call `parser.parse_frame` → `state.apply(...)` → `server.enqueue_broadcast(events)` (non-blocking, bounded).
 
-**`src/ws_server.py`:** aiohttp WebSocket at `/ws`. On connect, send `snapshot`. Maintain `set[WebSocketResponse]`; `broadcast(event)` sends to all, drops dead clients. Ping/pong every 30s.
+**`src/mate3_http.py`:** `fetch_config(host, timeout)` pulls `http://<host>/CONFIG.xml` and returns a parsed dict of curated values (firmware versions, nameplate, setpoints across System / Inverters / Charge Controllers / AGS / Grid_Use). Returns `None` on unreachable hosts or malformed XML.
 
-**`src/main.py`:** reads env from `run.sh` (`UDP_PORT`, `WS_PORT`, `LOG_LEVEL`, `MIN_UPDATE_INTERVAL_S`), wires listener → state → server, installs SIGTERM handler.
+**`src/config_poller.py`:** after the first UDP datagram establishes the MATE3's IP, runs `fetch_config` every `$CONFIG_POLL_INTERVAL_S` (default 300) per known source. Enqueues a `ConfigSnapshot` event only when the parsed dict differs from the previous.
 
-**`run.sh`:** bashio-based, exports options as env vars, `exec python3 /app/main.py`.
+**`src/ws_server.py`:** aiohttp WebSocket at `/ws`. On connect, send `snapshot` + one `config_snapshot` per known MAC. Bounded `asyncio.Queue` buffers enqueued events; `run_broadcaster(stop)` consumer drains it and fans out to connected clients in parallel (each within a `_SEND_TIMEOUT_S` window, so a stuck client gets dropped rather than stalling peers). Heartbeat via aiohttp's `WebSocketResponse(heartbeat=30)`.
 
-**`Dockerfile`:** `FROM $BUILD_FROM` (HA base image, Alpine-Python), `pip install -r requirements.txt`, copies `src/` and `run.sh`.
+**`src/discovery.py`:** on add-on start, POSTs to `http://supervisor/discovery` with the add-on's hostname + WS port so HA surfaces a **Discovered: Outback MATE3** card. On shutdown, DELETEs the announcement. No-ops outside HA (when `SUPERVISOR_TOKEN` is unset).
+
+**`src/main.py`:** reads env from `run.sh` (`UDP_PORT`, `WS_PORT`, `LOG_LEVEL`, `MIN_UPDATE_INTERVAL_S`, `CONFIG_POLL_INTERVAL_S`), wires listener → registry → server, spawns the config poller + broadcaster consumer tasks, announces discovery, installs SIGTERM handler.
+
+**`run.sh`:** bashio-based. Exports options as env vars, copies `/opt/integration/outback_mate3/` (baked into the image by the Dockerfile) into `/homeassistant/custom_components/outback_mate3/` when it differs (avoids restart-spam on unchanged content), `exec python3 -m src.main`.
+
+**`Dockerfile`:** `FROM $BUILD_FROM` (HA base image, Alpine-Python), `pip install -r requirements.txt`, copies `src/`, `run.sh`, and `bundled_integration/outback_mate3/` → `/opt/integration/outback_mate3/`.
 
 ### Integration (`custom_components/outback_mate3/`)
 
-**`__init__.py`** becomes a WebSocket client:
-- `OutbackMate3Client` (replaces `OutbackMate3`): opens `aiohttp.ClientSession.ws_connect(url)`, with exponential backoff reconnect (1s → 30s cap).
-- On `snapshot`: for each device in the payload, call entity-creation path; update aggregates.
-- On `device_added`: call entity-creation path for that device.
-- On `state_updated` / `aggregates_updated`: stash state and call `async_set_updated_data(None)` so coordinator consumers refresh.
-- On reconnect: discard any existing device/aggregate state and re-create from the new `snapshot` (devices are idempotent by `(mac, kind, index)`).
-- On disconnect past N seconds: mark all entities unavailable.
+**`__init__.py`** is the WebSocket client:
+- `OutbackMate3(DataUpdateCoordinator)`: opens `aiohttp.ClientSession.ws_connect(url, heartbeat=30)`, with exponential backoff reconnect (1 s → 30 s cap). Tracks `last_udp_at` for the connectivity binary sensor. Keyed-off-conditional logging so a stopped add-on doesn't produce a WARN every retry.
+- On `snapshot`: reset per-MAC device caches, replay each device through the normal `create_device_entities` path.
+- On `device_added`: materialize entities for the new (mac, kind, index) if not seen before.
+- On `state_updated`: write into the per-MAC cache + `async_set_updated_data(None)` to refresh entities.
+- On `config_snapshot`: store on `config_by_mac[mac]`; on the **first** such snapshot for a MAC, call `create_config_entities(…)` to materialize the CONFIG-derived diagnostic sensors (all `entity_registry_enabled_default=False` so they don't clutter the UI until a user opts in).
+- On reconnect: keep `discovered_devices` so we don't re-announce entities HA already knows about.
 
 **`config_flow.py`:**
-- Replace `CONF_PORT` with `CONF_URL` (e.g. `ws://a0d7b954-outback-mate3:8099/ws`).
-- Connectivity probe: open WS with 5s timeout; wait for `snapshot`; abort on failure.
-- `async_migrate_entry` upgrades old entries (drops `port`, inserts default `url`, user can edit).
+- `async_step_user`: asks for a WS URL (default `ws://local-outback-mate3:28099/ws`). 5 s connectivity probe waits for `snapshot`.
+- `async_step_hassio(HassioServiceInfo)`: auto-discovery from the add-on's announce. Uses `hassio_{slug}` as the unique ID and passes `updates={CONF_URL: url}` to `_abort_if_unique_id_configured` so later re-announces with a changed URL automatically update the existing entry (that's how the 8099 → 28099 port move migrated silently).
+- `async_migrate_entry`: upgrades legacy 1.x entries (drop `port`, insert default `url`).
 
 **`sensor.py`:**
-- Entity classes stay. `create_device_entities()` already takes the coordinator + MAC and materializes the right set — we keep calling it from the new event handlers.
-- The inner dicts `inverters[mac][no]` and `charge_controllers[mac][no]` are populated by WS events instead of by local parsing. Property accessors on entities keep reading from those dicts, so entity code is unchanged.
+- Live-UDP entity classes: `OutbackSystemSensor`, `OutbackInverterSensor`, `OutbackChargeControllerSensor`. Power-aggregate sensors on the System device compute totals on demand from `inverters[mac]` / `charge_controllers[mac]`.
+- Config-derived diagnostic entities: `OutbackConfigDiagnosticSensor` (disabled by default). Table-driven per System / Inverter / Charge Controller, ~400 in total, covering firmware, nameplate, charger setpoints, low/high battery cutoffs, grid-tie config, AC1/AC2 input config, stack mode, MPPT, AUX output, Relay, Diversion, PV Trigger, Nite Light, HVT, LGT, Grid Mode Schedules, full AGS block, and all three Grid_Use TOU profiles.
 
-**`manifest.json`:** version bump to `2.0.0`, still `iot_class: "local_push"`, `requirements: []` (aiohttp comes from HA core).
+**`binary_sensor.py`:** `binary_sensor.mate3_system_receiving_data` (device_class `connectivity`). Reads `True` iff `coordinator.last_udp_at` is within 300 s. Two refresh paths: coordinator listener (catches off→on instantly) + 30 s `async_track_time_interval` (catches on→off when the UDP stream goes silent).
+
+**`manifest.json`:** version pinned to the shared release version, `iot_class: "local_push"`, `hassio: true`, `config_flow: true`, `requirements: []` (aiohttp comes from HA core).
 
 ## Error Handling
 
@@ -197,12 +232,14 @@ Design notes:
 
 ## Migration
 
-Breaking change for existing users (all of whom are on Supervised per the README warning). Release notes document:
-1. Install the add-on from the repo URL.
-2. Re-add the integration; config flow now asks for WS URL.
-3. MATE3's UDP destination setting is unchanged (still points to the HA host IP:57027).
+Breaking change for existing users (all of whom were on Supervised per the pre-2.0 README warning). The 2.0.0 release notes document:
+1. Install the add-on from the repo URL (Supervisor → Add-on Store → Repositories → `https://github.com/weirded/ha-outback-mate3`).
+2. The add-on auto-deploys the matching integration to `/config/custom_components/outback_mate3/` on first start; restart HA once so it loads.
+3. A **Discovered: Outback MATE3** card appears under **Settings → Devices & Services**; one click to add.
+4. Legacy 1.x config entries migrate automatically via `async_migrate_entry` (drops the UDP-port field, inserts the default WS URL; user can edit if the add-on hostname differs).
+5. MATE3's UDP destination setting is unchanged (still points to the HA host IP:57027).
 
-Old UDP-direct code path is removed.
+Old UDP-direct code path is removed. HACS support is removed — the integration now ships bundled with the add-on, so users install one thing.
 
 ## Out of Scope
 
@@ -210,4 +247,4 @@ Old UDP-direct code path is removed.
 - Ingress UI for the add-on (no UI needed)
 - Add-on authentication (local network only)
 - Publishing the add-on to the official HA add-on store (community store / repo URL is enough for now)
-- Moving the integration into HA core (stays HACS-distributed)
+- Moving the integration into HA core (stays bundled with the add-on)
