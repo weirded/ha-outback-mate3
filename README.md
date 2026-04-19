@@ -105,7 +105,7 @@ Live aggregates computed from all inverters + charge controllers:
 - **From Grid** (W), **Solar Production** (W), **From Battery** (W), **To Loads** (W) — all four signed (positive/negative encodes direction).
 - **Battery Voltage** (V) — averaged from the charge controllers.
 - **Solar Production Energy** (kWh, totalizing) — Energy-Dashboard ready.
-- **Receiving Data from MATE3** (binary) — flips to Off after 5 minutes without a UDP frame.
+- **MATE3 Connected** (binary) — flips to Off after 5 minutes without a UDP frame.
 
 Diagnostic (disabled-by-default) from the CONFIG.xml poll: MATE3 firmware version; data-stream target (catches "saved but not applied"); SD-card log mode; system type / nominal V / battery Ah / PV W / max inverter kW / max charger kW / generator kW; Low-SOC warn/error; AC-coupled mode; global CC output cap; SunSpec/Modbus settings; FNDC integration; all three Grid Mode Schedules (enable, start, stop, mode); HVT (high-battery transfer) and LGT (load grid transfer) blocks; full Advanced Generator Start block (51 fields — enable mode, VDC/SOC/load/temp/exercise/quiet-time triggers, generator profile, run-limits, warm-up/cool-down, DC-gen absorb/float/bulk/EQ setpoints); and Grid_Use / Grid_Use_P2 / Grid_Use_P3 TOU schedules.
 

@@ -19,7 +19,7 @@ INITIAL_BACKOFF_S = 1.0
 MAX_BACKOFF_S = 30.0
 WS_HEARTBEAT_S = 30.0
 
-# `binary_sensor.mate3_system_receiving_data` — connectivity indicator.
+# `binary_sensor.mate3_system_connected` — connectivity indicator.
 STALE_AFTER_S = 300.0
 CONNECTIVITY_POLL_INTERVAL = timedelta(seconds=30)
 

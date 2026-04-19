@@ -1,9 +1,9 @@
 """Binary sensors for the Outback MATE3 integration.
 
-Ships one sensor today: ``Receiving Data from MATE3`` on the Outback System
-device. Flips to off after ``STALE_AFTER_S`` seconds without a UDP
-datagram, so automations can notice when the MATE3 stops streaming (cable
-pulled, firmware destination-IP glitch, power cycle).
+Ships one sensor today: ``MATE3 Connected`` on the Outback System device.
+Flips to off after ``STALE_AFTER_S`` seconds without a UDP datagram, so
+automations can notice when the MATE3 stops streaming (cable pulled,
+firmware destination-IP glitch, power cycle).
 """
 from __future__ import annotations
 
@@ -27,18 +27,18 @@ async def async_setup_entry(
     config_entry: MateConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    async_add_entities([OutbackReceivingDataSensor(config_entry.runtime_data)])
+    async_add_entities([OutbackMate3ConnectedSensor(config_entry.runtime_data)])
 
 
-class OutbackReceivingDataSensor(BinarySensorEntity):
-    """`Receiving Data from MATE3` — connectivity indicator on the system device."""
+class OutbackMate3ConnectedSensor(BinarySensorEntity):
+    """`MATE3 Connected` — connectivity indicator on the system device."""
 
     _attr_has_entity_name = True
-    _attr_name = "Receiving Data from MATE3"
+    _attr_translation_key = "mate3_connected"
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
     _attr_should_poll = False
-    _attr_unique_id = f"{DOMAIN}_system_receiving_data"
-    entity_id = "binary_sensor.mate3_system_receiving_data"
+    _attr_unique_id = f"{DOMAIN}_system_connected"
+    entity_id = "binary_sensor.mate3_system_connected"
 
     def __init__(self, mate3: OutbackMate3) -> None:
         self._mate3 = mate3

@@ -155,7 +155,7 @@ class OutbackMate3(DataUpdateCoordinator[None]):
 
         # Monotonic timestamp of the most recently-applied UDP-derived payload
         # (snapshot with devices, device_added, or state_updated). Used by the
-        # `binary_sensor.mate3_system_receiving_data` connectivity entity; None
+        # `binary_sensor.mate3_system_connected` connectivity entity; None
         # means we've never received a UDP frame yet.
         self.last_udp_at: float | None = None
 

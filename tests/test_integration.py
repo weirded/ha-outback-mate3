@@ -245,7 +245,7 @@ async def test_config_snapshot_only_creates_diagnostics_after_poll(
     )
 
 
-async def test_receiving_data_binary_sensor_flips_on_snapshot(
+async def test_connected_binary_sensor_flips_on_snapshot(
     hass: HomeAssistant, fake_addon: _FakeAddOn
 ) -> None:
     """The connectivity binary sensor turns on once UDP-derived data arrives."""
@@ -260,7 +260,7 @@ async def test_receiving_data_binary_sensor_flips_on_snapshot(
     # After the snapshot lands, the binary sensor should read "on". Initial
     # state right after setup is "off" (no UDP yet), so poll until it flips.
     for _ in range(100):
-        st = hass.states.get("binary_sensor.mate3_system_receiving_data")
+        st = hass.states.get("binary_sensor.mate3_system_connected")
         if st is not None and st.state == "on":
             break
         await asyncio.sleep(0.05)
@@ -269,7 +269,7 @@ async def test_receiving_data_binary_sensor_flips_on_snapshot(
     )
 
 
-async def test_receiving_data_binary_sensor_is_off_without_udp(
+async def test_connected_binary_sensor_is_off_without_udp(
     hass: HomeAssistant, fake_addon: _FakeAddOn
 ) -> None:
     """With only a config_snapshot (no UDP devices), the sensor stays off."""
@@ -285,7 +285,7 @@ async def test_receiving_data_binary_sensor_is_off_without_udp(
 
     # Give the WS loop a moment to process both messages.
     for _ in range(20):
-        st = hass.states.get("binary_sensor.mate3_system_receiving_data")
+        st = hass.states.get("binary_sensor.mate3_system_connected")
         if st is not None:
             break
         await asyncio.sleep(0.05)

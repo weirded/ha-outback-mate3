@@ -39,8 +39,8 @@
     },
     "entity": {
         "binary_sensor": {
-            "mate3_receiving_data": {
-                "name": "Receiving Data from MATE3"
+            "mate3_connected": {
+                "name": "MATE3 Connected"
             }
         }
     },
