@@ -60,11 +60,21 @@ the add-on the sole source of MATE3 knowledge and reduce the integration
 to a generic WS-to-HA renderer. No external users yet, so no migration
 shim needed — we just change the WS protocol and ship.
 
-- [ ] **D1** — Add-on emits an `entity_schema` WS message (after `hello`,
+- [x] **D1** — Add-on emits an `entity_schema` WS message (after `hello`,
   before `snapshot`) describing each entity per device kind: `key`, `unit`,
   `device_class`, `state_class`, `entity_category`, `translation_key`, plus
   enum `options` for mode fields. Add `protocol_version` to the `hello`
-  message.
+  message. _(2.1.0-dev4; new `outback_mate3_addon/src/schema.py` holds
+  `EntitySpec` dataclasses for every parser-emitted field — inverter (29)
+  + charge_controller (9) — with plain-string `device_class` / `state_class`
+  / `unit` so the add-on stays HA-agnostic. Enum `options` for
+  `inverter_mode` / `ac_mode` / `charge_mode` / `grid_mode` are derived from
+  the parser mode maps to keep them in lockstep, and include the `unknown`
+  fallback the parser emits. `ws_server.py` now sends hello (with
+  `protocol_version: 1`) unconditionally, then `entity_schema`, then
+  `snapshot`. Schema coverage is asserted by unit tests that diff the spec
+  set against the parser output on the t00 fixture. Backwards-compatible:
+  integration currently logs-and-ignores `entity_schema`; D3 consumes it.)_
 - [ ] **D2** — Publish the MATE3 HTTP config schema the same way — either as
   a field list attached to `config_snapshot` or as a separate
   `config_schema` message — so the ~300-line table in

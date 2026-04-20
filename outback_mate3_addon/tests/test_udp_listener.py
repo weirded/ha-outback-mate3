@@ -55,7 +55,9 @@ async def test_udp_frame_propagates_to_ws_client(pipeline):
     udp_port, ws_client = pipeline
 
     async with ws_client.ws_connect("/ws") as ws:
-        # Consume initial (empty) snapshot.
+        # Consume hello + entity_schema + initial (empty) snapshot.
+        await asyncio.wait_for(ws.receive_json(), timeout=2)  # hello
+        await asyncio.wait_for(ws.receive_json(), timeout=2)  # entity_schema
         snap = await asyncio.wait_for(ws.receive_json(), timeout=2)
         assert snap == {"type": "snapshot", "devices": []}
         await asyncio.sleep(0.05)  # let server register this client
@@ -84,6 +86,8 @@ async def test_noise_udp_frame_produces_no_events(pipeline):
     udp_port, ws_client = pipeline
 
     async with ws_client.ws_connect("/ws") as ws:
+        await ws.receive_json()  # hello
+        await ws.receive_json()  # entity_schema
         await ws.receive_json()  # empty snapshot
         await asyncio.sleep(0.05)
 
