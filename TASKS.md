@@ -116,11 +116,26 @@ shim needed — we just change the WS protocol and ship.
   `translations/en.json`. Three new integration tests cover: supported version
   raises no issue; newer version raises the issue with placeholders for both
   versions; entity_schema is stored on the coordinator.)_
-- [ ] **D5** — Translation labels stay in `custom_components/outback_mate3/translations/`
+- [x] **D5** — Translation labels stay in `custom_components/outback_mate3/translations/`
   keyed by the schema's `translation_key` (HA store compliance), but the
   canonical set of keys — including mode enum values — is validated against
   what the add-on advertises so the parser can't emit a string the
-  integration has no label for.
+  integration has no label for. _(2.1.0-dev8; new `tests/test_translations.py`
+  asserts: (1) `strings.json` and `translations/en.json` are byte-identical,
+  (2) every live + config `translation_key` has a `.name`, (3) every enum
+  option in the live schema has a `.state.<option>` entry (including the
+  `unknown` fallback), (4) no orphan labels exist (system aggregates
+  `from_grid` / `solar_production` / etc. are allow-listed because they're
+  integration-side rollups not advertised by the add-on). Running the tests
+  surfaced three D2 regressions that got fixed as part of this work:
+  `ags_must_run_*` (9 keys) and `ags_quiet_time_*` (9 keys) were missing
+  from `config_schema.py` entirely, `ags_load_start_*_current_threshold`
+  was renamed from `*_load_kw` with a wrong unit (Amps vs. actual kW in
+  CONFIG.xml), and `ags_soc_start_stop_mode` didn't match the parser's
+  `ags_soc_start_mode` key — all reverted/restored so schema keys match
+  `mate3_http.py` output. Added `state` blocks for `inverter_mode`
+  (17 options), `ac_mode` (4), `charge_mode` (6), `grid_mode` (2), and
+  a `kwh_today` label that was missing from strings.json.)_
 - [ ] **D6** — Reconcile `outback_mate3_addon/bundled_integration/` with the
   decoupled integration (regenerate from the new generic renderer, or drop
   the snapshot once the integration is HA-store-published).
