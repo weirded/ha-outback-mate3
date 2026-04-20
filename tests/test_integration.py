@@ -92,6 +92,10 @@ class _FakeAddOn:
     def __init__(self) -> None:
         self.messages: list[dict] = []
         self.hello_version: str | None = None
+        # Default to the supported protocol version so existing tests don't
+        # surface the "protocol too new" Repairs issue. Tests can override to
+        # exercise version-mismatch handling.
+        self.hello_protocol_version: int | None = 1
         self.connected: list[web.WebSocketResponse] = []
         self.url: str = ""  # set by the `fake_addon` fixture after the server binds
         self.app = web.Application()
@@ -102,8 +106,13 @@ class _FakeAddOn:
         # teardown and PHACC catches that as a lingering-timer error.
         ws = web.WebSocketResponse()
         await ws.prepare(request)
+        hello: dict[str, Any] = {"type": "hello"}
+        if self.hello_protocol_version is not None:
+            hello["protocol_version"] = self.hello_protocol_version
         if self.hello_version is not None:
-            await ws.send_json({"type": "hello", "addon_version": self.hello_version})
+            hello["addon_version"] = self.hello_version
+        if len(hello) > 1:
+            await ws.send_json(hello)
         for msg in self.messages:
             await ws.send_json(msg)
         self.connected.append(ws)
@@ -849,6 +858,100 @@ async def test_addon_offline_issue_cleared_on_reconnect(
     # A connect transition should clear it.
     mate3._on_connected()
     assert registry.async_get_issue(DOMAIN, ISSUE_ADDON_OFFLINE) is None
+
+
+# --- D4: protocol_version + entity_schema ---------------------------------
+
+
+async def test_hello_with_supported_protocol_version_raises_no_issue(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """When the add-on advertises the protocol version we support, no Repairs issue."""
+    from custom_components.outback_mate3.const import ISSUE_PROTOCOL_TOO_NEW
+    from homeassistant.helpers import issue_registry as ir
+
+    fake_addon.hello_protocol_version = 1
+    fake_addon.messages = [SNAPSHOT_PAYLOAD]
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    await _wait_for_state(hass, f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power")
+
+    registry = ir.async_get(hass)
+    assert registry.async_get_issue(DOMAIN, ISSUE_PROTOCOL_TOO_NEW) is None
+
+
+async def test_hello_with_newer_protocol_version_raises_repairs_issue(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """An add-on on a newer protocol version than we support raises a Repair.
+
+    D4: tells the user to update the integration so the two sides can stay
+    in lockstep without the integration silently rendering the wrong thing.
+    """
+    from custom_components.outback_mate3.const import (
+        ISSUE_PROTOCOL_TOO_NEW,
+        SUPPORTED_PROTOCOL_VERSION,
+    )
+    from homeassistant.helpers import issue_registry as ir
+
+    future_version = SUPPORTED_PROTOCOL_VERSION + 1
+    fake_addon.hello_protocol_version = future_version
+    fake_addon.messages = [SNAPSHOT_PAYLOAD]
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    mate3 = entry.runtime_data
+    for _ in range(60):
+        if mate3.addon_protocol_version == future_version:
+            break
+        await asyncio.sleep(0.05)
+    assert mate3.addon_protocol_version == future_version
+
+    registry = ir.async_get(hass)
+    issue = registry.async_get_issue(DOMAIN, ISSUE_PROTOCOL_TOO_NEW)
+    assert issue is not None
+    assert issue.severity == ir.IssueSeverity.ERROR
+    assert issue.translation_placeholders == {
+        "addon_protocol_version": str(future_version),
+        "supported_protocol_version": str(SUPPORTED_PROTOCOL_VERSION),
+    }
+
+
+async def test_entity_schema_message_is_stored_on_coordinator(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """An entity_schema message should be accepted and stored for D3 to consume."""
+    SCHEMA_MESSAGE = {
+        "type": "entity_schema",
+        "live": {
+            "inverter": [
+                {
+                    "key": "battery_voltage",
+                    "name": "Battery Voltage",
+                    "device_class": "voltage",
+                    "unit": "V",
+                    "state_class": "measurement",
+                    "entity_category": None,
+                    "translation_key": "battery_voltage",
+                    "options": None,
+                },
+            ],
+            "charge_controller": [],
+        },
+    }
+    fake_addon.messages = [SCHEMA_MESSAGE, SNAPSHOT_PAYLOAD]
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    await _wait_for_state(hass, f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power")
+
+    mate3 = entry.runtime_data
+    assert mate3.entity_schema == SCHEMA_MESSAGE["live"]
 
 
 # --- syrupy snapshot tests ------------------------------------------------

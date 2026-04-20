@@ -843,6 +843,10 @@
     "version_drift": {
       "title": "Integration and add-on versions don't match",
       "description": "The Outback MATE3 integration is at version {integration_version} but the add-on is at {addon_version}. They ship together and should be kept on the same version; update whichever is behind."
+    },
+    "protocol_too_new": {
+      "title": "Outback MATE3 integration is out of date",
+      "description": "The add-on is advertising protocol version {addon_protocol_version}, but this integration only understands version {supported_protocol_version}. Update the integration — some new fields may be missing until you do."
     }
   }
 }

@@ -83,9 +83,18 @@ shim needed — we just change the WS protocol and ship.
 - [ ] **D3** — Rewrite `custom_components/outback_mate3/sensor.py` +
   `sensor_config.py` as a generic factory that materializes entities from
   the received schema. Delete the per-field hard-coded tables.
-- [ ] **D4** — Integration raises a Repairs issue when the add-on's
+- [x] **D4** — Integration raises a Repairs issue when the add-on's
   `protocol_version` is newer than it knows how to render, removing the
-  implicit requirement that both sides stay in version lockstep.
+  implicit requirement that both sides stay in version lockstep. _(2.1.0-dev5;
+  `custom_components/outback_mate3/const.py` gets `SUPPORTED_PROTOCOL_VERSION = 1`
+  + `ISSUE_PROTOCOL_TOO_NEW`. Coordinator now parses `protocol_version` from the
+  hello message independently of `addon_version`, stashes the received
+  `entity_schema` on the coordinator (consumed in D3), and opens an ERROR-severity
+  `protocol_too_new` Repair when the add-on advertises a higher version than
+  supported. Added translations for the new issue in `strings.json` +
+  `translations/en.json`. Three new integration tests cover: supported version
+  raises no issue; newer version raises the issue with placeholders for both
+  versions; entity_schema is stored on the coordinator.)_
 - [ ] **D5** — Translation labels stay in `custom_components/outback_mate3/translations/`
   keyed by the schema's `translation_key` (HA store compliance), but the
   canonical set of keys — including mode enum values — is validated against

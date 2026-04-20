@@ -1,5 +1,5 @@
 name: "Outback MATE3"
-version: "2.1.0-dev4"
+version: "2.1.0-dev5"
 slug: outback_mate3
 description: >-
   Listens for Outback MATE3 UDP streaming telemetry and relays parsed device
