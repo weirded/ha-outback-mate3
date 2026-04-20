@@ -32,11 +32,13 @@ from .const import (
     DOMAIN,
     INITIAL_BACKOFF_S,
     ISSUE_ADDON_OFFLINE,
+    ISSUE_PROTOCOL_TOO_NEW,
     ISSUE_VERSION_DRIFT,
     KIND_CHARGE_CONTROLLER,
     KIND_INVERTER,
     MAX_BACKOFF_S,
     PLATFORMS,
+    SUPPORTED_PROTOCOL_VERSION,
     WS_HEARTBEAT_S,
 )
 
@@ -74,6 +76,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: MateConfigEntry) -> boo
         # Clear any Repairs issues we raised so a subsequent setup starts clean.
         ir.async_delete_issue(hass, DOMAIN, ISSUE_ADDON_OFFLINE)
         ir.async_delete_issue(hass, DOMAIN, ISSUE_VERSION_DRIFT)
+        ir.async_delete_issue(hass, DOMAIN, ISSUE_PROTOCOL_TOO_NEW)
     return unload_ok
 
 
@@ -179,6 +182,16 @@ class OutbackMate3(DataUpdateCoordinator[None]):
         # Populated by the add-on's `hello` message on first connect; drives
         # the `version_drift` Repairs issue.
         self.addon_version: str | None = None
+        # Protocol version advertised by the add-on in hello. Drives the
+        # `protocol_too_new` Repairs issue when higher than we support.
+        self.addon_protocol_version: int | None = None
+        # Entity schema advertised by the add-on (D1), indexed by device kind.
+        # D3 will use this to materialize entities generically.
+        self.entity_schema: dict[str, list[dict[str, Any]]] = {}
+        # CONFIG.xml-derived entity schema (D2), three sections: system /
+        # inverter / charge_controller. D3 consumes this to replace the
+        # in-process sensor_config tables.
+        self.config_entity_schema: dict[str, list[dict[str, Any]]] = {}
         # Scheduled `addon_offline` issue creation. Cancelled on reconnect so
         # brief Supervisor restarts don't flap a Repair in and out.
         self._addon_offline_handle: asyncio.TimerHandle | None = None
@@ -291,18 +304,59 @@ class OutbackMate3(DataUpdateCoordinator[None]):
             self._apply_device(msg, emit_discovery=False)
         elif mtype == "config_snapshot":
             self._apply_config(msg)
+        elif mtype == "entity_schema":
+            self._apply_entity_schema(msg)
         else:
             _LOGGER.debug("Ignoring unknown WS message type %r", mtype)
             return
         self.async_set_updated_data(None)
 
     def _apply_hello(self, payload: dict[str, Any]) -> None:
+        protocol_version = payload.get("protocol_version")
+        if isinstance(protocol_version, int):
+            self.addon_protocol_version = protocol_version
+            self._reconcile_protocol_version()
         addon_version = payload.get("addon_version")
-        if not isinstance(addon_version, str) or not addon_version:
-            _LOGGER.debug("hello without addon_version: %r", payload)
+        if isinstance(addon_version, str) and addon_version:
+            self.addon_version = addon_version
+            self._reconcile_version_drift()
+
+    def _apply_entity_schema(self, payload: dict[str, Any]) -> None:
+        live = payload.get("live")
+        if isinstance(live, dict):
+            self.entity_schema = live
+        else:
+            _LOGGER.debug("entity_schema without live section: %r", payload)
+        config = payload.get("config")
+        if isinstance(config, dict):
+            self.config_entity_schema = config
+
+    def _reconcile_protocol_version(self) -> None:
+        """Create or clear the protocol_too_new Repairs issue.
+
+        The integration knows how to render the schema shapes up to
+        SUPPORTED_PROTOCOL_VERSION. If the add-on advertises a higher value,
+        new fields / message types might be silently dropped — raise a Repair
+        so the user knows to update the integration.
+        """
+        version = self.addon_protocol_version
+        if version is None:
             return
-        self.addon_version = addon_version
-        self._reconcile_version_drift()
+        if version <= SUPPORTED_PROTOCOL_VERSION:
+            ir.async_delete_issue(self.hass, DOMAIN, ISSUE_PROTOCOL_TOO_NEW)
+            return
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            ISSUE_PROTOCOL_TOO_NEW,
+            is_fixable=False,
+            severity=ir.IssueSeverity.ERROR,
+            translation_key=ISSUE_PROTOCOL_TOO_NEW,
+            translation_placeholders={
+                "addon_protocol_version": str(version),
+                "supported_protocol_version": str(SUPPORTED_PROTOCOL_VERSION),
+            },
+        )
 
     def _reconcile_version_drift(self) -> None:
         """Create or clear the version_drift Repairs issue.

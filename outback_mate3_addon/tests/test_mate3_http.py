@@ -53,6 +53,13 @@ def test_mate3_firmware_and_stream(config):
     assert m["sd_card_log_interval_s"] == 5
 
 
+def test_mate3_data_stream_target_precomputed(config):
+    """D2: composite `{ip}:{port}` target is precomputed by the add-on so the
+    config schema stays declarative (no lambda getter on the integration side)."""
+    m = config["mate3"]
+    assert m["data_stream_target"] == "192.168.226.135:57027"
+
+
 def test_mate3_network_fields(config):
     m = config["mate3"]
     # Whatever the DHCP fallback static config is — just verify fields exist.

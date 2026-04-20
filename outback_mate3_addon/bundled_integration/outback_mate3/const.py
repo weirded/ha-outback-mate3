@@ -24,9 +24,15 @@ WS_HEARTBEAT_S = 30.0
 STALE_AFTER_S = 300.0
 CONNECTIVITY_POLL_INTERVAL = timedelta(seconds=30)
 
+# Highest WS protocol version this integration knows how to render. Bumped
+# in lockstep with the add-on's PROTOCOL_VERSION. An add-on advertising a
+# higher value raises the ISSUE_PROTOCOL_TOO_NEW Repairs issue.
+SUPPORTED_PROTOCOL_VERSION = 1
+
 # Repairs issue IDs.
 ISSUE_ADDON_OFFLINE = "addon_offline"
 ISSUE_VERSION_DRIFT = "version_drift"
+ISSUE_PROTOCOL_TOO_NEW = "protocol_too_new"
 
 # How long the add-on may be unreachable before we create the `addon_offline`
 # Repairs issue. Keeps short Supervisor restarts / network hiccups from

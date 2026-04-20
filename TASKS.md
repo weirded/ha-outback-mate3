@@ -75,11 +75,25 @@ shim needed — we just change the WS protocol and ship.
   `snapshot`. Schema coverage is asserted by unit tests that diff the spec
   set against the parser output on the t00 fixture. Backwards-compatible:
   integration currently logs-and-ignores `entity_schema`; D3 consumes it.)_
-- [ ] **D2** — Publish the MATE3 HTTP config schema the same way — either as
+- [x] **D2** — Publish the MATE3 HTTP config schema the same way — either as
   a field list attached to `config_snapshot` or as a separate
   `config_schema` message — so the ~300-line table in
   `custom_components/outback_mate3/sensor_config.py` is driven by the add-on
-  instead of maintained in parallel.
+  instead of maintained in parallel. _(2.1.0-dev6; new
+  `outback_mate3_addon/src/config_schema.py` holds `ConfigEntitySpec`
+  dataclasses for every CONFIG.xml-derived diagnostic entity — system (~140
+  specs including 3×19 programmatically-generated Grid_Use entries), inverter
+  (59), charge-controller (40) — all with plain-string `device_class` / `unit`
+  so the add-on stays HA-agnostic. `ws_server.py` now emits both sections in
+  one message: `{"type": "entity_schema", "live": {...}, "config": {...}}`.
+  Composite `data_stream_target` (`"{ip}:{port}"`) moved from an integration-
+  side lambda to a precomputed field in `mate3_http._parse_mate3` so the
+  schema stays declarative. Renamed source keys (`configured_type` reads
+  `type`, `configured_inverter_mode` reads `inverter_mode`) are expressed via
+  `ConfigEntitySpec.source_key`. Integration coordinator stashes both
+  sections on `entity_schema` and `config_entity_schema` attributes;
+  integration-side rendering switches over in D3. Added 16 add-on unit tests
+  + 1 integration test.)_
 - [ ] **D3** — Rewrite `custom_components/outback_mate3/sensor.py` +
   `sensor_config.py` as a generic factory that materializes entities from
   the received schema. Delete the per-field hard-coded tables.

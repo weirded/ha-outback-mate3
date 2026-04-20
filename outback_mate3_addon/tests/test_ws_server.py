@@ -118,6 +118,31 @@ async def test_entity_schema_follows_hello_before_snapshot():
 
 
 @pytest.mark.asyncio
+async def test_entity_schema_includes_config_sections():
+    """D2: the entity_schema message also carries CONFIG.xml-derived specs
+    so the integration can render diagnostic sensors generically."""
+    server = WSServer(_populated_registry(), heartbeat=100)
+    async with TestClient(TestServer(server.app)) as client, client.ws_connect("/ws") as ws:
+        await asyncio.wait_for(ws.receive_json(), timeout=2)  # hello
+        schema = await asyncio.wait_for(ws.receive_json(), timeout=2)
+        assert schema["type"] == "entity_schema"
+        assert "config" in schema
+        assert set(schema["config"]) == {"system", "inverter", "charge_controller"}
+        # Spot-check: nominal voltage carries voltage device class + section.
+        sys_entries = schema["config"]["system"]
+        nom = next(s for s in sys_entries if s["key"] == "nominal_voltage")
+        assert nom["section"] == "system"
+        assert nom["device_class"] == "voltage"
+        assert nom["unit"] == "V"
+        # Spot-check: data_stream_target is now a regular spec (precomputed).
+        dst = next(s for s in sys_entries if s["key"] == "data_stream_target")
+        assert dst["section"] == "mate3"
+        # Spot-check: CC firmware is flagged for sw_version plumbing.
+        cc_fw = next(s for s in schema["config"]["charge_controller"] if s["key"] == "firmware")
+        assert cc_fw["is_firmware"] is True
+
+
+@pytest.mark.asyncio
 async def test_hello_carries_protocol_version_even_without_addon_version():
     """protocol_version is independent of addon_version and should always be sent.
 

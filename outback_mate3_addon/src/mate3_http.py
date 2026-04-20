@@ -132,6 +132,8 @@ def _parse_mate3(root: ET.Element) -> dict[str, Any]:
     }
     network = remote.find("Network")
     if network is not None:
+        ds_ip = _ipv4(network.find("Data_Stream_IP"))
+        ds_port = _int(network.find("Data_Stream_Port"))
         out.update(
             {
                 "dhcp": _text(network.find("DHCP")),
@@ -139,8 +141,10 @@ def _parse_mate3(root: ET.Element) -> dict[str, Any]:
                 "netmask": _ipv4(network.find("Netmask")),
                 "gateway": _ipv4(network.find("Gateway")),
                 "http_port": _int(network.find("HTTP_Port")),
-                "data_stream_ip": _ipv4(network.find("Data_Stream_IP")),
-                "data_stream_port": _int(network.find("Data_Stream_Port")),
+                "data_stream_ip": ds_ip,
+                "data_stream_port": ds_port,
+                # Precomputed composite so the WS config schema is declarative.
+                "data_stream_target": f"{ds_ip}:{ds_port}" if ds_ip and ds_port else None,
             }
         )
 

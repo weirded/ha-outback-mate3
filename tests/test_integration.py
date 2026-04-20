@@ -954,6 +954,43 @@ async def test_entity_schema_message_is_stored_on_coordinator(
     assert mate3.entity_schema == SCHEMA_MESSAGE["live"]
 
 
+async def test_config_schema_is_stored_on_coordinator(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """D2: the entity_schema message now carries a `config` section describing
+    CONFIG.xml-derived diagnostic entities. The coordinator should stash it
+    for D3 to consume."""
+    SCHEMA_MESSAGE = {
+        "type": "entity_schema",
+        "live": {"inverter": [], "charge_controller": []},
+        "config": {
+            "system": [
+                {
+                    "key": "nominal_voltage",
+                    "name": "Nominal Voltage",
+                    "device_class": "voltage",
+                    "unit": "V",
+                    "is_firmware": False,
+                    "translation_key": "nominal_voltage",
+                    "section": "system",
+                    "source_key": "nominal_voltage",
+                },
+            ],
+            "inverter": [],
+            "charge_controller": [],
+        },
+    }
+    fake_addon.messages = [SCHEMA_MESSAGE, SNAPSHOT_PAYLOAD]
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    await _wait_for_state(hass, f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power")
+
+    mate3 = entry.runtime_data
+    assert mate3.config_entity_schema == SCHEMA_MESSAGE["config"]
+
+
 # --- syrupy snapshot tests ------------------------------------------------
 
 

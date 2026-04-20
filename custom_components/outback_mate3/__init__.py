@@ -188,6 +188,10 @@ class OutbackMate3(DataUpdateCoordinator[None]):
         # Entity schema advertised by the add-on (D1), indexed by device kind.
         # D3 will use this to materialize entities generically.
         self.entity_schema: dict[str, list[dict[str, Any]]] = {}
+        # CONFIG.xml-derived entity schema (D2), three sections: system /
+        # inverter / charge_controller. D3 consumes this to replace the
+        # in-process sensor_config tables.
+        self.config_entity_schema: dict[str, list[dict[str, Any]]] = {}
         # Scheduled `addon_offline` issue creation. Cancelled on reconnect so
         # brief Supervisor restarts don't flap a Repair in and out.
         self._addon_offline_handle: asyncio.TimerHandle | None = None
@@ -319,10 +323,13 @@ class OutbackMate3(DataUpdateCoordinator[None]):
 
     def _apply_entity_schema(self, payload: dict[str, Any]) -> None:
         live = payload.get("live")
-        if not isinstance(live, dict):
+        if isinstance(live, dict):
+            self.entity_schema = live
+        else:
             _LOGGER.debug("entity_schema without live section: %r", payload)
-            return
-        self.entity_schema = live
+        config = payload.get("config")
+        if isinstance(config, dict):
+            self.config_entity_schema = config
 
     def _reconcile_protocol_version(self) -> None:
         """Create or clear the protocol_too_new Repairs issue.

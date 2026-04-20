@@ -20,6 +20,7 @@ from typing import Any
 
 from aiohttp import WSMsgType, web
 
+from src.config_schema import build_config_schema
 from src.schema import build_live_schema
 from src.state import ConfigSnapshot, DeviceAdded, DeviceRegistry, Event, StateUpdated
 
@@ -113,7 +114,13 @@ class WSServer:
         await ws.send_json(hello)
         # Advertise the entity schema before any device state so the
         # integration knows how to render every field that follows.
-        await ws.send_json({"type": "entity_schema", "live": build_live_schema()})
+        await ws.send_json(
+            {
+                "type": "entity_schema",
+                "live": build_live_schema(),
+                "config": build_config_schema(),
+            }
+        )
         await ws.send_json({"type": "snapshot", "devices": self._registry.snapshot()})
         # Replay the last known config for each MAC so new clients get the
         # full picture without having to wait for the next poll interval.
