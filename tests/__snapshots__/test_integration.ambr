@@ -72,6 +72,13 @@
       'unit': 'Ah',
     }),
     dict({
+      'device_class': 'energy',
+      'entity_id': 'sensor.mate3_testmac00001_charge_controller_1_kwh_today',
+      'state': '1.5',
+      'state_class': <SensorStateClass.TOTAL_INCREASING: 'total_increasing'>,
+      'unit': <UnitOfEnergy.KILO_WATT_HOUR: 'kWh'>,
+    }),
+    dict({
       'device_class': 'current',
       'entity_id': 'sensor.mate3_testmac00001_charge_controller_1_output_current',
       'state': '7.5',

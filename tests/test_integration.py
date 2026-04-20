@@ -10,6 +10,8 @@ migrations, malformed payloads, and diagnostics.
 from __future__ import annotations
 
 import asyncio
+import sys
+from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
@@ -21,6 +23,18 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "outback_mate3_addon"))
+from src.schema import build_live_schema  # noqa: E402
+from src.config_schema import build_config_schema  # noqa: E402
+
+_LIVE_SCHEMA = build_live_schema()
+_CONFIG_SCHEMA = build_config_schema()
+_FULL_ENTITY_SCHEMA_MSG: dict[str, Any] = {
+    "type": "entity_schema",
+    "live": _LIVE_SCHEMA,
+    "config": _CONFIG_SCHEMA,
+}
 
 # PHACC disables sockets by default so accidental internet hits fail loudly.
 # These tests rely on a locally-bound aiohttp server, so reenable.
@@ -98,6 +112,11 @@ class _FakeAddOn:
         self.hello_protocol_version: int | None = 1
         self.connected: list[web.WebSocketResponse] = []
         self.url: str = ""  # set by the `fake_addon` fixture after the server binds
+        # When True (the default), the server prepends _FULL_ENTITY_SCHEMA_MSG
+        # before self.messages so the coordinator's entity_schema is populated
+        # before the first snapshot arrives. Set to False in tests that supply
+        # their own entity_schema message and assert on coordinator storage.
+        self.send_default_schema: bool = True
         self.app = web.Application()
         self.app.router.add_get("/ws", self._handle)
 
@@ -113,6 +132,8 @@ class _FakeAddOn:
             hello["addon_version"] = self.hello_version
         if len(hello) > 1:
             await ws.send_json(hello)
+        if self.send_default_schema:
+            await ws.send_json(_FULL_ENTITY_SCHEMA_MSG)
         for msg in self.messages:
             await ws.send_json(msg)
         self.connected.append(ws)
@@ -943,12 +964,15 @@ async def test_entity_schema_message_is_stored_on_coordinator(
             "charge_controller": [],
         },
     }
+    fake_addon.send_default_schema = False
     fake_addon.messages = [SCHEMA_MESSAGE, SNAPSHOT_PAYLOAD]
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    await _wait_for_state(hass, f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power")
+    # With the minimal schema (only battery_voltage for inverter), wait for the
+    # system battery_voltage sensor which is always created (not schema-driven).
+    await _wait_for_state(hass, "sensor.mate3_system_battery_voltage")
 
     mate3 = entry.runtime_data
     assert mate3.entity_schema == SCHEMA_MESSAGE["live"]
@@ -980,12 +1004,15 @@ async def test_config_schema_is_stored_on_coordinator(
             "charge_controller": [],
         },
     }
+    fake_addon.send_default_schema = False
     fake_addon.messages = [SCHEMA_MESSAGE, SNAPSHOT_PAYLOAD]
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
-    await _wait_for_state(hass, f"sensor.mate3_{MAC.lower()}_inverter_1_grid_power")
+    # With an empty live schema, no per-device sensors are created. Wait for the
+    # system battery_voltage sensor (always created, not schema-driven).
+    await _wait_for_state(hass, "sensor.mate3_system_battery_voltage")
 
     mate3 = entry.runtime_data
     assert mate3.config_entity_schema == SCHEMA_MESSAGE["config"]

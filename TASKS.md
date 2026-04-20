@@ -94,9 +94,16 @@ shim needed — we just change the WS protocol and ship.
   sections on `entity_schema` and `config_entity_schema` attributes;
   integration-side rendering switches over in D3. Added 16 add-on unit tests
   + 1 integration test.)_
-- [ ] **D3** — Rewrite `custom_components/outback_mate3/sensor.py` +
+- [x] **D3** — Rewrite `custom_components/outback_mate3/sensor.py` +
   `sensor_config.py` as a generic factory that materializes entities from
-  the received schema. Delete the per-field hard-coded tables.
+  the received schema. Delete the per-field hard-coded tables. _(2.1.0-dev7;
+  `sensor.py` drops from 691 → 387 lines, `sensor_config.py` from 1425 → 186
+  lines (−1543 total). `create_device_entities` iterates `entity_schema`
+  specs; `OutbackConfigDiagnosticSensor` takes a spec dict and calls
+  `_read_value()` generically. `config_flow._probe_ws_url` updated to skip
+  `entity_schema` messages. Snapshot gains `kwh_today` CC sensor (was
+  accidentally omitted from old hard-coded table). All 33 integration tests +
+  112 add-on tests pass.)_
 - [x] **D4** — Integration raises a Repairs issue when the add-on's
   `protocol_version` is newer than it knows how to render, removing the
   implicit requirement that both sides stay in version lockstep. _(2.1.0-dev5;
