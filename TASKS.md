@@ -146,10 +146,16 @@ shim needed — we just change the WS protocol and ship.
   the commit just pins the already-regenerated snapshot. The add-on still
   ships a bundled copy because the integration isn't HA-store-published
   yet; deferring the drop-the-bundle option until it is.)_
-- [ ] **D7** — Update `docs/architecture.md` + `DOCS.md` to reflect the new
+- [x] **D7** — Update `docs/architecture.md` + `DOCS.md` to reflect the new
   layering: add-on owns the MATE3 protocol end-to-end (UDP parsing, HTTP
   config polling, entity schema); integration is a generic WS consumer with
-  zero MATE3-specific knowledge.
+  zero MATE3-specific knowledge. _(docs-only; architecture.md gets a new
+  "Who owns the MATE3 protocol?" subsection describing `schema.py` +
+  `config_schema.py` + the `entity_schema` WS message + how translations
+  stay validated against the advertised schema; the Repairs section gains a
+  `protocol_too_new` entry and the version section explains why
+  protocol_version is decoupled from package version. DOCS.md gets a
+  one-paragraph user-facing summary of the same ownership shift.)_
 
 ## Release cut — 2.1.0
 
