@@ -454,6 +454,18 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> list[Sensor
                     SensorDeviceClass.POWER,
                     UnitOfPower.WATT,
                 ),
+                # F3: MATE3 reports "Daily Ah" at values[12]. No HA device_class
+                # matches Amp-hours, so state_class is passed explicitly.
+                OutbackChargeControllerSensor(
+                    mate3,
+                    mac_address,
+                    device_id,
+                    "daily_ah",
+                    "Daily Ah",
+                    None,
+                    "Ah",
+                    state_class=SensorStateClass.TOTAL_INCREASING,
+                ),
             ]
         )
 
@@ -473,6 +485,7 @@ class OutbackBaseSensor(CoordinatorEntity[OutbackMate3], SensorEntity):
         name: str,
         device_class: SensorDeviceClass | None = None,
         unit: str | None = None,
+        state_class: SensorStateClass | None = None,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(mate3)
@@ -505,8 +518,12 @@ class OutbackBaseSensor(CoordinatorEntity[OutbackMate3], SensorEntity):
         # ENUM sensors return strings, so they must not carry a numeric state_class.
         # Energy counters (kwh_today) reset to 0 at midnight — the HA Energy dashboard
         # needs TOTAL_INCREASING to treat the daily reset as a counter rollover and
-        # integrate correctly. Everything else is an instantaneous measurement.
-        if device_class == SensorDeviceClass.ENUM:
+        # integrate correctly. Daily-Ah (F3) is the same shape but no matching HA
+        # device_class exists, so callers pass state_class explicitly. Everything
+        # else is an instantaneous measurement.
+        if state_class is not None:
+            self._attr_state_class = state_class
+        elif device_class == SensorDeviceClass.ENUM:
             self._attr_state_class = None
         elif device_class == SensorDeviceClass.ENERGY:
             self._attr_state_class = SensorStateClass.TOTAL_INCREASING

@@ -65,6 +65,13 @@
       'unit': None,
     }),
     dict({
+      'device_class': None,
+      'entity_id': 'sensor.mate3_testmac00001_charge_controller_1_daily_ah',
+      'state': '28.0',
+      'state_class': <SensorStateClass.TOTAL_INCREASING: 'total_increasing'>,
+      'unit': 'Ah',
+    }),
+    dict({
       'device_class': 'current',
       'entity_id': 'sensor.mate3_testmac00001_charge_controller_1_output_current',
       'state': '7.5',

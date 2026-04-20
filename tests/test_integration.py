@@ -64,6 +64,7 @@ SNAPSHOT_PAYLOAD: dict[str, Any] = {
                 "output_power": 390,
                 "battery_voltage": 52.5,
                 "kwh_today": 1.5,
+                "daily_ah": 28.0,
                 "charge_mode": "bulk",
             },
         },
@@ -168,6 +169,27 @@ async def test_snapshot_creates_udp_entities(hass: HomeAssistant, fake_addon: _F
         hass, f"sensor.mate3_{MAC.lower()}_charge_controller_1_pv_power"
     )
     assert float(cc_state.state) == 400
+
+
+async def test_daily_ah_sensor_is_total_increasing_counter(
+    hass: HomeAssistant, fake_addon: _FakeAddOn
+) -> None:
+    """F3: the daily Ah sensor materializes with unit `Ah` and the
+    TOTAL_INCREASING state_class (it resets to 0 at midnight, same shape as
+    kwh_today), so it integrates correctly in long-term statistics."""
+    fake_addon.messages = [SNAPSHOT_PAYLOAD]
+
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_URL: fake_addon.url}, version=2)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    daily_ah = await _wait_for_state(
+        hass, f"sensor.mate3_{MAC.lower()}_charge_controller_1_daily_ah"
+    )
+    assert float(daily_ah.state) == 28.0
+    assert daily_ah.attributes["unit_of_measurement"] == "Ah"
+    assert daily_ah.attributes["state_class"] == "total_increasing"
 
 
 async def test_state_updated_refreshes_entities(

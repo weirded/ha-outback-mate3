@@ -392,6 +392,9 @@
       "configured_type": {
         "name": "Configured Type"
       },
+      "daily_ah": {
+        "name": "Daily Ah"
+      },
       "data_stream_mode": {
         "name": "Data Stream Mode"
       },

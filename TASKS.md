@@ -34,10 +34,17 @@ via `./scripts/bump-dev-version.sh`.
   19.4 kWh / 53.4 V ≈ 363 Ah ≈ `values[12]=0364`. Pre-existing from the
   upstream integration; 2.0 rewrite carried it over unchanged.)_
 
-- [ ] **F3** — Charge-controller daily Ah is not exposed. `values[12]` (4-digit)
-  is the MATE3 "Daily Ah" reading (69 / 36 Ah on hass-4 at capture time). Add a
-  `daily_ah` sensor (unit `Ah`, `device_class=None`, `state_class=total_increasing`
-  with a daily reset). See `docs/audit/2.0.1-sensor-audit.md`.
+- [x] **F3** — Charge-controller daily Ah is not exposed. _(2.1.0-dev3;
+  `values[12]` is the MATE3 "Daily Ah" reading, a 4-digit integer (not
+  tenths). Parser now emits `daily_ah` in the CC state dict. Integration
+  materializes `sensor.mate3_<mac>_charge_controller_<N>_daily_ah` with
+  unit `Ah`, `device_class=None`, `state_class=TOTAL_INCREASING` so it
+  integrates correctly across the midnight reset. Extended
+  `OutbackBaseSensor.__init__` to take an optional `state_class` override
+  for cases like this where no HA device_class matches the unit. Added
+  parser test assertions (364 / 246 Ah on t00) and an integration test
+  asserting the entity attrs. Updated `test_entity_states_snapshot` —
+  delta is exactly the one new `daily_ah` row.)_
 
 ## Add-on / integration decoupling
 

@@ -211,5 +211,8 @@ def _parse_charge_controller(values: list[str]) -> dict[str, Any]:
         # = 036 / 019) and against battery-voltage × daily-Ah on the t00
         # fixture (19.4 kWh / 53.4 V ≈ 363 Ah ≈ values[12] = 0364 Ah).
         "kwh_today": float(values[6]) / 10.0,
+        # F3: values[12] is the MATE3 "Daily Ah" reading — 4-digit integer
+        # Amp-hours produced since midnight. Resets daily alongside kwh_today.
+        "daily_ah": float(values[12]),
         "charge_mode": _CHARGE_MODE.get(int(values[10]), "unknown"),
     }
