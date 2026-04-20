@@ -24,13 +24,15 @@ via `./scripts/bump-dev-version.sh`.
   sensor was already fine — it averages the two CC battery voltages, not the
   inverters — but the per-inverter sensors will now show the correct value.)_
 
-- [ ] **F2** — Charge-controller `kwh_today` sensor is stuck at 0. Same shape
-  as F1: parser reads the wrong CSV field. `values[13]` is always `00`; the
-  real value lives at `values[6]` as integer tenths of a kWh. Verified against
-  hass-4 captures (port 4 `values[6]=036` while web UI showed 3.6 kWh; port 5
-  `values[6]=019` while web showed 1.9 kWh). Fix:
-  `kwh_today = float(values[6]) / 10.0`. Pre-existing from the upstream
-  integration. See `docs/audit/2.0.1-sensor-audit.md`.
+- [x] **F2** — Charge-controller `kwh_today` sensor is stuck at 0. _(2.1.0-dev2;
+  same shape as F1: parser was reading `values[13]` which is always `00`. Real
+  value lives at `values[6]` as integer tenths of a kWh. Fixed in
+  `outback_mate3_addon/src/parser.py`; updated `test_charge_controller_1_values`
+  + `test_charge_controller_2_values` to assert 19.4 / 13.2 kWh against the
+  t00 fixture. Cross-checked against hass-4 (web UI 3.6 / 1.9 kWh matched
+  `values[6]=036/019`) and against the daily-Ah value at `values[12]` —
+  19.4 kWh / 53.4 V ≈ 363 Ah ≈ `values[12]=0364`. Pre-existing from the
+  upstream integration; 2.0 rewrite carried it over unchanged.)_
 
 - [ ] **F3** — Charge-controller daily Ah is not exposed. `values[12]` (4-digit)
   is the MATE3 "Daily Ah" reading (69 / 36 Ah on hass-4 at capture time). Add a
