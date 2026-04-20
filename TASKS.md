@@ -136,9 +136,16 @@ shim needed — we just change the WS protocol and ship.
   `mate3_http.py` output. Added `state` blocks for `inverter_mode`
   (17 options), `ac_mode` (4), `charge_mode` (6), `grid_mode` (2), and
   a `kwh_today` label that was missing from strings.json.)_
-- [ ] **D6** — Reconcile `outback_mate3_addon/bundled_integration/` with the
+- [x] **D6** — Reconcile `outback_mate3_addon/bundled_integration/` with the
   decoupled integration (regenerate from the new generic renderer, or drop
-  the snapshot once the integration is HA-store-published).
+  the snapshot once the integration is HA-store-published). _(2.1.0-dev9;
+  ran `./scripts/sync-bundled-integration.sh` to mirror the D3/D5 integration
+  changes into the bundled copy. sensor.py −387 LOC, sensor_config.py
+  −1239 LOC, plus strings.json + en.json enum states picked up from D5.
+  install-addon.sh already runs this sync automatically on each deploy, so
+  the commit just pins the already-regenerated snapshot. The add-on still
+  ships a bundled copy because the integration isn't HA-store-published
+  yet; deferring the drop-the-bundle option until it is.)_
 - [ ] **D7** — Update `docs/architecture.md` + `DOCS.md` to reflect the new
   layering: add-on owns the MATE3 protocol end-to-end (UDP parsing, HTTP
   config polling, entity schema); integration is a generic WS consumer with
