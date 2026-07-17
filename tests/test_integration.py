@@ -25,8 +25,8 @@ from homeassistant.helpers.service_info.hassio import HassioServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "outback_mate3_addon"))
-from src.schema import build_live_schema  # noqa: E402
-from src.config_schema import build_config_schema  # noqa: E402
+from src.config_schema import build_config_schema
+from src.schema import build_live_schema
 
 _LIVE_SCHEMA = build_live_schema()
 _CONFIG_SCHEMA = build_config_schema()

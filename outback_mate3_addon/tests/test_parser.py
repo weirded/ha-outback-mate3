@@ -136,7 +136,7 @@ def test_charge_controller_1_values(t00_devices):
     # Cross-check: 19.4 kWh / 53.4 V ≈ 363 Ah, and values[12] = 0364 Ah.
     _approx(cc["kwh_today"], 19.4)
     # F3: values[12] is the MATE3 "Daily Ah" reading (raw integer Ah, not
-    # tenths). Sanity: kwh_today × 1000 / battery_voltage ≈ daily_ah.
+    # tenths). Sanity: kwh_today x 1000 / battery_voltage ~= daily_ah.
     _approx(cc["daily_ah"], 364.0)
     assert cc["charge_mode"] == "bulk"
 

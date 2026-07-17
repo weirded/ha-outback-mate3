@@ -61,7 +61,7 @@ def test_system_schema_includes_precomputed_data_stream_target():
 
 def test_system_schema_includes_grid_use_programmatic_entries():
     """Grid_Use time-of-use specs are generated programmatically (19 per profile
-    × 3 profiles = 57) — the total spec count must reflect that."""
+    x 3 profiles = 57) — the total spec count must reflect that."""
     keys = {s.key for s in SYSTEM_CONFIG_ENTITIES}
     # Mode + 18 drop/use hour/min entries per profile.
     for prefix in ("grid_use", "grid_use_p2", "grid_use_p3"):
@@ -130,9 +130,9 @@ def test_build_config_schema_entries_have_required_fields():
     }
     for kind, entries in schema.items():
         for entry in entries:
-            assert required.issubset(entry.keys()), (
-                f"{kind}.{entry.get('key')} missing: {required - entry.keys()}"
-            )
+            assert required.issubset(
+                entry.keys()
+            ), f"{kind}.{entry.get('key')} missing: {required - entry.keys()}"
     # Only system entries carry a section.
     for entry in schema["system"]:
         assert "section" in entry

@@ -228,7 +228,7 @@ SYSTEM_CONFIG_ENTITIES: list[ConfigEntitySpec] = [
 ]
 
 
-# Programmatically append the 19 Grid_Use entries × 3 profiles = 57 specs.
+# Programmatically append the 19 Grid_Use entries x 3 profiles = 57 specs.
 for _prefix, _label in (
     ("grid_use", "Grid Use"),
     ("grid_use_p2", "Grid Use P2"),

@@ -141,18 +141,27 @@ INVERTER_ENTITIES: tuple[EntitySpec, ...] = (
     _voltage("battery_voltage", "Battery Voltage"),
     # Enums
     EntitySpec(
-        "inverter_mode", "Inverter Mode",
-        device_class=_DC_ENUM, unit=None, state_class=None,
+        "inverter_mode",
+        "Inverter Mode",
+        device_class=_DC_ENUM,
+        unit=None,
+        state_class=None,
         options=_INVERTER_MODE_OPTIONS,
     ),
     EntitySpec(
-        "ac_mode", "AC Mode",
-        device_class=_DC_ENUM, unit=None, state_class=None,
+        "ac_mode",
+        "AC Mode",
+        device_class=_DC_ENUM,
+        unit=None,
+        state_class=None,
         options=_AC_MODE_OPTIONS,
     ),
     EntitySpec(
-        "grid_mode", "Grid Mode",
-        device_class=_DC_ENUM, unit=None, state_class=None,
+        "grid_mode",
+        "Grid Mode",
+        device_class=_DC_ENUM,
+        unit=None,
+        state_class=None,
         options=_GRID_MODE_OPTIONS,
     ),
 )
@@ -168,18 +177,27 @@ CHARGE_CONTROLLER_ENTITIES: tuple[EntitySpec, ...] = (
     # kwh_today resets daily → TOTAL_INCREASING so the Energy dashboard
     # treats midnight reset as counter rollover.
     EntitySpec(
-        "kwh_today", "kWh Today",
-        device_class=_DC_ENERGY, unit=_U_KWH, state_class=_SC_TOTAL_INCREASING,
+        "kwh_today",
+        "kWh Today",
+        device_class=_DC_ENERGY,
+        unit=_U_KWH,
+        state_class=_SC_TOTAL_INCREASING,
     ),
     # F3: Amp-hours has no HA device_class; state_class carries the
     # TOTAL_INCREASING semantic on its own.
     EntitySpec(
-        "daily_ah", "Daily Ah",
-        device_class=None, unit=_U_AH, state_class=_SC_TOTAL_INCREASING,
+        "daily_ah",
+        "Daily Ah",
+        device_class=None,
+        unit=_U_AH,
+        state_class=_SC_TOTAL_INCREASING,
     ),
     EntitySpec(
-        "charge_mode", "Charge Mode",
-        device_class=_DC_ENUM, unit=None, state_class=None,
+        "charge_mode",
+        "Charge Mode",
+        device_class=_DC_ENUM,
+        unit=None,
+        state_class=None,
         options=_CHARGE_MODE_OPTIONS,
     ),
 )

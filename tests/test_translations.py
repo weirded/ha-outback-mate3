@@ -97,9 +97,7 @@ def test_strings_does_not_label_keys_the_schema_no_longer_emits():
     field — flag it so the label set stays tight."""
     sensors = _sensor_labels(_load(STRINGS_FILE))
     live_keys = {s["translation_key"] for specs in build_live_schema().values() for s in specs}
-    config_keys = {
-        s["translation_key"] for specs in build_config_schema().values() for s in specs
-    }
+    config_keys = {s["translation_key"] for specs in build_config_schema().values() for s in specs}
     # System aggregates are integration-side rollups not in the schema; allow-list them.
     allowlist = {
         "from_grid",

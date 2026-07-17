@@ -54,9 +54,7 @@ def create_config_entities(mate3: OutbackMate3, mac_address: str) -> list[Sensor
     entities: list[SensorEntity] = []
 
     for spec in schema.get("system", []):
-        entities.append(
-            OutbackConfigDiagnosticSensor(mate3, mac_address, "system", 0, spec)
-        )
+        entities.append(OutbackConfigDiagnosticSensor(mate3, mac_address, "system", 0, spec))
 
     n_inverters = len(config.get("inverters", []))
     for idx in range(1, n_inverters + 1):
@@ -69,9 +67,7 @@ def create_config_entities(mate3: OutbackMate3, mac_address: str) -> list[Sensor
     for idx in range(1, n_ccs + 1):
         for spec in schema.get("charge_controller", []):
             entities.append(
-                OutbackConfigDiagnosticSensor(
-                    mate3, mac_address, "charge_controller", idx, spec
-                )
+                OutbackConfigDiagnosticSensor(mate3, mac_address, "charge_controller", idx, spec)
             )
 
     _LOGGER.debug("Created %d config entities for MAC %s", len(entities), mac_address)

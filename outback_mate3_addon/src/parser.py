@@ -208,7 +208,7 @@ def _parse_charge_controller(values: list[str]) -> dict[str, Any]:
         # F2: values[13] is always `00` in captured frames; kwh_today actually
         # lives at values[6] as integer tenths of a kWh (e.g. `194` → 19.4 kWh).
         # Verified against hass-4 web UI (web shows 3.6 / 1.9 kWh; values[6]
-        # = 036 / 019) and against battery-voltage × daily-Ah on the t00
+        # = 036 / 019) and against battery-voltage x daily-Ah on the t00
         # fixture (19.4 kWh / 53.4 V ≈ 363 Ah ≈ values[12] = 0364 Ah).
         "kwh_today": float(values[6]) / 10.0,
         # F3: values[12] is the MATE3 "Daily Ah" reading — 4-digit integer

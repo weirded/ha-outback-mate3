@@ -18,7 +18,6 @@ from src.schema import (
     build_live_schema,
 )
 
-
 # --- EntitySpec shape ------------------------------------------------------
 
 
@@ -74,9 +73,7 @@ def test_inverter_entities_cover_every_parser_state_key():
 
     from src.parser import parse_frame
 
-    fixtures = (
-        Path(__file__).resolve().parent.parent.parent / "tests" / "fixtures" / "mate3_frames"
-    )
+    fixtures = Path(__file__).resolve().parent.parent.parent / "tests" / "fixtures" / "mate3_frames"
     updates = parse_frame((fixtures / "telemetry_00.bin").read_bytes(), "192.168.200.9")
     inverter_state = next(u.state for u in updates if u.kind == KIND_INVERTER)
 
@@ -90,9 +87,7 @@ def test_charge_controller_entities_cover_every_parser_state_key():
 
     from src.parser import parse_frame
 
-    fixtures = (
-        Path(__file__).resolve().parent.parent.parent / "tests" / "fixtures" / "mate3_frames"
-    )
+    fixtures = Path(__file__).resolve().parent.parent.parent / "tests" / "fixtures" / "mate3_frames"
     updates = parse_frame((fixtures / "telemetry_00.bin").read_bytes(), "192.168.200.9")
     cc_state = next(u.state for u in updates if u.kind == KIND_CHARGE_CONTROLLER)
 
@@ -176,10 +171,18 @@ def test_build_live_schema_is_json_serializable():
 
 def test_build_live_schema_entries_have_required_fields():
     schema = build_live_schema()
-    required = {"key", "name", "device_class", "unit", "state_class",
-                "entity_category", "translation_key", "options"}
+    required = {
+        "key",
+        "name",
+        "device_class",
+        "unit",
+        "state_class",
+        "entity_category",
+        "translation_key",
+        "options",
+    }
     for kind, entries in schema.items():
         for entry in entries:
-            assert required.issubset(entry.keys()), (
-                f"{kind}.{entry.get('key')} missing keys: {required - entry.keys()}"
-            )
+            assert required.issubset(
+                entry.keys()
+            ), f"{kind}.{entry.get('key')} missing keys: {required - entry.keys()}"
