@@ -3,6 +3,22 @@
 The add-on and its bundled integration share a single version number; see
 the top-level [`CHANGELOG.md`](../CHANGELOG.md) for the combined history.
 
+## 2.1.0 — 2026-07-17
+
+- **Reliable startup.** If the add-on couldn't refresh the bundled integration
+  files in your config folder (for example, when those files were owned by a
+  different user), it used to restart in a loop and never begin relaying
+  telemetry. It now logs a clear warning and starts normally — the UDP→WS relay
+  never depended on that refresh.
+- **Corrected telemetry.** Per-inverter battery voltage now reads the real
+  value instead of 0 V, and each charge controller now reports the energy it
+  generated today (kWh) plus a new daily amp-hour (Ah) total.
+- **Add-on owns the MATE3 schema.** The add-on now advertises the full set of
+  sensors (names, units, states) to the integration over the WebSocket link, so
+  the integration renders them generically and the two stay in lockstep. A
+  protocol version is included so a mismatch surfaces as a Home Assistant Repair
+  instead of silently mis-rendering.
+
 ## 2.0.0 — 2026-04-18
 
 First release of the split architecture. The add-on owns the MATE3 UDP

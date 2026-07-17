@@ -3,6 +3,32 @@
 All notable changes to the integration and the companion add-on. The two
 share a single version number.
 
+## 2.1.0 — 2026-07-17
+
+**Fixes**
+
+- **Inverter battery voltage now reads correctly.** The per-inverter battery
+  voltage sensors were stuck at 0 V and now report the real voltage. (The
+  system-level battery voltage was already correct.)
+- **Charge-controller energy sensors now work.** Each charge controller now
+  reports the energy it generated today (kWh) — previously stuck at 0 — plus a
+  new daily amp-hour (Ah) total, both resetting at midnight like the MATE3 does.
+- **The add-on no longer gets stuck on startup.** If it couldn't refresh the
+  bundled integration files in your config folder (for example, when those
+  files were owned by a different user), the add-on would restart in a loop and
+  never begin relaying telemetry. It now logs a clear, actionable warning and
+  starts normally — relaying telemetry never depended on that refresh.
+
+**Under the hood**
+
+- The add-on is now the single source of truth for every MATE3 sensor: it tells
+  the integration which sensors exist and how to label them, and the
+  integration renders them generically. Sensor names, units, and states now
+  stay in lockstep with the add-on automatically.
+- If you ever run an add-on newer than your installed integration understands,
+  Home Assistant now surfaces a Repair notification asking you to update,
+  instead of quietly mis-rendering data.
+
 ## 2.0.0 — 2026-04-18
 
 The 2.0 cut. First release of the split architecture. The integration no
