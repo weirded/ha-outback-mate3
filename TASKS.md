@@ -177,10 +177,10 @@ shim needed — we just change the WS protocol and ship.
 
 ## Release cut — 2.1.0
 
-- [ ] **C1** Final version bump `2.1.0-dev<N>` → `2.1.0` (drop `-dev` suffix)
-  across `outback_mate3_addon/config.yaml` and
+- [x] **C1** *(2.1.0)* Final version bump `2.1.0-dev10` → `2.1.0` (drop `-dev`
+  suffix) across `outback_mate3_addon/config.yaml` and
   `custom_components/outback_mate3/manifest.json`.
-- [ ] **C2** Write the `## 2.1.0 — <date>` section in `CHANGELOG.md` from the
-  annotated fixes / D-items above.
-- [ ] **C3** Tag `v2.1.0` so `.github/workflows/release.yaml` publishes the
-  GitHub release with the matching CHANGELOG slice.
+- [x] **C2** *(2.1.0)* Write the `## 2.1.0 — 2026-07-17` section in `CHANGELOG.md`
+  (top-level + add-on) from the annotated fixes / D-items above.
+- [x] **C3** *(2.1.0)* Tag `v2.1.0` so `.github/workflows/release.yaml` publishes
+  the GitHub release with the matching CHANGELOG slice.
