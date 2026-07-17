@@ -16,12 +16,38 @@ the real source IP, and there's no supported way to fix it from Core.
 
 | Half | Runs as | What it owns |
 |---|---|---|
-| **Add-on** (`outback_mate3_addon/`) | Privileged add-on container with `host_network: true` | UDP listener on port 57027, HTTP config poll of MATE3's `/CONFIG.xml`, WebSocket server on port 28099 |
-| **Integration** (`custom_components/outback_mate3/`) | Home Assistant Core | WebSocket client, `DataUpdateCoordinator`, Home Assistant entities, config flow, repairs |
+| **Add-on** (`outback_mate3_addon/`) | Privileged add-on container with `host_network: true` | MATE3 protocol end-to-end: UDP listener on port 57027, HTTP config poll of MATE3's `/CONFIG.xml`, entity schema (field names, units, device classes, enum options), WebSocket server on port 28099 |
+| **Integration** (`custom_components/outback_mate3/`) | Home Assistant Core | Generic WebSocket-to-HA renderer: consumes the add-on's `entity_schema`, materializes entities, runs the `DataUpdateCoordinator`, config flow, repairs |
 
 The add-on can see UDP packets because it's on the host network. The
 integration doesn't need UDP because the add-on hands it parsed state over
 a durable WebSocket.
+
+### Who owns the MATE3 protocol?
+
+The add-on. The 2.0 line split the *network stack* (UDP / WebSocket) between
+the two halves but left MATE3 *semantics* — field names, units, device
+classes, enum strings, the ~400-row diagnostic-entity table derived from
+`CONFIG.xml` — duplicated on the integration side. The 2.1 decoupling
+(D1–D7) moved all of that into the add-on and reshaped the integration
+into a generic schema-driven renderer.
+
+Concretely, the add-on sources live in
+`outback_mate3_addon/src/schema.py` (live UDP-derived entities — per-inverter
+/ per-charge-controller fields, plus enum `options` for the mode sensors)
+and `outback_mate3_addon/src/config_schema.py` (CONFIG.xml-derived
+diagnostics — system, MATE3 itself, per-inverter, per-CC). On every WS
+client connect, the add-on ships both as one `entity_schema` message with
+`live` and `config` sections. The integration stashes them on the
+coordinator and `create_device_entities` iterates the specs to build HA
+entities — no MATE3-specific tables left in the integration.
+
+Translation labels still live in `custom_components/outback_mate3/strings.json`
+(HA store compliance requires them to be shipped with the integration), but
+`tests/test_translations.py` validates the *set* of labels against the
+advertised schema: every `translation_key` must have a `.name`, every enum
+option must have a `.state.<opt>` entry (including the `unknown` fallback),
+and orphaned labels fail the build.
 
 ## Why bundle the integration inside the add-on?
 
@@ -110,10 +136,10 @@ The MATE3 returns IP addresses in a triple-zero-padded format
 (`192.168.000.064`). The add-on normalizes these to dotted-quad
 (`192.168.0.64`) before surfacing them — otherwise HA's IP parsing gags.
 
-## Repairs: add-on-offline and version-drift
+## Repairs: add-on-offline, version-drift, protocol-too-new
 
 Home Assistant's Repairs system is how we surface cross-component health.
-The integration raises two issues:
+The integration raises three issues:
 
 - **`addon_offline`** — raised when the WebSocket to the add-on has been down
   for more than 60 s (a grace window so Supervisor add-on bounces don't
@@ -123,6 +149,12 @@ The integration raises two issues:
   (sent in a `hello` frame on every (re)connect) doesn't match the
   integration's manifest version. Links to the add-on store. Non-fixable
   from HA; the user upgrades the lagging half.
+- **`protocol_too_new`** — raised when the add-on advertises a
+  `protocol_version` (also in `hello`) that's higher than the integration's
+  `SUPPORTED_PROTOCOL_VERSION`. Separate from `version_drift` so that
+  backward-compatible integration releases can pin the protocol they've
+  actually been tested against without forcing a version match on every
+  deploy.
 
 Neither repair opens a flow — the user's action happens outside HA
 (restart the add-on, upgrade one half). A flow-driven fix would just be
@@ -132,10 +164,23 @@ noise.
 
 Both `outback_mate3_addon/config.yaml` and
 `custom_components/outback_mate3/manifest.json` carry the same version
-string. During development it's `<semver>-dev<N>` (e.g. `2.0.0-dev22`); on
+string. During development it's `<semver>-dev<N>` (e.g. `2.1.0-dev9`); on
 release, the `-devN` suffix is stripped and the release workflow validates
 that both files match the tag before publishing.
 
 `scripts/bump-dev-version.sh` increments N in lockstep. The CI release
 workflow (`.github/workflows/release.yaml`) fails the release if the two
 files disagree with the tag.
+
+The *protocol* between the two halves has its own version, decoupled from
+the package version. `PROTOCOL_VERSION` in
+`outback_mate3_addon/src/ws_server.py` and `SUPPORTED_PROTOCOL_VERSION` in
+`custom_components/outback_mate3/const.py` bump only when the wire shape
+of `hello` / `entity_schema` / `snapshot` / `state_updated` changes in a
+way the integration needs to know about. `version_drift` fires on any
+package-version mismatch; `protocol_too_new` fires independently when the
+integration can't render the advertised protocol. The separation means
+future releases can ship a protocol_version bump that's genuinely
+forward-incompatible (add a required field, rename a message) and get a
+clear Repairs signal for it, without conflating it with the "please keep
+both halves on the same `-devN`" hygiene message.

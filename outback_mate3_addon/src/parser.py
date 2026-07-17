@@ -178,7 +178,9 @@ def _parse_inverter(values: list[str]) -> dict[str, Any]:
         "charger_current": l1_charger_current + l2_charger_current,
         "total_ac_input_voltage": l1_ac_input_voltage + l2_ac_input_voltage,
         "total_ac_output_voltage": l1_ac_output_voltage + l2_ac_output_voltage,
-        "battery_voltage": float(values[12]),
+        # Radian battery voltage lands in the 20th CSV field as tenths of a volt;
+        # the old values[12] read was L2 sell current (always 0 on the test system).
+        "battery_voltage": float(values[19]) / 10.0,
     }
 
     state["inverter_mode"] = _INVERTER_MODE.get(int(values[16]), "unknown")
@@ -203,6 +205,14 @@ def _parse_charge_controller(values: list[str]) -> dict[str, Any]:
         "output_power": output_current * battery_voltage,
         "pv_power": pv_current * pv_voltage,
         "battery_voltage": battery_voltage,
-        "kwh_today": float(values[13]),
+        # F2: values[13] is always `00` in captured frames; kwh_today actually
+        # lives at values[6] as integer tenths of a kWh (e.g. `194` → 19.4 kWh).
+        # Verified against hass-4 web UI (web shows 3.6 / 1.9 kWh; values[6]
+        # = 036 / 019) and against battery-voltage x daily-Ah on the t00
+        # fixture (19.4 kWh / 53.4 V ≈ 363 Ah ≈ values[12] = 0364 Ah).
+        "kwh_today": float(values[6]) / 10.0,
+        # F3: values[12] is the MATE3 "Daily Ah" reading — 4-digit integer
+        # Amp-hours produced since midnight. Resets daily alongside kwh_today.
+        "daily_ah": float(values[12]),
         "charge_mode": _CHARGE_MODE.get(int(values[10]), "unknown"),
     }

@@ -20,7 +20,10 @@ jobs:
           python-version: "3.12"
 
       - name: Install ruff
-        run: pip install ruff==0.6.9
+        # Keep in lockstep with the pin in .pre-commit-config.yaml so local
+        # pre-commit and CI never disagree on lint/format (they did across
+        # 0.6.9 vs 0.8.4, which silently red-lit the 2.1.0 branch).
+        run: pip install ruff==0.8.4
 
       - name: Ruff lint
         run: ruff check .

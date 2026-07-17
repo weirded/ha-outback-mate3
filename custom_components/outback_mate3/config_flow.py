@@ -36,7 +36,7 @@ async def _probe_ws_url(url: str, timeout_s: float = 5.0) -> str | None:
                         msg_type = payload.get("type")
                         if msg_type == "snapshot":
                             return None
-                        if msg_type in {"hello", "config_snapshot"}:
+                        if msg_type in {"hello", "config_snapshot", "entity_schema"}:
                             continue
                         return "bad_handshake"
     except TimeoutError:

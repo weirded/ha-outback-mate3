@@ -68,6 +68,8 @@ def test_event_to_message_rejects_unknown_type():
 async def test_new_client_receives_snapshot(ws_setup):
     _, ws_client = ws_setup
     async with ws_client.ws_connect("/ws") as ws:
+        await asyncio.wait_for(ws.receive_json(), timeout=2)  # hello
+        await asyncio.wait_for(ws.receive_json(), timeout=2)  # entity_schema
         msg = await asyncio.wait_for(ws.receive_json(), timeout=2)
         assert msg["type"] == "snapshot"
         assert len(msg["devices"]) == 4
@@ -81,24 +83,102 @@ async def test_hello_prefixes_snapshot_when_version_known():
     server = WSServer(_populated_registry(), heartbeat=100, addon_version="2.0.0-dev18")
     async with TestClient(TestServer(server.app)) as client, client.ws_connect("/ws") as ws:
         first = await asyncio.wait_for(ws.receive_json(), timeout=2)
-        assert first == {"type": "hello", "addon_version": "2.0.0-dev18"}
-        second = await asyncio.wait_for(ws.receive_json(), timeout=2)
-        assert second["type"] == "snapshot"
+        assert first == {
+            "type": "hello",
+            "addon_version": "2.0.0-dev18",
+            "protocol_version": 1,
+        }
+        schema = await asyncio.wait_for(ws.receive_json(), timeout=2)
+        assert schema["type"] == "entity_schema"
+        third = await asyncio.wait_for(ws.receive_json(), timeout=2)
+        assert third["type"] == "snapshot"
 
 
 @pytest.mark.asyncio
-async def test_hello_omitted_when_version_unset():
-    """Without addon_version (the test-fixture default), snapshot arrives first."""
+async def test_entity_schema_follows_hello_before_snapshot():
+    """After hello, the add-on publishes the entity_schema so the integration
+    can render entities without duplicating MATE3 metadata."""
     server = WSServer(_populated_registry(), heartbeat=100)
     async with TestClient(TestServer(server.app)) as client, client.ws_connect("/ws") as ws:
         first = await asyncio.wait_for(ws.receive_json(), timeout=2)
-        assert first["type"] == "snapshot"
+        assert first["type"] == "hello"
+        second = await asyncio.wait_for(ws.receive_json(), timeout=2)
+        assert second["type"] == "entity_schema"
+        assert "live" in second
+        assert "inverter" in second["live"]
+        assert "charge_controller" in second["live"]
+        # A known entity makes it through end-to-end.
+        inverter_specs = second["live"]["inverter"]
+        battery = next(s for s in inverter_specs if s["key"] == "battery_voltage")
+        assert battery["device_class"] == "voltage"
+        assert battery["unit"] == "V"
+        assert battery["state_class"] == "measurement"
+        third = await asyncio.wait_for(ws.receive_json(), timeout=2)
+        assert third["type"] == "snapshot"
+
+
+@pytest.mark.asyncio
+async def test_entity_schema_includes_config_sections():
+    """D2: the entity_schema message also carries CONFIG.xml-derived specs
+    so the integration can render diagnostic sensors generically."""
+    server = WSServer(_populated_registry(), heartbeat=100)
+    async with TestClient(TestServer(server.app)) as client, client.ws_connect("/ws") as ws:
+        await asyncio.wait_for(ws.receive_json(), timeout=2)  # hello
+        schema = await asyncio.wait_for(ws.receive_json(), timeout=2)
+        assert schema["type"] == "entity_schema"
+        assert "config" in schema
+        assert set(schema["config"]) == {"system", "inverter", "charge_controller"}
+        # Spot-check: nominal voltage carries voltage device class + section.
+        sys_entries = schema["config"]["system"]
+        nom = next(s for s in sys_entries if s["key"] == "nominal_voltage")
+        assert nom["section"] == "system"
+        assert nom["device_class"] == "voltage"
+        assert nom["unit"] == "V"
+        # Spot-check: data_stream_target is now a regular spec (precomputed).
+        dst = next(s for s in sys_entries if s["key"] == "data_stream_target")
+        assert dst["section"] == "mate3"
+        # Spot-check: CC firmware is flagged for sw_version plumbing.
+        cc_fw = next(s for s in schema["config"]["charge_controller"] if s["key"] == "firmware")
+        assert cc_fw["is_firmware"] is True
+
+
+@pytest.mark.asyncio
+async def test_hello_carries_protocol_version_even_without_addon_version():
+    """protocol_version is independent of addon_version and should always be sent.
+
+    D4 relies on this: the integration raises a Repairs issue if the add-on
+    advertises a protocol_version newer than it knows how to render, so the
+    add-on must advertise it unconditionally.
+    """
+    server = WSServer(_populated_registry(), heartbeat=100)
+    async with TestClient(TestServer(server.app)) as client, client.ws_connect("/ws") as ws:
+        first = await asyncio.wait_for(ws.receive_json(), timeout=2)
+        assert first["type"] == "hello"
+        assert first["protocol_version"] == 1
+        assert "addon_version" not in first
+
+
+@pytest.mark.asyncio
+async def test_hello_addon_version_omitted_when_version_unset():
+    """Without addon_version, hello still arrives (for protocol_version) but
+    omits the addon_version field."""
+    server = WSServer(_populated_registry(), heartbeat=100)
+    async with TestClient(TestServer(server.app)) as client, client.ws_connect("/ws") as ws:
+        first = await asyncio.wait_for(ws.receive_json(), timeout=2)
+        assert first["type"] == "hello"
+        assert "addon_version" not in first
+        schema = await asyncio.wait_for(ws.receive_json(), timeout=2)
+        assert schema["type"] == "entity_schema"
+        third = await asyncio.wait_for(ws.receive_json(), timeout=2)
+        assert third["type"] == "snapshot"
 
 
 @pytest.mark.asyncio
 async def test_snapshot_contains_state(ws_setup):
     _, ws_client = ws_setup
     async with ws_client.ws_connect("/ws") as ws:
+        await asyncio.wait_for(ws.receive_json(), timeout=2)  # hello
+        await asyncio.wait_for(ws.receive_json(), timeout=2)  # entity_schema
         msg = await asyncio.wait_for(ws.receive_json(), timeout=2)
         inv1 = next(d for d in msg["devices"] if d["kind"] == "inverter" and d["index"] == 1)
         assert inv1["state"]["inverter_mode"] == "offsetting"
@@ -111,7 +191,9 @@ async def test_snapshot_contains_state(ws_setup):
 async def test_broadcast_delivers_to_connected_client(ws_setup):
     server, ws_client = ws_setup
     async with ws_client.ws_connect("/ws") as ws:
-        await ws.receive_json()  # consume snapshot
+        await ws.receive_json()  # hello
+        await ws.receive_json()  # entity_schema
+        await ws.receive_json()  # snapshot
         await asyncio.sleep(0.05)
 
         evt = StateUpdated(mac="A", kind=KIND_INVERTER, index=1, state={"grid_power": 42})
@@ -126,8 +208,10 @@ async def test_broadcast_delivers_to_connected_client(ws_setup):
 async def test_broadcast_delivers_to_multiple_clients(ws_setup):
     server, ws_client = ws_setup
     async with ws_client.ws_connect("/ws") as ws1, ws_client.ws_connect("/ws") as ws2:
-        await ws1.receive_json()
-        await ws2.receive_json()
+        # Drain hello + entity_schema + snapshot on both clients.
+        for _ in range(3):
+            await ws1.receive_json()
+            await ws2.receive_json()
         await asyncio.sleep(0.05)
         assert server.client_count == 2
 
@@ -150,7 +234,9 @@ async def test_broadcast_with_no_clients_is_noop(ws_setup):
 async def test_disconnected_client_is_removed_from_clients_set(ws_setup):
     server, ws_client = ws_setup
     async with ws_client.ws_connect("/ws") as ws:
-        await ws.receive_json()
+        await ws.receive_json()  # hello
+        await ws.receive_json()  # entity_schema
+        await ws.receive_json()  # snapshot
         await asyncio.sleep(0.05)
         assert server.client_count == 1
     await asyncio.sleep(0.1)
@@ -168,6 +254,8 @@ async def test_enqueue_broadcast_is_delivered_via_run_broadcaster(ws_setup):
     consumer = asyncio.create_task(server.run_broadcaster(stop))
     try:
         async with ws_client.ws_connect("/ws") as ws:
+            await ws.receive_json()  # hello
+            await ws.receive_json()  # entity_schema
             await ws.receive_json()  # snapshot
             await asyncio.sleep(0.05)
 
@@ -206,8 +294,10 @@ async def test_one_slow_client_does_not_stall_other_clients(ws_setup):
 
     # Two real clients connected; we'll monkey-patch one's send_json to hang.
     async with ws_client.ws_connect("/ws") as fast_ws, ws_client.ws_connect("/ws") as _slow_ws:
-        await fast_ws.receive_json()
-        await _slow_ws.receive_json()
+        # Drain hello + entity_schema + snapshot on both clients.
+        for _ in range(3):
+            await fast_ws.receive_json()
+            await _slow_ws.receive_json()
         await asyncio.sleep(0.05)
 
         # Identify the server-side client objects and wrap one's send_json to

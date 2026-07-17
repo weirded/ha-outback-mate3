@@ -5,6 +5,8 @@
 
 Streams live data from your Outback MATE3 into Home Assistant. Listens for the MATE3's UDP telemetry on the LAN, polls its `/CONFIG.xml` every 5 minutes for firmware + setpoints, and ships a bundled companion integration into `/config/custom_components/outback_mate3/` on first start. You only install this add-on — the integration lands automatically.
 
+The add-on owns the MATE3 protocol end-to-end. It parses UDP frames, polls `CONFIG.xml`, and advertises the set of entities (field names, units, enum options) to the integration over its WebSocket. The integration is a generic renderer — it creates Home Assistant entities from whatever schema the add-on advertises, so new MATE3 fields can ship in an add-on update without needing a matching integration release.
+
 ## First run
 
 1. Click **Install**, then **Start**. The defaults work.

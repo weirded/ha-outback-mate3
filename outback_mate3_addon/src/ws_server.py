@@ -20,9 +20,17 @@ from typing import Any
 
 from aiohttp import WSMsgType, web
 
+from src.config_schema import build_config_schema
+from src.schema import build_live_schema
 from src.state import ConfigSnapshot, DeviceAdded, DeviceRegistry, Event, StateUpdated
 
 _LOGGER = logging.getLogger(__name__)
+
+# WS protocol version advertised in the hello message. Bump when we change
+# the shape of entity_schema / hello / snapshot in a way the integration
+# needs to know about. The integration pins a SUPPORTED_PROTOCOL_VERSION
+# and files a Repairs issue when the add-on advertises something newer.
+PROTOCOL_VERSION = 1
 
 # Send a ping every 30s; close the socket if no pong within 10s.
 HEARTBEAT_S = 30.0
@@ -96,12 +104,23 @@ class WSServer:
         ws = web.WebSocketResponse(heartbeat=self._heartbeat)
         await ws.prepare(request)
 
-        # Send a hello first so the integration can surface a Repairs issue
-        # if its own manifest version doesn't match ours. Omitted when we
-        # don't know our own version (e.g. unit tests that don't set it) so
-        # the test fakes don't have to hand-drain an extra frame.
+        # Send a hello first carrying the protocol_version so the integration
+        # can surface a Repairs issue if it doesn't know how to render this
+        # protocol. addon_version is included when known (for version-drift
+        # detection) but is separate from the protocol contract itself.
+        hello: dict[str, Any] = {"type": "hello", "protocol_version": PROTOCOL_VERSION}
         if self._addon_version is not None:
-            await ws.send_json({"type": "hello", "addon_version": self._addon_version})
+            hello["addon_version"] = self._addon_version
+        await ws.send_json(hello)
+        # Advertise the entity schema before any device state so the
+        # integration knows how to render every field that follows.
+        await ws.send_json(
+            {
+                "type": "entity_schema",
+                "live": build_live_schema(),
+                "config": build_config_schema(),
+            }
+        )
         await ws.send_json({"type": "snapshot", "devices": self._registry.snapshot()})
         # Replay the last known config for each MAC so new clients get the
         # full picture without having to wait for the next poll interval.

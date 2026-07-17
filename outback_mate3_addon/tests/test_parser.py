@@ -104,7 +104,7 @@ def test_inverter_1_values(t00_devices):
     _approx(inv["charger_power"], 0.0)
     _approx(inv["total_ac_input_voltage"], 247.0)
     _approx(inv["total_ac_output_voltage"], 246.0)
-    _approx(inv["battery_voltage"], 0.0)
+    _approx(inv["battery_voltage"], 53.2)
 
     assert inv["inverter_mode"] == "offsetting"
     assert inv["ac_mode"] == "ac-use"
@@ -115,6 +115,7 @@ def test_inverter_2_values(t00_devices):
     inv = next(u for u in t00_devices if u.kind == KIND_INVERTER and u.index == 2).state
     _approx(inv["grid_power"], 122.0)
     _approx(inv["inverter_power"], 494.0)
+    _approx(inv["battery_voltage"], 53.2)
     assert inv["inverter_mode"] == "slave-on"
     assert inv["ac_mode"] == "ac-use"
 
@@ -130,7 +131,13 @@ def test_charge_controller_1_values(t00_devices):
     _approx(cc["pv_power"], 968.0)
     _approx(cc["battery_voltage"], 53.4)
     _approx(cc["output_power"], 18.0 * 53.4)
-    _approx(cc["kwh_today"], 0.0)
+    # F2: kwh_today lives at values[6] as tenths of a kWh, not at values[13]
+    # (which is always `00` and was the source of the stuck-at-zero bug).
+    # Cross-check: 19.4 kWh / 53.4 V ≈ 363 Ah, and values[12] = 0364 Ah.
+    _approx(cc["kwh_today"], 19.4)
+    # F3: values[12] is the MATE3 "Daily Ah" reading (raw integer Ah, not
+    # tenths). Sanity: kwh_today x 1000 / battery_voltage ~= daily_ah.
+    _approx(cc["daily_ah"], 364.0)
     assert cc["charge_mode"] == "bulk"
 
 
@@ -139,6 +146,8 @@ def test_charge_controller_2_values(t00_devices):
     _approx(cc["pv_current"], 8.0)
     _approx(cc["pv_voltage"], 85.0)
     _approx(cc["battery_voltage"], 53.5)
+    _approx(cc["kwh_today"], 13.2)
+    _approx(cc["daily_ah"], 246.0)
     assert cc["charge_mode"] == "bulk"
 
 

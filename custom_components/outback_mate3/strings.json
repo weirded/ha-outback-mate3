@@ -93,7 +93,13 @@
         "name": "AC Input Priority"
       },
       "ac_mode": {
-        "name": "AC Mode"
+        "name": "AC Mode",
+        "state": {
+          "ac-drop": "AC Drop",
+          "ac-use": "AC Use",
+          "no-ac": "No AC",
+          "unknown": "Unknown"
+        }
       },
       "ac_output_voltage": {
         "name": "AC Output Voltage Setpoint"
@@ -339,7 +345,15 @@
         "name": "CC Float Coordination"
       },
       "charge_mode": {
-        "name": "Charge Mode"
+        "name": "Charge Mode",
+        "state": {
+          "absorb": "Absorb",
+          "bulk": "Bulk",
+          "eq": "Equalize",
+          "float": "Float",
+          "silent": "Silent",
+          "unknown": "Unknown"
+        }
       },
       "charger_absorb_end_amps": {
         "name": "Absorb End Amps"
@@ -392,6 +406,9 @@
       "configured_type": {
         "name": "Configured Type"
       },
+      "daily_ah": {
+        "name": "Daily Ah"
+      },
       "data_stream_mode": {
         "name": "Data Stream Mode"
       },
@@ -423,7 +440,11 @@
         "name": "Global CC Max Charge Rate"
       },
       "grid_mode": {
-        "name": "Grid Mode"
+        "name": "Grid Mode",
+        "state": {
+          "grid": "Grid",
+          "generator": "Generator"
+        }
       },
       "grid_mode_schedule_1_enable_hour": {
         "name": "Grid Mode Schedule 1 Hour"
@@ -585,10 +606,32 @@
         "name": "Total Inverter Current"
       },
       "inverter_mode": {
-        "name": "Inverter Mode"
+        "name": "Inverter Mode",
+        "state": {
+          "ags-error": "AGS Error",
+          "charger-off": "Charger Off",
+          "charging": "Charging",
+          "comm-error": "Comm Error",
+          "equalizing": "Equalizing",
+          "floating": "Floating",
+          "inverter-error": "Inverter Error",
+          "inverting": "Inverting",
+          "off": "Off",
+          "offsetting": "Offsetting",
+          "pass-through": "Pass Through",
+          "search": "Search",
+          "selling": "Selling",
+          "silent": "Silent",
+          "slave-off": "Slave Off",
+          "slave-on": "Slave On",
+          "unknown": "Unknown"
+        }
       },
       "inverter_power": {
         "name": "Total Inverter Power"
+      },
+      "kwh_today": {
+        "name": "Energy Today"
       },
       "l1_ac_input_voltage": {
         "name": "L1 AC Input Voltage"
@@ -840,6 +883,10 @@
     "version_drift": {
       "title": "Integration and add-on versions don't match",
       "description": "The Outback MATE3 integration is at version {integration_version} but the add-on is at {addon_version}. They ship together and should be kept on the same version; update whichever is behind."
+    },
+    "protocol_too_new": {
+      "title": "Outback MATE3 integration is out of date",
+      "description": "The add-on is advertising protocol version {addon_protocol_version}, but this integration only understands version {supported_protocol_version}. Update the integration — some new fields may be missing until you do."
     }
   }
 }

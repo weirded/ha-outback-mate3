@@ -17,24 +17,29 @@ bashio::log.info "Outback MATE3 v${ADDON_VERSION}: UDP :${UDP_PORT} -> WS :${WS_
 # we sync it into /homeassistant/custom_components/outback_mate3/ if the
 # content differs. That way users install ONE thing (this add-on) and the
 # integration ends up in the right place; they just restart HA to load it.
+#
+# This is a *convenience only* — the UDP->WS relay below does not depend on it.
+# The sync therefore runs in a separate script that is guarded so that ANY
+# failure (permission denied on the target, files in use, read-only mount) is
+# logged as a warning and does NOT stop the add-on from starting. Note the
+# `|| rc=$?`: without it, `set -e` would abort the whole run script the moment
+# the sync exits non-zero — which is exactly what crash-looped the add-on when
+# the target dir was not removable.
 
 BUNDLED="/opt/integration/outback_mate3"
 TARGET="/homeassistant/custom_components/outback_mate3"
 
-if [ -d "$BUNDLED" ]; then
-    if [ -d /homeassistant ]; then
-        mkdir -p /homeassistant/custom_components
-        if ! diff -rq "$BUNDLED" "$TARGET" >/dev/null 2>&1; then
-            bashio::log.info "Deploying bundled integration to ${TARGET}"
-            rm -rf "$TARGET"
-            cp -R "$BUNDLED" "$TARGET"
-            bashio::log.warning "Integration was updated; restart Home Assistant to load the new version."
-        else
-            bashio::log.debug "Bundled integration already current at ${TARGET}"
-        fi
-    else
-        bashio::log.warning "/homeassistant is not mapped — integration auto-deploy skipped. Add 'map: [homeassistant_config:rw]' to config.yaml to enable."
-    fi
+if [ -d /homeassistant ]; then
+    rc=0
+    /app/deploy_integration.sh "$BUNDLED" "$TARGET" || rc=$?
+    case "$rc" in
+        0)  bashio::log.warning "Integration was updated; restart Home Assistant to load the new version." ;;
+        10) bashio::log.debug "Bundled integration already current at ${TARGET}" ;;
+        2)  bashio::log.debug "No bundled integration in image; skipping auto-deploy." ;;
+        *)  bashio::log.warning "Could not sync the bundled integration into ${TARGET} (rc=${rc}: permission denied, files in use, or read-only). The add-on will keep running — the relay does not depend on this. Update ${TARGET} manually or fix its permissions to re-enable auto-deploy." ;;
+    esac
+else
+    bashio::log.warning "/homeassistant is not mapped — integration auto-deploy skipped. Add 'map: [homeassistant_config:rw]' to config.yaml to enable."
 fi
 
 
