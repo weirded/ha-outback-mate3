@@ -13,6 +13,12 @@ RUN pip3 install --break-system-packages --no-cache-dir -r /app/requirements.txt
 
 COPY src/ /app/src/
 
+# Convenience helper run.sh invokes at startup to sync the bundled companion
+# integration into HA's config dir. Kept as its own guarded script so a failure
+# to deploy it can never abort the add-on (see run.sh).
+COPY deploy_integration.sh /app/deploy_integration.sh
+RUN chmod a+x /app/deploy_integration.sh
+
 # Ship a copy of the companion integration inside the image so the add-on
 # can deploy it into /homeassistant/custom_components/ at startup (B9).
 # Users then only have to install the add-on — the integration lands

@@ -46,6 +46,24 @@ via `./scripts/bump-dev-version.sh`.
   asserting the entity attrs. Updated `test_entity_states_snapshot` —
   delta is exactly the one new `daily_ah` row.)_
 
+- [x] **F4** — Add-on crash-loops and never starts (relay never comes up) when
+  the bundled-integration auto-deploy can't write the target. _(2.1.0-dev10;
+  `run.sh` runs under `set -e` and did a bare `rm -rf`/`cp` of
+  `/homeassistant/custom_components/outback_mate3`. When that dir isn't
+  removable — observed on hass-4 where the files were owned by another uid
+  (`stefan:staff`, dir mode 755) so the container process got `Permission
+  denied` — `rm` returned non-zero and `set -e` aborted the whole run script
+  before `exec python3 -m src.main`. s6 then restarted the service in a tight
+  loop, so the UDP→WS relay (the add-on's actual job) never started. Fix:
+  extracted the sync into `outback_mate3_addon/deploy_integration.sh` with an
+  explicit exit-code contract, and `run.sh` now invokes it with `|| rc=$?` so a
+  failure is logged as an actionable warning and startup continues — the relay
+  does not depend on the sync. On an un-removable target the script bails
+  before touching anything, leaving the existing integration intact. Regression
+  net: `outback_mate3_addon/tests/test_deploy_integration.py` — the key test
+  reproduces the `set -e` guard and asserts execution reaches the relay-start
+  marker even when the deploy fails.)_
+
 ## Add-on / integration decoupling
 
 Today the integration hard-codes knowledge that derives from the MATE3
