@@ -33,6 +33,7 @@ _DEVICE_BLOCK = re.compile(r"^\d+,\d+")
 
 KIND_INVERTER = "inverter"
 KIND_CHARGE_CONTROLLER = "charge_controller"
+KIND_FNDC = "fndc"
 
 _INVERTER_MODE = {
     0: "off",
@@ -112,6 +113,9 @@ def parse_frame(data: bytes, remote_ip: str) -> list[DeviceUpdate]:
             elif device_type == 3:
                 state = _parse_charge_controller(values)
                 updates.append(DeviceUpdate(mac, KIND_CHARGE_CONTROLLER, index, state))
+            elif device_type == 4:
+                state = _parse_fndc(values)
+                updates.append(DeviceUpdate(mac, KIND_FNDC, index, state))
             else:
                 _LOGGER.debug("Unknown device type %d from %s", device_type, remote_ip)
         except (IndexError, ValueError) as exc:
@@ -215,4 +219,38 @@ def _parse_charge_controller(values: list[str]) -> dict[str, Any]:
         # Amp-hours produced since midnight. Resets daily alongside kwh_today.
         "daily_ah": float(values[12]),
         "charge_mode": _CHARGE_MODE.get(int(values[10]), "unknown"),
+    }
+
+
+def _parse_fndc(values: list[str]) -> dict[str, Any]:
+    """Parse a FlexNet DC (type 4) block.
+
+    Field mapping was reverse-engineered from a live capture against a real
+    FNDC on port 10 and cross-checked against the MATE3's own front-panel
+    display:
+
+        <10,4,0339,0140,0101,11,00662,530,072,000,08,08>
+             ^^^^ ^^^^ ^^^^     ^^^^^ ^^^ ^^^
+             [2]  [3]  [4]      [6]   [7] [8]
+
+    - values[2..4]: Shunt A/B/C current, tenths of an amp (matches the
+      3-shunt labeling convention used elsewhere in the OutBack ecosystem,
+      e.g. shunt_a/shunt_b/shunt_c config keys).
+    - values[7]: battery voltage, tenths of a volt (530 -> 53.0V), consistent
+      with the same convention used by inverter/charge-controller blocks and
+      cross-checked against those devices' own voltage readings.
+    - values[8]: State of Charge, plain integer percent (072 -> 72%).
+      CONFIRMED against the MATE3's own front-panel Battery Status display.
+
+    values[5], values[6], values[9], values[10], values[11] are present in
+    every captured frame but their meaning hasn't been confirmed (they were
+    still settling shortly after a MATE3 power-cycle during capture) -
+    intentionally omitted rather than guessed.
+    """
+    return {
+        "shunt_a_current": float(values[2]) / 10.0,
+        "shunt_b_current": float(values[3]) / 10.0,
+        "shunt_c_current": float(values[4]) / 10.0,
+        "battery_voltage": float(values[7]) / 10.0,
+        "soc": float(values[8]),
     }

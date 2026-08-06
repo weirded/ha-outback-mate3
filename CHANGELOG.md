@@ -3,6 +3,25 @@
 All notable changes to the integration and the companion add-on. The two
 share a single version number.
 
+## Unreleased
+
+**Added**
+
+- **FlexNet DC (FNDC) support.** If your system has an FNDC battery monitor,
+  its State of Charge, battery voltage, and all three shunt currents (A/B/C)
+  are now decoded from the UDP stream and exposed as live sensors, alongside
+  a new `Outback Fndc <n>` device. A convenience `Battery SOC` sensor is also
+  added to the System device, averaging SOC across all FNDCs present. Field
+  mapping was reverse-engineered from a live capture and confirmed against a
+  real MATE3's own front-panel Battery Status display.
+
+**Fixed**
+
+- Re-synced the add-on's bundled copy of the integration with the canonical
+  `custom_components/outback_mate3/` source, which had drifted (a stale
+  `-dev9` version suffix and a minor formatting difference in
+  `sensor_config.py`).
+
 ## 2.1.0 — 2026-07-17
 
 **Fixes**

@@ -10,9 +10,10 @@ from __future__ import annotations
 
 import json
 
-from src.parser import KIND_CHARGE_CONTROLLER, KIND_INVERTER
+from src.parser import KIND_CHARGE_CONTROLLER, KIND_FNDC, KIND_INVERTER
 from src.schema import (
     CHARGE_CONTROLLER_ENTITIES,
+    FNDC_ENTITIES,
     INVERTER_ENTITIES,
     EntitySpec,
     build_live_schema,
@@ -158,11 +159,49 @@ def test_cc_charge_mode_enum_options():
 # --- build_live_schema -----------------------------------------------------
 
 
-def test_build_live_schema_covers_both_device_kinds():
+def test_build_live_schema_covers_all_device_kinds():
     schema = build_live_schema()
-    assert set(schema.keys()) == {KIND_INVERTER, KIND_CHARGE_CONTROLLER}
+    assert set(schema.keys()) == {KIND_INVERTER, KIND_CHARGE_CONTROLLER, KIND_FNDC}
     assert len(schema[KIND_INVERTER]) == len(INVERTER_ENTITIES)
     assert len(schema[KIND_CHARGE_CONTROLLER]) == len(CHARGE_CONTROLLER_ENTITIES)
+    assert len(schema[KIND_FNDC]) == len(FNDC_ENTITIES)
+
+
+# --- FNDC entities -----------------------------------------------------
+
+
+def test_fndc_entities_cover_every_parser_state_key():
+    from src.parser import parse_frame
+
+    payload = b"[AAAAAA-BBBBBB]<10,4,0339,0140,0101,11,00662,530,072,000,08,08>"
+    updates = parse_frame(payload, "192.168.200.9")
+    fndc_state = next(u.state for u in updates if u.kind == KIND_FNDC)
+
+    spec_keys = {spec.key for spec in FNDC_ENTITIES}
+    missing = set(fndc_state.keys()) - spec_keys
+    assert not missing, f"FNDC parser emits keys not in schema: {missing}"
+
+
+def test_fndc_soc_is_battery_device_class_percentage():
+    spec = next(s for s in FNDC_ENTITIES if s.key == "soc")
+    assert spec.device_class == "battery"
+    assert spec.unit == "%"
+    assert spec.state_class == "measurement"
+
+
+def test_fndc_shunt_currents_are_current_measurement():
+    for key in ("shunt_a_current", "shunt_b_current", "shunt_c_current"):
+        spec = next(s for s in FNDC_ENTITIES if s.key == key)
+        assert spec.device_class == "current"
+        assert spec.unit == "A"
+        assert spec.state_class == "measurement"
+
+
+def test_fndc_battery_voltage_is_voltage_measurement():
+    spec = next(s for s in FNDC_ENTITIES if s.key == "battery_voltage")
+    assert spec.device_class == "voltage"
+    assert spec.unit == "V"
+    assert spec.state_class == "measurement"
 
 
 def test_build_live_schema_is_json_serializable():

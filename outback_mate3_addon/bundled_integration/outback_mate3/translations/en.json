@@ -338,8 +338,23 @@
       "battery_ah_capacity": {
         "name": "Battery Ah Capacity"
       },
+      "battery_soc": {
+        "name": "Battery SOC"
+      },
       "battery_voltage": {
         "name": "Battery Voltage"
+      },
+      "shunt_a_current": {
+        "name": "Shunt A Current"
+      },
+      "shunt_b_current": {
+        "name": "Shunt B Current"
+      },
+      "shunt_c_current": {
+        "name": "Shunt C Current"
+      },
+      "soc": {
+        "name": "State of Charge"
       },
       "cc_float_coordination_mode": {
         "name": "CC Float Coordination"

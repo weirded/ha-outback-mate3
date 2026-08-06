@@ -14,6 +14,7 @@ DEFAULT_URL = "ws://local-outback-mate3:28099/ws"
 
 KIND_INVERTER = "inverter"
 KIND_CHARGE_CONTROLLER = "charge_controller"
+KIND_FNDC = "fndc"
 
 # WebSocket connection tuning.
 INITIAL_BACKOFF_S = 1.0
