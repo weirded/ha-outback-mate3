@@ -233,7 +233,8 @@ def test_fndc_block_is_parsed():
     assert updates[0].index == 1
 
     state = updates[0].state
-    _approx(state["shunt_a_current"], 33.9)
+    # status_flags=08 in this capture -> bit 4 set -> Shunt A is negative.
+    _approx(state["shunt_a_current"], -33.9)
     _approx(state["shunt_b_current"], 14.0)
     _approx(state["shunt_c_current"], 10.1)
     _approx(state["battery_voltage"], 53.0)
@@ -265,6 +266,25 @@ def test_fndc_index_increments_independently_of_other_device_types():
     assert len(updates) == 2
     assert [u.index for u in updates] == [1, 2]
     assert all(u.kind == KIND_FNDC for u in updates)
+
+def test_fndc_shunts_all_positive_when_no_sign_bits_set():
+    """status_flags=00: no sign bits set, all three shunts positive."""
+    payload = b"[AAAAAA-BBBBBB]<10,4,0050,0060,0070,00,00000,530,050,000,00,08>"
+    updates = parse_frame(payload, REMOTE_IP)
+    state = updates[0].state
+    _approx(state["shunt_a_current"], 5.0)
+    _approx(state["shunt_b_current"], 6.0)
+    _approx(state["shunt_c_current"], 7.0)
+
+
+def test_fndc_shunt_b_and_c_negative_when_flagged():
+    """status_flags=48 (16+32): bits 5 and 6 set -> Shunt B and C negative."""
+    payload = b"[AAAAAA-BBBBBB]<10,4,0050,0060,0070,00,00000,530,050,000,48,08>"
+    updates = parse_frame(payload, REMOTE_IP)
+    state = updates[0].state
+    _approx(state["shunt_a_current"], 5.0)
+    _approx(state["shunt_b_current"], -6.0)
+    _approx(state["shunt_c_current"], -7.0)
 
 
 def test_device_update_is_immutable():

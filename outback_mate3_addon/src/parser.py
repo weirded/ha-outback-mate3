@@ -225,32 +225,50 @@ def _parse_charge_controller(values: list[str]) -> dict[str, Any]:
 def _parse_fndc(values: list[str]) -> dict[str, Any]:
     """Parse a FlexNet DC (type 4) block.
 
-    Field mapping was reverse-engineered from a live capture against a real
-    FNDC on port 10 and cross-checked against the MATE3's own front-panel
-    display:
+    Field mapping was reverse-engineered from live captures against a real
+    FNDC on port 10, cross-checked against the MATE3's own front-panel
+    display, and confirmed against OutBack's official "Mate Serial
+    Communications Guide" (Rev 4.04, 2008) FLEXnet DC status page spec --
+    the UDP block mirrors that page's field layout 1:1, minus the leading
+    port/type prefix:
 
-        <10,4,0339,0140,0101,11,00662,530,072,000,08,08>
-             ^^^^ ^^^^ ^^^^     ^^^^^ ^^^ ^^^
-             [2]  [3]  [4]      [6]   [7] [8]
+        <10,4,0094,0141,0146,04,00282,533,054,000,08,08>
+             ^^^^ ^^^^ ^^^^          ^^^ ^^^         ^^
+             [2]  [3]  [4]           [7] [8]         [10]
 
-    - values[2..4]: Shunt A/B/C current, tenths of an amp (matches the
-      3-shunt labeling convention used elsewhere in the OutBack ecosystem,
-      e.g. shunt_a/shunt_b/shunt_c config keys).
-    - values[7]: battery voltage, tenths of a volt (530 -> 53.0V), consistent
-      with the same convention used by inverter/charge-controller blocks and
-      cross-checked against those devices' own voltage readings.
-    - values[8]: State of Charge, plain integer percent (072 -> 72%).
-      CONFIRMED against the MATE3's own front-panel Battery Status display.
+    - values[2..4]: Shunt A/B/C current MAGNITUDE, tenths of an amp. Sign is
+      NOT encoded here -- the serial spec confirms shunt currents are always
+      sent unsigned; direction lives entirely in the status-flags byte.
+    - values[7]: battery voltage, tenths of a volt.
+    - values[8]: State of Charge, plain integer percent. CONFIRMED against
+      the MATE3's own front-panel Battery Status display.
+    - values[10]: Status Flags byte (spec pg. 18, Figure 14). Bits 4/5/6
+      (decimal values 8/16/32) mean "Shunt A/B/C values are negative"
+      respectively. CONFIRMED: our own captures consistently show bit 4 set
+      (value 8) exactly when the MATE3's own display shows Channel A as
+      negative, and clear when it doesn't.
 
-    values[5], values[6], values[9], values[10], values[11] are present in
-    every captured frame but their meaning hasn't been confirmed (they were
-    still settling shortly after a MATE3 power-cycle during capture) -
-    intentionally omitted rather than guessed.
+    values[5] (extra data identifier), values[6] (extra data), values[9]
+    (shunt enable flags), and values[11] (battery temperature, spec pg. 18:
+    reported value - 10 = actual Celsius) are documented by the spec but not
+    currently surfaced as entities.
     """
+    shunt_a = float(values[2]) / 10.0
+    shunt_b = float(values[3]) / 10.0
+    shunt_c = float(values[4]) / 10.0
+
+    status_flags = int(values[10])
+    if status_flags & 0x08:  # bit 4: Shunt A values are negative
+        shunt_a = -shunt_a
+    if status_flags & 0x10:  # bit 5: Shunt B values are negative
+        shunt_b = -shunt_b
+    if status_flags & 0x20:  # bit 6: Shunt C values are negative
+        shunt_c = -shunt_c
+
     return {
-        "shunt_a_current": float(values[2]) / 10.0,
-        "shunt_b_current": float(values[3]) / 10.0,
-        "shunt_c_current": float(values[4]) / 10.0,
+        "shunt_a_current": shunt_a,
+        "shunt_b_current": shunt_b,
+        "shunt_c_current": shunt_c,
         "battery_voltage": float(values[7]) / 10.0,
         "soc": float(values[8]),
     }
