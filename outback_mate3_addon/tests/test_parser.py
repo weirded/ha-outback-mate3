@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 from src.parser import (
     KIND_CHARGE_CONTROLLER,
+    KIND_FNDC,
     KIND_INVERTER,
     DeviceUpdate,
     parse_frame,
@@ -217,6 +218,73 @@ def test_240v_ac_factor_doubles_voltage():
 
 
 # --- Object identity ---------------------------------------------------------
+
+
+# --- FlexNet DC (FNDC) value correctness --------------------------------
+
+_FNDC_BLOCK = "10,4,0339,0140,0101,11,00662,530,072,000,08,08"
+
+
+def test_fndc_block_is_parsed():
+    payload = f"[AAAAAA-BBBBBB]<{_FNDC_BLOCK}>".encode()
+    updates = parse_frame(payload, REMOTE_IP)
+    assert len(updates) == 1
+    assert updates[0].kind == KIND_FNDC
+    assert updates[0].index == 1
+
+    state = updates[0].state
+    # status_flags=08 in this capture -> bit 4 set -> Shunt A is negative.
+    _approx(state["shunt_a_current"], -33.9)
+    _approx(state["shunt_b_current"], 14.0)
+    _approx(state["shunt_c_current"], 10.1)
+    _approx(state["battery_voltage"], 53.0)
+    _approx(state["soc"], 72.0)
+
+
+def test_fndc_alongside_inverter_and_charge_controllers():
+    payload = (
+        b"[0090EA-E0C3C6]<01,6,17,00,00,00,117,000,120,09,00,00,00,117,000,121,02,000,01,528,012,000>"
+        b"<08,3,00,30,17,098,151,06,03,000,02,536,0280,00>"
+        b"<09,3,00,23,14,094,150,08,03,000,02,533,0279,00>"
+        b"<" + _FNDC_BLOCK.encode() + b">"
+    )
+    updates = parse_frame(payload, REMOTE_IP)
+    assert len(updates) == 4
+    assert [u.kind for u in updates] == [
+        KIND_INVERTER,
+        KIND_CHARGE_CONTROLLER,
+        KIND_CHARGE_CONTROLLER,
+        KIND_FNDC,
+    ]
+    fndc = next(u for u in updates if u.kind == KIND_FNDC).state
+    _approx(fndc["soc"], 72.0)
+
+
+def test_fndc_index_increments_independently_of_other_device_types():
+    payload = f"[AAAAAA-BBBBBB]<{_FNDC_BLOCK}><{_FNDC_BLOCK}>".encode()
+    updates = parse_frame(payload, REMOTE_IP)
+    assert len(updates) == 2
+    assert [u.index for u in updates] == [1, 2]
+    assert all(u.kind == KIND_FNDC for u in updates)
+
+def test_fndc_shunts_all_positive_when_no_sign_bits_set():
+    """status_flags=00: no sign bits set, all three shunts positive."""
+    payload = b"[AAAAAA-BBBBBB]<10,4,0050,0060,0070,00,00000,530,050,000,00,08>"
+    updates = parse_frame(payload, REMOTE_IP)
+    state = updates[0].state
+    _approx(state["shunt_a_current"], 5.0)
+    _approx(state["shunt_b_current"], 6.0)
+    _approx(state["shunt_c_current"], 7.0)
+
+
+def test_fndc_shunt_b_and_c_negative_when_flagged():
+    """status_flags=48 (16+32): bits 5 and 6 set -> Shunt B and C negative."""
+    payload = b"[AAAAAA-BBBBBB]<10,4,0050,0060,0070,00,00000,530,050,000,48,08>"
+    updates = parse_frame(payload, REMOTE_IP)
+    state = updates[0].state
+    _approx(state["shunt_a_current"], 5.0)
+    _approx(state["shunt_b_current"], -6.0)
+    _approx(state["shunt_c_current"], -7.0)
 
 
 def test_device_update_is_immutable():

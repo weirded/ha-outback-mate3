@@ -34,6 +34,7 @@ from src.parser import (
     _CHARGE_MODE,
     _INVERTER_MODE,
     KIND_CHARGE_CONTROLLER,
+    KIND_FNDC,
     KIND_INVERTER,
 )
 
@@ -53,6 +54,9 @@ _U_V = "V"
 _U_W = "W"
 _U_KWH = "kWh"
 _U_AH = "Ah"
+_U_PCT = "%"
+
+_DC_BATTERY = "battery"
 
 
 @dataclass(frozen=True)
@@ -203,9 +207,25 @@ CHARGE_CONTROLLER_ENTITIES: tuple[EntitySpec, ...] = (
 )
 
 
+FNDC_ENTITIES: tuple[EntitySpec, ...] = (
+    _current("shunt_a_current", "Shunt A Current"),
+    _current("shunt_b_current", "Shunt B Current"),
+    _current("shunt_c_current", "Shunt C Current"),
+    _voltage("battery_voltage", "Battery Voltage"),
+    EntitySpec(
+        "soc",
+        "State of Charge",
+        device_class=_DC_BATTERY,
+        unit=_U_PCT,
+        state_class=_SC_MEASUREMENT,
+    ),
+)
+
+
 def build_live_schema() -> dict[str, list[dict[str, Any]]]:
     """Return the JSON-ready live-entity schema, keyed by device kind."""
     return {
         KIND_INVERTER: [spec.to_dict() for spec in INVERTER_ENTITIES],
         KIND_CHARGE_CONTROLLER: [spec.to_dict() for spec in CHARGE_CONTROLLER_ENTITIES],
+        KIND_FNDC: [spec.to_dict() for spec in FNDC_ENTITIES],
     }

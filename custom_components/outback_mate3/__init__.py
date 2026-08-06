@@ -35,6 +35,7 @@ from .const import (
     ISSUE_PROTOCOL_TOO_NEW,
     ISSUE_VERSION_DRIFT,
     KIND_CHARGE_CONTROLLER,
+    KIND_FNDC,
     KIND_INVERTER,
     MAX_BACKOFF_S,
     PLATFORMS,
@@ -100,7 +101,7 @@ async def async_remove_config_entry_device(
             continue
         if identifier == "system":
             # System device is global and regenerates from any known MAC.
-            return not (mate3.inverters or mate3.charge_controllers)
+            return not (mate3.inverters or mate3.charge_controllers or mate3.fndcs)
         parts = identifier.split("_")
         if len(parts) < 3:
             continue
@@ -117,6 +118,8 @@ async def async_remove_config_entry_device(
             and mac in mate3.charge_controllers
             and index in mate3.charge_controllers[mac]
         ):
+            return False
+        if kind == "fndc" and mac in mate3.fndcs and index in mate3.fndcs[mac]:
             return False
     return True
 
@@ -166,6 +169,7 @@ class OutbackMate3(DataUpdateCoordinator[None]):
         # Per-MAC state dicts that sensor.py reads from directly.
         self.inverters: dict[str, dict[int, dict[str, Any]]] = {}
         self.charge_controllers: dict[str, dict[int, dict[str, Any]]] = {}
+        self.fndcs: dict[str, dict[int, dict[str, Any]]] = {}
         # Per-MAC parsed CONFIG.xml (firmware, nameplate, setpoints).
         self.config_by_mac: dict[str, dict[str, Any]] = {}
 
@@ -296,6 +300,7 @@ class OutbackMate3(DataUpdateCoordinator[None]):
             # re-announce entities HA already knows about.
             self.inverters.clear()
             self.charge_controllers.clear()
+            self.fndcs.clear()
             for device in msg.get("devices", []):
                 self._apply_device(device, emit_discovery=True)
         elif mtype == "device_added":
@@ -458,6 +463,9 @@ class OutbackMate3(DataUpdateCoordinator[None]):
         elif kind == KIND_CHARGE_CONTROLLER:
             self.charge_controllers.setdefault(mac, {})[index] = state
             type_code = 3
+        elif kind == KIND_FNDC:
+            self.fndcs.setdefault(mac, {})[index] = state
+            type_code = 4
         else:
             _LOGGER.debug("Ignoring unknown device kind %r", kind)
             return

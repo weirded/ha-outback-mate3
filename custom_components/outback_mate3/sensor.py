@@ -14,6 +14,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
+    PERCENTAGE,
     UnitOfElectricCurrent,
     UnitOfElectricPotential,
     UnitOfEnergy,
@@ -109,6 +110,19 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> list[Sensor
         )
     )
 
+    # Add battery SOC sensor (sourced from FNDC, if present)
+    entities.append(
+        OutbackSystemSensor(
+            mate3=mate3,
+            mac_address=mac_address,
+            device_id=0,
+            sensor_type="battery_soc",
+            name="Battery SOC",
+            device_class=SensorDeviceClass.BATTERY,
+            unit=PERCENTAGE,
+        )
+    )
+
     # Add energy sensor for solar production
     entities.append(
         OutbackSystemSensor(
@@ -154,6 +168,24 @@ def create_device_entities(mate3: OutbackMate3, mac_address: str) -> list[Sensor
         for spec in cc_specs:
             entities.append(
                 OutbackChargeControllerSensor(
+                    mate3,
+                    mac_address,
+                    device_id,
+                    spec["key"],
+                    spec["name"],
+                    _to_device_class(spec.get("device_class")),
+                    _to_unit(spec.get("unit")),
+                    state_class=_to_state_class(spec.get("state_class")),
+                )
+            )
+
+    # Add FNDC sensors (see note above -- mac may not be in this dict yet).
+    fndc_specs = mate3.entity_schema.get("fndc", [])
+    for device_id, _fndc in mate3.fndcs.get(mac_address, {}).items():
+        _LOGGER.debug("Creating sensors for FNDC %d from MAC %s", device_id, mac_address)
+        for spec in fndc_specs:
+            entities.append(
+                OutbackFndcSensor(
                     mate3,
                     mac_address,
                     device_id,
@@ -307,6 +339,13 @@ class OutbackSystemSensor(OutbackBaseSensor):
                     voltages.append(cc["battery_voltage"])
             if voltages:
                 return float(sum(voltages) / len(voltages))
+        elif self._sensor_type == "battery_soc":
+            socs = []
+            for fndc in self._mate3.fndcs.get(self._mac_address, {}).values():
+                if "soc" in fndc:
+                    socs.append(fndc["soc"])
+            if socs:
+                return float(sum(socs) / len(socs))
         return None
 
     def _get_device_type(self) -> str:
@@ -384,4 +423,39 @@ class OutbackChargeControllerSensor(OutbackBaseSensor):
             and self._device_id in self._mate3.charge_controllers[self._mac_address]
             and self._sensor_type
             in self._mate3.charge_controllers[self._mac_address][self._device_id]
+        )
+
+
+class OutbackFndcSensor(OutbackBaseSensor):
+    """Representation of an Outback FlexNet DC sensor."""
+
+    def _get_device_type(self) -> str:
+        """Get the device type string."""
+        return "fndc"
+
+    @property
+    def native_value(self) -> StateType:
+        """Return the state of the sensor."""
+        if (
+            self._mac_address in self._mate3.fndcs
+            and self._device_id in self._mate3.fndcs[self._mac_address]
+        ):
+            value = self._mate3.fndcs[self._mac_address][self._device_id].get(self._sensor_type)
+            _LOGGER.debug(
+                "FNDC sensor %s for device %d from MAC %s value: %s",
+                self._sensor_type,
+                self._device_id,
+                self._mac_address,
+                value,
+            )
+            return value
+        return None
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return (
+            self._mac_address in self._mate3.fndcs
+            and self._device_id in self._mate3.fndcs[self._mac_address]
+            and self._sensor_type in self._mate3.fndcs[self._mac_address][self._device_id]
         )
